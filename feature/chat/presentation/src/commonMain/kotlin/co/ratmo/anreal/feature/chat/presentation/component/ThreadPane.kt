@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,7 +72,7 @@ internal fun ThreadPane(
         }
         state.historyError != null && state.thread.messages.isEmpty() -> {
             AnrealError(
-                modifier = modifier,
+                modifier = modifier.fillMaxSize(),
                 message = state.historyError.asString(),
                 onRetry = { onAction(ChatAction.OnRetryHistory) },
             )
@@ -219,7 +220,11 @@ private fun ThreadPaneLoadingPreview() {
 @Composable
 private fun ThreadPaneErrorPreview() {
     AnrealPreview {
-        ThreadPane(state = chatErrorPreviewState(), onAction = {})
+        ThreadPane(
+            state = chatErrorPreviewState(),
+            onAction = {},
+            modifier = Modifier.height(480.dp),
+        )
     }
 }
 
@@ -227,7 +232,11 @@ private fun ThreadPaneErrorPreview() {
 @Composable
 private fun ThreadPaneEmptyPreview() {
     AnrealPreview {
-        ThreadPane(state = chatEmptyPreviewState(), onAction = {})
+        ThreadPane(
+            state = chatEmptyPreviewState(),
+            onAction = {},
+            modifier = Modifier.height(480.dp),
+        )
     }
 }
 
