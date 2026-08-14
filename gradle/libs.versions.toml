@@ -22,6 +22,9 @@ kotlinx-serialization = "1.11.0"
 ktor = "3.5.2"
 material3 = "1.11.0-alpha07"
 navigation = "2.9.2"
+ksp = "2.3.11"
+room3 = "3.0.1"
+sqlite = "2.7.0"
 
 [libraries]
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
@@ -74,6 +77,9 @@ materialKolor = { module = "com.materialkolor:material-kolor", version.ref = "ma
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
 icons-material-symbols-rounded = { module = "com.composables:icons-material-symbols-rounded-cmp", version = "2.2.1" }
+androidx-room3-runtime = { module = "androidx.room3:room3-runtime", version.ref = "room3" }
+androidx-room3-compiler = { module = "androidx.room3:room3-compiler", version.ref = "room3" }
+androidx-sqlite-bundled = { module = "androidx.sqlite:sqlite-bundled", version.ref = "sqlite" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -90,3 +96,5 @@ anrealCompose = { id = "anreal.compose" }
 anrealKoin = { id = "anreal.koin" }
 anrealKtor = { id = "anreal.ktor" }
 anrealSerialization = { id = "anreal.serialization" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+androidxRoom3 = { id = "androidx.room3", version.ref = "room3" }

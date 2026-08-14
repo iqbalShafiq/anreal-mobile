@@ -1,0 +1,118 @@
+package co.ratmo.anreal.feature.chat.data
+
+import co.ratmo.anreal.core.data.network.delete
+import co.ratmo.anreal.core.data.network.get
+import co.ratmo.anreal.core.data.network.patch
+import co.ratmo.anreal.core.data.network.post
+import co.ratmo.anreal.core.data.network.postJsonl
+import co.ratmo.anreal.core.domain.model.ChatSession
+import co.ratmo.anreal.core.domain.util.DataError
+import co.ratmo.anreal.core.domain.util.EmptyResult
+import co.ratmo.anreal.core.domain.util.Result
+import co.ratmo.anreal.core.domain.util.asEmptyResult
+import co.ratmo.anreal.core.domain.util.map
+import co.ratmo.anreal.core.domain.util.mapError
+import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import io.ktor.client.HttpClient
+
+class KtorChatRemoteDataSource(
+    private val httpClient: HttpClient,
+) {
+    suspend fun listSessions(): Result<SessionPage, ChatError> {
+        return httpClient.get<SessionListPageDto>(
+            route = "/api/chat/sessions",
+            queryParameters = mapOf("limit" to 50),
+        ).map { page ->
+            SessionPage(items = page.items.map { it.toSession() }, nextCursor = page.nextCursor)
+        }.mapNetwork()
+    }
+
+    suspend fun openDraft(): Result<ChatSession, ChatError> {
+        return httpClient.post<DraftRequestDto, SessionMutationDto>(
+            route = "/api/chat/sessions/draft",
+            body = DraftRequestDto(),
+        ).map { it.toSession() }.mapNetwork()
+    }
+
+    suspend fun renameSession(sessionId: String, title: String): Result<ChatSession, ChatError> {
+        return httpClient.patch<SessionTitleDto, SessionMutationDto>(
+            route = "/api/chat/sessions/$sessionId",
+            body = SessionTitleDto(title = title),
+        ).map { it.toSession() }.mapNetwork()
+    }
+
+    suspend fun deleteSession(sessionId: String): EmptyResult<ChatError> {
+        return httpClient.delete(
+            route = "/api/chat/sessions/$sessionId",
+            queryParameters = mapOf("confirm" to true),
+        ).mapNetwork().asEmptyResult()
+    }
+
+    suspend fun markRead(sessionId: String): EmptyResult<ChatError> {
+        return httpClient.post<MarkReadDto, Unit>(
+            route = "/api/chat/sessions/mark-read",
+            body = MarkReadDto(sessionId = sessionId),
+        ).mapNetwork().asEmptyResult()
+    }
+
+    suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
+        return httpClient.get<List<HistoryMessageDto>>(
+            route = "/api/chat",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { messages -> messages.mapIndexed { index, dto -> dto.toMessage(index) } }
+            .mapNetwork()
+    }
+
+    suspend fun send(
+        sessionId: String,
+        messages: List<ChatMessage>,
+        resume: ResumeDto? = null,
+        onLine: suspend (String) -> Unit,
+    ): EmptyResult<ChatError> {
+        return httpClient.postJsonl(
+            route = "/api/chat",
+            body = ChatRequestDto(
+                sessionId = sessionId,
+                messages = messages.map { it.toHistoryDto() },
+                resume = resume,
+            ),
+            onLine = onLine,
+        ).toChatResult()
+    }
+
+    suspend fun stop(streamId: String): EmptyResult<ChatError> {
+        return httpClient.post<StopRunDto, Unit>(
+            route = "/api/chat/stop",
+            body = StopRunDto(streamId = streamId),
+        ).mapNetwork().asEmptyResult()
+    }
+
+    suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError> {
+        return httpClient.get<RunStatusDto>(
+            route = "/api/chat/run-status",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { dto ->
+            RunStatusSnapshot(
+                streamId = dto.streamId,
+                status = dto.status,
+                lastEventId = dto.lastEventId,
+            )
+        }.mapNetwork()
+    }
+}
+
+private fun <T> Result<T, DataError.Network>.mapNetwork(): Result<T, ChatError> {
+    return mapError { it.toChatError() }
+}
+
+private fun Result<Unit, DataError.Network>.toChatResult(): EmptyResult<ChatError> {
+    return mapError { it.toChatError() }
+}
+
+private fun DataError.Network.toChatError(): ChatError {
+    return if (this == DataError.Network.CONFLICT) ChatError.RunActive
+    else ChatError.Network(this)
+}

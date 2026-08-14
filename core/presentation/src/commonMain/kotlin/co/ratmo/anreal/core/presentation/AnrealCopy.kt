@@ -32,6 +32,16 @@ object AnrealCopy {
     const val ACTION_SHOW_PASSWORD = "action_show_password"
     const val ACTION_HIDE_PASSWORD = "action_hide_password"
     const val STATUS_LOADING = "status_loading"
+    const val ERROR_RUN_ACTIVE = "error_run_active"
+    const val CHAT_EMPTY_TITLE = "chat_empty_title"
+    const val CHAT_EMPTY_BODY = "chat_empty_body"
+    const val CHAT_SESSIONS_EMPTY_TITLE = "chat_sessions_empty_title"
+    const val CHAT_SESSIONS_EMPTY_BODY = "chat_sessions_empty_body"
+    const val ACTION_NEW_CHAT = "action_new_chat"
+    const val ACTION_SEND = "action_send"
+    const val ACTION_STOP = "action_stop"
+    const val ACTION_RESUME = "action_resume"
+    const val COMPOSER_PLACEHOLDER = "composer_placeholder"
 
     fun get(key: String): String {
         return when (key) {
@@ -65,6 +75,16 @@ object AnrealCopy {
             ACTION_SHOW_PASSWORD -> "Show"
             ACTION_HIDE_PASSWORD -> "Hide"
             STATUS_LOADING -> "Loading"
+            ERROR_RUN_ACTIVE -> "This chat is already running. Resume it or wait for it to finish."
+            CHAT_EMPTY_TITLE -> "Ask anything about your documents"
+            CHAT_EMPTY_BODY -> "Upload a PDF or image, then ask questions."
+            CHAT_SESSIONS_EMPTY_TITLE -> "No chats yet"
+            CHAT_SESSIONS_EMPTY_BODY -> "Start a conversation about your documents."
+            ACTION_NEW_CHAT -> "New chat"
+            ACTION_SEND -> "Send"
+            ACTION_STOP -> "Stop"
+            ACTION_RESUME -> "Resume"
+            COMPOSER_PLACEHOLDER -> "Ask a question"
             else -> key
         }
     }

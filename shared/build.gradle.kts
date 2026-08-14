@@ -42,6 +42,7 @@ kotlin {
         implementation(project(":core:presentation"))
         implementation(project(":core:design-system"))
         implementation(project(":feature:auth:presentation"))
+        implementation(project(":feature:chat:presentation"))
         implementation(libs.androidx.navigation.compose)
     }
 }

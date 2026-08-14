@@ -17,5 +17,6 @@ kotlin {
     }
     sourceSets.commonMain.dependencies {
         implementation(project(":core:domain"))
+        implementation(libs.kotlinx.coroutines.core)
     }
 }
