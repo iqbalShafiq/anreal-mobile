@@ -17,5 +17,11 @@ kotlin {
     }
     sourceSets.commonMain.dependencies {
         implementation(project(":core:domain"))
+        implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.koin.core)
+    }
+    sourceSets.commonTest.dependencies {
+        implementation(libs.kotlinx.coroutines.test)
+        implementation(libs.ktor.client.mock)
     }
 }
