@@ -56,4 +56,29 @@ class ResultTest {
 
         assertThat(empty).isEqualTo(Result.Success(Unit))
     }
+
+    @Test
+    fun mapError_transforms_error() {
+        val mapped = Result.Error(SampleError.TOO_SHORT).mapError { OtherError.BAD }
+
+        assertThat(mapped).isEqualTo(Result.Error(OtherError.BAD))
+    }
+
+    @Test
+    fun mapError_preserves_success() {
+        val mapped = Result.Success(3).mapError { OtherError.BAD }
+
+        assertThat(mapped).isEqualTo(Result.Success(3))
+    }
+
+    @Test
+    fun errorOrNull_returns_error_only() {
+        assertThat(Result.Error(SampleError.TOO_SHORT).errorOrNull())
+            .isEqualTo(SampleError.TOO_SHORT)
+        assertThat(Result.Success(1).errorOrNull()).isEqualTo(null)
+    }
+
+    private enum class OtherError : Error {
+        BAD,
+    }
 }

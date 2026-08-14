@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.anrealAndroidLibrary)
     alias(libs.plugins.anrealCompose)
+    alias(libs.plugins.anrealSerialization)
 }
 
 kotlin {
@@ -40,6 +41,8 @@ kotlin {
         implementation(project(":core:domain"))
         implementation(project(":core:presentation"))
         implementation(project(":core:design-system"))
+        implementation(project(":feature:auth:presentation"))
+        implementation(libs.androidx.navigation.compose)
     }
 }
 

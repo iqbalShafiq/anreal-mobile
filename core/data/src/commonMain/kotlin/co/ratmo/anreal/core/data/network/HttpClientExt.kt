@@ -7,6 +7,8 @@ import io.ktor.client.call.body
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.request.get as ktorGet
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post as ktorPost
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.isSuccess
 import io.ktor.util.network.UnresolvedAddressException
@@ -23,6 +25,25 @@ suspend inline fun <reified Response : Any> HttpClient.get(
                 if (value != null) parameter(key, value)
             }
         }
+    }
+}
+
+suspend inline fun <reified Request : Any, reified Response : Any> HttpClient.post(
+    route: String,
+    body: Request,
+): Result<Response, DataError.Network> {
+    return safeCall {
+        ktorPost(urlString = route) {
+            setBody(body)
+        }
+    }
+}
+
+suspend inline fun HttpClient.post(
+    route: String,
+): Result<Unit, DataError.Network> {
+    return safeCall {
+        ktorPost(urlString = route) {}
     }
 }
 
@@ -51,7 +72,11 @@ suspend inline fun <reified T> responseToResult(
 ): Result<T, DataError.Network> {
     if (response.status.isSuccess()) {
         return try {
-            Result.Success(response.body())
+            if (Unit is T) {
+                Result.Success(Unit)
+            } else {
+                Result.Success(response.body())
+            }
         } catch (exception: SerializationException) {
             Result.Error(DataError.Network.SERIALIZATION)
         }

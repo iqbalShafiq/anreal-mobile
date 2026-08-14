@@ -18,6 +18,22 @@ inline fun <T, E : Error, R> Result<T, E>.map(
     }
 }
 
+inline fun <T, E : Error, F : Error> Result<T, E>.mapError(
+    map: (E) -> F,
+): Result<T, F> {
+    return when (this) {
+        is Result.Error -> Result.Error(map(error))
+        is Result.Success -> Result.Success(data)
+    }
+}
+
+fun <T, E : Error> Result<T, E>.errorOrNull(): E? {
+    return when (this) {
+        is Result.Error -> error
+        is Result.Success -> null
+    }
+}
+
 inline fun <T, E : Error> Result<T, E>.onSuccess(
     action: (T) -> Unit,
 ): Result<T, E> {

@@ -5,6 +5,8 @@ plugins {
 dependencies {
     implementation(project(":shared"))
     implementation(project(":core:data"))
+    implementation(project(":feature:auth:data"))
+    implementation(project(":feature:auth:presentation"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)

@@ -1,16 +1,14 @@
 package co.ratmo.anreal.core.designsystem.component
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
+import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 
 @Composable
@@ -21,12 +19,9 @@ fun AnrealEmpty(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(AnrealSpacing.lg),
-        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
-        horizontalAlignment = Alignment.CenterHorizontally,
+    AnrealCenteredColumn(
+        modifier = modifier.padding(AnrealSpacing.lg),
+        spacing = AnrealSpacing.sm,
     ) {
         Text(
             text = title,
@@ -45,5 +40,29 @@ fun AnrealEmpty(
                 Text(actionLabel)
             }
         }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AnrealEmptyWithActionPreview() {
+    AnrealPreview {
+        AnrealEmpty(
+            title = "Ask anything about your documents",
+            body = "Upload a PDF or image, then ask questions.",
+            actionLabel = "Upload",
+            onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AnrealEmptyWithoutActionPreview() {
+    AnrealPreview {
+        AnrealEmpty(
+            title = "No chats yet",
+            body = "Start a conversation about your documents.",
+        )
     }
 }
