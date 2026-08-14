@@ -19,9 +19,15 @@ kotlin {
         implementation(project(":core:domain"))
         implementation(libs.kotlinx.coroutines.core)
         implementation(libs.koin.core)
+        implementation(libs.androidx.datastore.preferences.core)
+    }
+    sourceSets.androidMain.dependencies {
+        implementation(libs.koin.android)
+        implementation(libs.tink.android)
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)
         implementation(libs.ktor.client.mock)
+        implementation(libs.turbine)
     }
 }

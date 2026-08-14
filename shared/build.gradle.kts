@@ -41,9 +41,12 @@ kotlin {
         implementation(project(":core:domain"))
         implementation(project(":core:presentation"))
         implementation(project(":core:design-system"))
+        implementation(project(":feature:auth:domain"))
         implementation(project(":feature:auth:presentation"))
         implementation(project(":feature:chat:presentation"))
         implementation(libs.androidx.navigation.compose)
+        implementation(libs.koin.compose)
+        implementation(libs.koin.compose.viewmodel)
     }
 }
 

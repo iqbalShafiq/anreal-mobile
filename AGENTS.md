@@ -56,7 +56,7 @@ A concern becomes its own `:core:*` module only when it has a non-trivial API. O
 |---|---|
 | DI | Koin (`singleOf` / `viewModelOf`) |
 | HTTP | Ktor Client + KotlinX Serialization |
-| Prefs | DataStore; encrypted store for the session token (Android) |
+| Prefs | DataStore Preferences 1.2.1; `DataStoreSessionTokenStore` + Tink AEAD / Android Keystore for the session cookie. Not `security-crypto`. iOS Keychain is a TODO stub. |
 | Nav | Type-safe Navigation Compose (`@Serializable` routes) |
 | Images | Coil 3 |
 | Logging | Kermit |

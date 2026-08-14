@@ -2,6 +2,7 @@ package co.ratmo.anreal.core.data.network
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isNull
 import co.ratmo.anreal.core.data.auth.InMemorySessionTokenStore
 import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.Result
@@ -47,5 +48,26 @@ class SafeCallTest {
 
         val denied = client.get<Envelope>(route = "/nope")
         assertThat(denied).isEqualTo(Result.Error(DataError.Network.UNAUTHORIZED))
+    }
+
+    @Test
+    fun unauthorized_clears_the_session_token() = runTest {
+        val store = InMemorySessionTokenStore()
+        store.save("stale.token")
+        val engine = MockEngine {
+            respond(
+                content = """{"error":"no"}""",
+                status = HttpStatusCode.Unauthorized,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val client = HttpClientFactory.create(
+            engine = engine,
+            tokenStore = store,
+            baseUrl = "http://127.0.0.1:3001",
+        )
+
+        client.get<Envelope>(route = "/nope")
+        assertThat(store.token()).isNull()
     }
 }

@@ -24,5 +24,6 @@ kotlin {
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)
         implementation(libs.ktor.client.mock)
+        implementation(libs.turbine)
     }
 }

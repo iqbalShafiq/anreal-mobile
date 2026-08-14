@@ -13,6 +13,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.plugins.plugin
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
@@ -46,8 +47,12 @@ object HttpClientFactory {
                     request.headers.append(HttpHeaders.Cookie, sessionCookieHeader(token))
                 }
                 val call = execute(request)
-                parseSessionToken(call.response.headers.getAll(HttpHeaders.SetCookie).orEmpty())
-                    ?.let { tokenStore.save(it) }
+                if (call.response.status == HttpStatusCode.Unauthorized) {
+                    tokenStore.clear()
+                } else {
+                    parseSessionToken(call.response.headers.getAll(HttpHeaders.SetCookie).orEmpty())
+                        ?.let { tokenStore.save(it) }
+                }
                 call
             }
         }
