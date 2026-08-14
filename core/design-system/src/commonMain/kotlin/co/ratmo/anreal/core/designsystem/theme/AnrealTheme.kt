@@ -22,7 +22,7 @@ fun AnrealTheme(
         null
     }
     val brandScheme = rememberDynamicColorScheme(
-        primary = Color(AnrealBrand.seedArgb),
+        seedColor = Color(AnrealBrand.seedArgb),
         isDark = darkTheme,
         isAmoled = false,
         style = PaletteStyle.Expressive,
