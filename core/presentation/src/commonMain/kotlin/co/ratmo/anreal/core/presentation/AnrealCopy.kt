@@ -47,6 +47,18 @@ object AnrealCopy {
     const val LABEL_UNREAD = "label_unread"
     const val DIALOG_RUN_ACTIVE_TITLE = "dialog_run_active_title"
     const val ACTION_WAIT = "action_wait"
+    const val ACTION_RENAME = "action_rename"
+    const val ACTION_DELETE = "action_delete"
+    const val ACTION_DELETING = "action_deleting"
+    const val ACTION_CANCEL = "action_cancel"
+    const val DIALOG_RENAME_TITLE = "dialog_rename_title"
+    const val DIALOG_DELETE_TITLE = "dialog_delete_title"
+    const val DIALOG_DELETE_BODY = "dialog_delete_body"
+    const val DIALOG_DELETE_BODY_RUNNING = "dialog_delete_body_running"
+    const val TOAST_CHAT_DELETED = "toast_chat_deleted"
+    const val CD_SESSION_MENU = "cd_session_menu"
+    const val ERROR_TITLE_REQUIRED = "error_title_required"
+    const val LABEL_SESSION_TITLE = "label_session_title"
 
     fun get(key: String): String {
         return when (key) {
@@ -95,6 +107,18 @@ object AnrealCopy {
             LABEL_UNREAD -> "Unread"
             DIALOG_RUN_ACTIVE_TITLE -> "Chat already running"
             ACTION_WAIT -> "Wait"
+            ACTION_RENAME -> "Rename"
+            ACTION_DELETE -> "Delete"
+            ACTION_DELETING -> "Deleting…"
+            ACTION_CANCEL -> "Cancel"
+            DIALOG_RENAME_TITLE -> "Rename chat"
+            DIALOG_DELETE_TITLE -> "Delete chat"
+            DIALOG_DELETE_BODY -> "This removes the conversation. Documents and preferences are not affected."
+            DIALOG_DELETE_BODY_RUNNING -> "The running reply will stop."
+            TOAST_CHAT_DELETED -> "Chat deleted"
+            CD_SESSION_MENU -> "Chat actions"
+            ERROR_TITLE_REQUIRED -> "Enter a name for this chat."
+            LABEL_SESSION_TITLE -> "Name"
             else -> key
         }
     }

@@ -106,3 +106,12 @@ internal fun chatStreamingPreviewState(): ChatState = chatPopulatedPreviewState(
 internal fun chatConflictPreviewState(): ChatState = chatPopulatedPreviewState(
     runActiveConflict = true,
 )
+
+internal fun chatRenamePreviewState(): ChatState = chatPopulatedPreviewState().copy(
+    renameSessionId = previewUnreadSession.id,
+    renameDraft = previewUnreadSession.title,
+)
+
+internal fun chatDeletePreviewState(): ChatState = chatPopulatedPreviewState().copy(
+    deleteSessionId = previewUnreadSession.id,
+)

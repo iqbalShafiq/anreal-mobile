@@ -45,14 +45,24 @@ data class ChatState(
     val draft: String = "",
     val isSending: Boolean = false,
     val runActiveConflict: Boolean = false,
+    val renameSessionId: String? = null,
+    val renameDraft: String = "",
+    val renameError: UiText? = null,
+    val deleteSessionId: String? = null,
+    val deleteError: UiText? = null,
+    val sessionBusy: Boolean = false,
 )
 
 sealed interface ChatAction {
     data object OnRefreshSessions : ChatAction
     data object OnNewChat : ChatAction
     data class OnSessionClick(val sessionId: String) : ChatAction
-    data class OnRenameSession(val sessionId: String, val title: String) : ChatAction
-    data class OnDeleteSession(val sessionId: String) : ChatAction
+    data class OnSessionMenuRename(val sessionId: String) : ChatAction
+    data class OnSessionMenuDelete(val sessionId: String) : ChatAction
+    data class OnRenameDraftChange(val draft: String) : ChatAction
+    data object OnConfirmRename : ChatAction
+    data object OnConfirmDelete : ChatAction
+    data object OnDismissSessionDialog : ChatAction
     data class OnDraftChange(val draft: String) : ChatAction
     data object OnSend : ChatAction
     data object OnStop : ChatAction
@@ -95,15 +105,14 @@ class ChatViewModel(
             ChatAction.OnRefreshSessions -> viewModelScope.launch { refreshSessions() }
             ChatAction.OnNewChat -> viewModelScope.launch { openDraft() }
             is ChatAction.OnSessionClick -> viewModelScope.launch { selectSession(action.sessionId) }
-            is ChatAction.OnRenameSession -> viewModelScope.launch {
-                chatRepository.renameSession(action.sessionId, action.title)
+            is ChatAction.OnSessionMenuRename -> openRename(action.sessionId)
+            is ChatAction.OnSessionMenuDelete -> openDelete(action.sessionId)
+            is ChatAction.OnRenameDraftChange -> _state.update {
+                it.copy(renameDraft = action.draft.take(SESSION_TITLE_MAX), renameError = null)
             }
-            is ChatAction.OnDeleteSession -> viewModelScope.launch {
-                chatRepository.deleteSession(action.sessionId)
-                if (_state.value.selectedSessionId == action.sessionId) {
-                    openDraft()
-                }
-            }
+            ChatAction.OnConfirmRename -> viewModelScope.launch { confirmRename() }
+            ChatAction.OnConfirmDelete -> viewModelScope.launch { confirmDelete() }
+            ChatAction.OnDismissSessionDialog -> dismissSessionDialog()
             is ChatAction.OnDraftChange -> {
                 savedStateHandle[DRAFT_KEY] = action.draft
                 _state.update { it.copy(draft = action.draft) }
@@ -147,6 +156,81 @@ class ChatViewModel(
                 }
             }
         return page
+    }
+
+    private fun openRename(sessionId: String) {
+        val title = _state.value.sessions.firstOrNull { it.id == sessionId }?.title.orEmpty()
+        _state.update {
+            it.copy(
+                renameSessionId = sessionId,
+                renameDraft = title.take(SESSION_TITLE_MAX),
+                renameError = null,
+                deleteSessionId = null,
+                deleteError = null,
+            )
+        }
+    }
+
+    private fun openDelete(sessionId: String) {
+        _state.update {
+            it.copy(
+                deleteSessionId = sessionId,
+                deleteError = null,
+                renameSessionId = null,
+                renameError = null,
+            )
+        }
+    }
+
+    private fun dismissSessionDialog() {
+        _state.update {
+            it.copy(
+                renameSessionId = null,
+                renameDraft = "",
+                renameError = null,
+                deleteSessionId = null,
+                deleteError = null,
+                sessionBusy = false,
+            )
+        }
+    }
+
+    private suspend fun confirmRename() {
+        val sessionId = _state.value.renameSessionId ?: return
+        val title = normalizeSessionTitle(_state.value.renameDraft)
+        if (title.isEmpty()) {
+            _state.update {
+                it.copy(renameError = UiText.StringResource(AnrealCopy.ERROR_TITLE_REQUIRED))
+            }
+            return
+        }
+        _state.update { it.copy(sessionBusy = true, renameError = null) }
+        chatRepository.renameSession(sessionId, title)
+            .onSuccess { dismissSessionDialog() }
+            .onFailure { error ->
+                _state.update {
+                    it.copy(sessionBusy = false, renameError = error.toUiText())
+                }
+            }
+    }
+
+    private suspend fun confirmDelete() {
+        val sessionId = _state.value.deleteSessionId ?: return
+        _state.update { it.copy(sessionBusy = true, deleteError = null) }
+        chatRepository.deleteSession(sessionId)
+            .onSuccess {
+                val selected = _state.value.selectedSessionId
+                dismissSessionDialog()
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_CHAT_DELETED)))
+                if (selected == sessionId) {
+                    openDraft()
+                }
+            }
+            .onFailure { error ->
+                _state.update {
+                    it.copy(sessionBusy = false, deleteError = error.toUiText())
+                }
+            }
     }
 
     private suspend fun openDraft() {
@@ -269,8 +353,15 @@ class ChatViewModel(
     private companion object {
         const val SESSION_KEY = "sessionId"
         const val DRAFT_KEY = "draft"
+        const val SESSION_TITLE_MAX = 48
     }
 }
+
+internal fun normalizeSessionTitle(raw: String): String {
+    return raw.trim().replace(WHITESPACE, " ").take(48)
+}
+
+private val WHITESPACE = Regex("\\s+")
 
 private fun ChatSession.toUi(): ChatSessionUi = ChatSessionUi(
     id = id,

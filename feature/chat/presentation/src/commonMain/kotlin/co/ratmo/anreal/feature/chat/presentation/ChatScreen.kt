@@ -1,5 +1,6 @@
 package co.ratmo.anreal.feature.chat.presentation
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,20 +11,27 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
+import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
+import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
+import co.ratmo.anreal.feature.chat.presentation.component.RenameSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RunActiveDialog
 import co.ratmo.anreal.feature.chat.presentation.component.SessionDrawer
 import co.ratmo.anreal.feature.chat.presentation.component.ThreadPane
@@ -32,6 +40,8 @@ import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatDeletePreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatRenamePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatStreamingPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
@@ -44,8 +54,22 @@ fun ChatRoot(
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ObserveAsEvents(viewModel.events) { }
-    ChatScreen(state = state, onAction = viewModel::onAction)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarScope = rememberCoroutineScope()
+    ObserveAsEvents(viewModel.events) { event ->
+        when (event) {
+            is ChatEvent.ShowMessage -> snackbarScope.launch {
+                snackbarHostState.showSnackbar(event.message.asString())
+            }
+        }
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        ChatScreen(state = state, onAction = viewModel::onAction)
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,6 +141,12 @@ fun ChatScreen(
     if (state.runActiveConflict) {
         RunActiveDialog(onAction = onAction)
     }
+    if (state.renameSessionId != null) {
+        RenameSessionDialog(state = state, onAction = onAction)
+    }
+    if (state.deleteSessionId != null) {
+        DeleteSessionDialog(state = state, onAction = onAction)
+    }
 }
 
 @AnrealPreviews
@@ -164,5 +194,21 @@ private fun ChatStreamingPreview() {
 private fun ChatConflictPreview() {
     AnrealPreview {
         ChatScreen(state = chatConflictPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatRenamePreview() {
+    AnrealPreview {
+        ChatScreen(state = chatRenamePreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatDeletePreview() {
+    AnrealPreview {
+        ChatScreen(state = chatDeletePreviewState(), onAction = {})
     }
 }

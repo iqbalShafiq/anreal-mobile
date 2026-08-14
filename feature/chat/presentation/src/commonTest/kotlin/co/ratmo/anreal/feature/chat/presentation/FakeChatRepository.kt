@@ -18,6 +18,10 @@ class FakeChatRepository : ChatRepository {
     var history: Result<List<ChatMessage>, ChatError> = Result.Success(emptyList())
     var sendResult: EmptyResult<ChatError> = Result.Success(Unit)
     var sentText: String? = null
+    var lastRenamed: Pair<String, String>? = null
+    var lastDeleted: String? = null
+    var renameResult: Result<ChatSession, ChatError>? = null
+    var deleteResult: EmptyResult<ChatError> = Result.Success(Unit)
     var runStatus: Result<RunStatusSnapshot, ChatError> = Result.Success(
         RunStatusSnapshot(streamId = null, status = "idle", lastEventId = null),
     )
@@ -38,14 +42,19 @@ class FakeChatRepository : ChatRepository {
     }
 
     override suspend fun renameSession(sessionId: String, title: String): Result<ChatSession, ChatError> {
+        lastRenamed = sessionId to title
+        val forced = renameResult
+        if (forced is Result.Error) return forced
         val updated = ChatSession(id = sessionId, title = title, updatedAt = "now")
         sessions.value = sessions.value.map { if (it.id == sessionId) updated else it }
         return Result.Success(updated)
     }
 
     override suspend fun deleteSession(sessionId: String): EmptyResult<ChatError> {
+        lastDeleted = sessionId
+        if (deleteResult is Result.Error) return deleteResult
         sessions.value = sessions.value.filterNot { it.id == sessionId }
-        return Result.Success(Unit)
+        return deleteResult
     }
 
     override suspend fun markRead(sessionId: String): EmptyResult<ChatError> = Result.Success(Unit)
