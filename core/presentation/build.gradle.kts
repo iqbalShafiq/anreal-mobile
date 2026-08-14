@@ -7,7 +7,7 @@ plugins {
 
 kotlin {
     android {
-        namespace = "co.ratmo.anreal.shared"
+        namespace = "co.ratmo.anreal.core.presentation"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
         compilerOptions {
@@ -19,30 +19,9 @@ kotlin {
         withHostTest {
             isIncludeAndroidResources = true
         }
-        withDeviceTestBuilder {
-            sourceSetTreeName = "test"
-        }.configure {
-            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        }
     }
-
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "Shared"
-            isStatic = true
-        }
-    }
-
     sourceSets.commonMain.dependencies {
         implementation(project(":core:domain"))
-        implementation(project(":core:presentation"))
         implementation(project(":core:design-system"))
     }
-}
-
-dependencies {
-    androidRuntimeClasspath(libs.compose.uiTooling)
 }

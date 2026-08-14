@@ -1,6 +1,7 @@
 rootProject.name = "anreal-mobile"
 
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
             mavenContent {
@@ -27,5 +28,9 @@ dependencyResolutionManagement {
     }
 }
 
-include(":androidApp")
+include(":app")
 include(":shared")
+include(":core:domain")
+include(":core:data")
+include(":core:presentation")
+include(":core:design-system")
