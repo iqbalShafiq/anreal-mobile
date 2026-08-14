@@ -1,16 +1,25 @@
 package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
+import co.ratmo.anreal.core.designsystem.component.GlassSurface
+import co.ratmo.anreal.core.designsystem.component.GlassTone
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -20,7 +29,7 @@ import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
-import com.composables.icons.materialsymbols.rounded.Send
+import com.composables.icons.materialsymbols.rounded.Arrow_upward
 import com.composables.icons.materialsymbols.rounded.South_west
 import com.composables.icons.materialsymbols.rounded.Stop
 
@@ -30,48 +39,93 @@ internal fun ComposerBar(
     onAction: (ChatAction) -> Unit,
 ) {
     val streaming = state.isSending || state.thread.status == RunStatus.Streaming
-    Row(
+    val canSubmit = state.draft.isNotBlank()
+    GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(AnrealSpacing.md),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+        tone = GlassTone.Thin,
+        emphasized = canSubmit || streaming,
     ) {
-        OutlinedTextField(
-            value = state.draft,
-            onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER)) },
-            singleLine = false,
-            maxLines = 4,
-        )
-        when {
-            streaming && state.draft.isBlank() -> {
-                FilledIconButton(onClick = { onAction(ChatAction.OnStop) }) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Stop,
-                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_STOP),
-                    )
-                }
+        Column(
+            modifier = Modifier.padding(
+                start = AnrealSpacing.md,
+                end = AnrealSpacing.sm,
+                top = AnrealSpacing.md,
+                bottom = AnrealSpacing.sm,
+            ),
+            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+        ) {
+            MessageQueueDock(state = state, onAction = onAction)
+            AnrealComposerField(
+                value = state.draft,
+                onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
+                placeholder = AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER),
+                onSubmit = { onAction(ChatAction.OnSend) },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Spacer(modifier = Modifier.weight(1f))
+                ComposerSubmitButton(
+                    streaming = streaming,
+                    canSubmit = canSubmit,
+                    onAction = onAction,
+                )
             }
-            streaming -> {
-                FilledIconButton(onClick = { onAction(ChatAction.OnSend) }) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.South_west,
-                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_QUEUE),
-                    )
-                }
+        }
+    }
+}
+
+@Composable
+private fun ComposerSubmitButton(
+    streaming: Boolean,
+    canSubmit: Boolean,
+    onAction: (ChatAction) -> Unit,
+) {
+    val colors = IconButtonDefaults.filledIconButtonColors()
+    when {
+        streaming && !canSubmit -> {
+            FilledIconButton(
+                onClick = { onAction(ChatAction.OnStop) },
+                modifier = Modifier.size(AnrealSpacing.touch),
+                shape = CircleShape,
+                colors = colors,
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.Stop,
+                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_STOP),
+                )
             }
-            else -> {
-                FilledIconButton(
-                    onClick = { onAction(ChatAction.OnSend) },
-                    enabled = state.draft.isNotBlank(),
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Send,
-                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_SEND),
-                    )
-                }
+        }
+        streaming -> {
+            FilledIconButton(
+                onClick = { onAction(ChatAction.OnSend) },
+                modifier = Modifier.size(AnrealSpacing.touch),
+                shape = CircleShape,
+                colors = colors,
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.South_west,
+                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_QUEUE),
+                )
+            }
+        }
+        else -> {
+            FilledIconButton(
+                onClick = { onAction(ChatAction.OnSend) },
+                modifier = Modifier.size(AnrealSpacing.touch),
+                enabled = canSubmit,
+                shape = CircleShape,
+                colors = colors,
+            ) {
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.Arrow_upward,
+                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_SEND),
+                )
             }
         }
     }

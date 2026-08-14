@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
@@ -138,10 +139,12 @@ internal fun SessionRow(
         modifier = Modifier.clickable(onClick = onClick),
         colors = if (selected) {
             ListItemDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f),
             )
         } else {
-            ListItemDefaults.colors()
+            ListItemDefaults.colors(
+                containerColor = Color.Transparent,
+            )
         },
     )
 }

@@ -56,13 +56,8 @@ fun AnrealTextField(
             keyboardOptions = keyboardOptions,
             keyboardActions = keyboardActions,
             singleLine = true,
-            shape = MaterialTheme.shapes.large,
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                errorContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
+            shape = MaterialTheme.shapes.extraLarge,
+            colors = anrealFieldColors(),
         )
         if (error != null) {
             Text(
@@ -73,6 +68,21 @@ fun AnrealTextField(
         }
     }
 }
+
+@Composable
+internal fun anrealFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    errorContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f),
+    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+    errorBorderColor = MaterialTheme.colorScheme.error,
+    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+)
 
 @AnrealPreviews
 @Composable

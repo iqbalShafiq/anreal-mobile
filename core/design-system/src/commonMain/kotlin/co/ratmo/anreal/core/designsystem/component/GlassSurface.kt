@@ -1,6 +1,7 @@
 package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +28,12 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 
+enum class GlassTone {
+    Thin,
+    Regular,
+    Pane,
+}
+
 @Composable
 fun HazeBackdrop(
     hazeState: HazeState,
@@ -42,15 +49,42 @@ fun HazeBackdrop(
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun GlassSurface(
-    hazeState: HazeState,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.large,
+    hazeState: HazeState? = LocalAnrealHazeState.current,
+    shape: Shape = MaterialTheme.shapes.extraLarge,
+    tone: GlassTone = GlassTone.Thin,
+    emphasized: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val style = when (tone) {
+        GlassTone.Thin -> HazeMaterials.thin()
+        GlassTone.Regular -> HazeMaterials.regular()
+        GlassTone.Pane -> HazeMaterials.thin()
+    }
+    val tint = scheme.surface.copy(
+        alpha = when (tone) {
+            GlassTone.Thin -> 0.58f
+            GlassTone.Regular -> 0.78f
+            GlassTone.Pane -> 0.70f
+        },
+    )
+    val border = if (emphasized) {
+        scheme.primary.copy(alpha = 0.38f)
+    } else {
+        scheme.outlineVariant.copy(alpha = 0.45f)
+    }
+    val frost = if (hazeState != null) {
+        Modifier.hazeEffect(state = hazeState, style = style)
+    } else {
+        Modifier
+    }
     Surface(
-        modifier = modifier.hazeEffect(state = hazeState, style = HazeMaterials.thin()),
+        modifier = modifier
+            .then(frost)
+            .border(width = 1.dp, color = border, shape = shape),
         shape = shape,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.62f),
+        color = if (hazeState != null) tint else scheme.surfaceContainer,
         content = content,
     )
 }
@@ -83,6 +117,7 @@ private fun GlassSurfacePreview() {
             }
             GlassSurface(
                 hazeState = hazeState,
+                emphasized = true,
                 modifier = Modifier
                     .align(Alignment.Center)
                     .padding(AnrealSpacing.lg)

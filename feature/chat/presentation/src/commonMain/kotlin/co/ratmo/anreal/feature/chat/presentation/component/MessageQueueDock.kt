@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,52 +37,45 @@ internal fun MessageQueueDock(
                     AnrealCopy.LABEL_QUEUED_COUNT,
                     listOf(state.queue.size.toString()),
                 ).asString(),
+                style = MaterialTheme.typography.labelLarge,
             )
         }
         return
     }
     val visible = if (state.queueExpanded) state.queue else state.queue.take(1)
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AnrealSpacing.md),
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
-        Column(modifier = Modifier.padding(AnrealSpacing.sm)) {
-            visible.forEach { item ->
-                QueueChip(
-                    item = item,
-                    onRecall = { onAction(ChatAction.OnRecallQueued(item.id)) },
-                    onRemove = { onAction(ChatAction.OnRemoveQueued(item.id)) },
-                    onCancelEdit = { onAction(ChatAction.OnCancelQueueEdit) },
-                )
+    Column(verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs)) {
+        visible.forEach { item ->
+            QueueChip(
+                item = item,
+                onRecall = { onAction(ChatAction.OnRecallQueued(item.id)) },
+                onRemove = { onAction(ChatAction.OnRemoveQueued(item.id)) },
+                onCancelEdit = { onAction(ChatAction.OnCancelQueueEdit) },
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (state.queue.size > 1) {
+                TextButton(onClick = { onAction(ChatAction.OnToggleQueueExpanded) }) {
+                    Text(
+                        if (state.queueExpanded) {
+                            AnrealCopy.get(AnrealCopy.CD_HIDE_QUEUE)
+                        } else {
+                            AnrealCopy.get(AnrealCopy.CD_EXPAND_QUEUE)
+                        },
+                    )
+                }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (state.queue.size > 1) {
-                    TextButton(onClick = { onAction(ChatAction.OnToggleQueueExpanded) }) {
-                        Text(
-                            if (state.queueExpanded) {
-                                AnrealCopy.get(AnrealCopy.CD_HIDE_QUEUE)
-                            } else {
-                                AnrealCopy.get(AnrealCopy.CD_EXPAND_QUEUE)
-                            },
-                        )
+            Row {
+                if (state.queue.any { it.status == QueueStatus.Pending }) {
+                    TextButton(onClick = { onAction(ChatAction.OnSendNow) }) {
+                        Text(AnrealCopy.get(AnrealCopy.ACTION_SEND_NOW))
                     }
                 }
-                Row {
-                    if (state.queue.any { it.status == QueueStatus.Pending }) {
-                        TextButton(onClick = { onAction(ChatAction.OnSendNow) }) {
-                            Text(AnrealCopy.get(AnrealCopy.ACTION_SEND_NOW))
-                        }
-                    }
-                    TextButton(onClick = { onAction(ChatAction.OnHideQueue) }) {
-                        Text(AnrealCopy.get(AnrealCopy.CD_HIDE_QUEUE))
-                    }
+                TextButton(onClick = { onAction(ChatAction.OnHideQueue) }) {
+                    Text(AnrealCopy.get(AnrealCopy.CD_HIDE_QUEUE))
                 }
             }
         }
@@ -101,7 +93,7 @@ private fun QueueChip(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onRecall)
-            .padding(vertical = AnrealSpacing.xs),
+            .padding(vertical = AnrealSpacing.xxs),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -109,6 +101,7 @@ private fun QueueChip(
             Text(
                 text = item.text,
                 style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
