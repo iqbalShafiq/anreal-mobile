@@ -59,6 +59,19 @@ object AnrealCopy {
     const val CD_SESSION_MENU = "cd_session_menu"
     const val ERROR_TITLE_REQUIRED = "error_title_required"
     const val LABEL_SESSION_TITLE = "label_session_title"
+    const val TOOL_STATUS_WORKING = "tool_status_working"
+    const val TOOL_STATUS_DONE = "tool_status_done"
+    const val TOOL_STATUS_ERROR = "tool_status_error"
+    const val TOOL_RUNNING_FALLBACK = "tool_running_fallback"
+    const val TOOL_FIND_DOCUMENTS = "tool_find_documents"
+    const val TOOL_SEARCH_DOCUMENT_PAGES = "tool_search_document_pages"
+    const val TOOL_GET_DOCUMENT_NEXT_PAGE = "tool_get_document_next_page"
+    const val TOOL_WEB_SEARCH = "tool_web_search"
+    const val TOOL_WEB_FETCH = "tool_web_fetch"
+    const val TOOL_GENERATE_IMAGE = "tool_generate_image"
+    const val TOOL_EDIT_IMAGE = "tool_edit_image"
+    const val TOOL_VIEW_IMAGE = "tool_view_image"
+    const val TOOL_DESCRIPTIVE_STATS = "tool_descriptive_stats"
 
     fun get(key: String): String {
         return when (key) {
@@ -119,6 +132,19 @@ object AnrealCopy {
             CD_SESSION_MENU -> "Chat actions"
             ERROR_TITLE_REQUIRED -> "Enter a name for this chat."
             LABEL_SESSION_TITLE -> "Name"
+            TOOL_STATUS_WORKING -> "Working"
+            TOOL_STATUS_DONE -> "Done"
+            TOOL_STATUS_ERROR -> "Error"
+            TOOL_RUNNING_FALLBACK -> "Running {0}"
+            TOOL_FIND_DOCUMENTS -> "Finding documents"
+            TOOL_SEARCH_DOCUMENT_PAGES -> "Searching document pages"
+            TOOL_GET_DOCUMENT_NEXT_PAGE -> "Reading next page"
+            TOOL_WEB_SEARCH -> "Searching the web"
+            TOOL_WEB_FETCH -> "Fetching web page"
+            TOOL_GENERATE_IMAGE -> "Generating image"
+            TOOL_EDIT_IMAGE -> "Editing image"
+            TOOL_VIEW_IMAGE -> "Viewing image"
+            TOOL_DESCRIPTIVE_STATS -> "Computing statistics"
             else -> key
         }
     }

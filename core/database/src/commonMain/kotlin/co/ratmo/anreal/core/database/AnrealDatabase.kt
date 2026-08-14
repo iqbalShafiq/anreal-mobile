@@ -1,5 +1,6 @@
 package co.ratmo.anreal.core.database
 
+import androidx.room3.AutoMigration
 import androidx.room3.ConstructedBy
 import androidx.room3.Database
 import androidx.room3.RoomDatabase
@@ -10,7 +11,8 @@ import kotlinx.coroutines.IO
 
 @Database(
     entities = [SessionEntity::class, MessageEntity::class],
-    version = 1,
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 @ConstructedBy(AnrealDatabaseConstructor::class)
 abstract class AnrealDatabase : RoomDatabase() {

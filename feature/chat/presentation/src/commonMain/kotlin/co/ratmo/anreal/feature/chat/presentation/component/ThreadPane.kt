@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
+import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
 import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -88,26 +89,34 @@ internal fun ThreadPane(
 
 @Composable
 private fun MessageBubble(message: ChatMessage) {
-    val text = message.parts.filterIsInstance<ChatPart.Text>().joinToString("") { it.text }
-    val reasoning = message.parts.filterIsInstance<ChatPart.Reasoning>().joinToString("") { it.text }
     val isUser = message.role == ChatRole.User
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
     ) {
-        if (reasoning.isNotBlank()) {
-            Text(
-                text = reasoning,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        if (text.isNotBlank()) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+        message.parts.forEach { part ->
+            when (part) {
+                is ChatPart.Reasoning -> if (part.text.isNotBlank()) {
+                    Text(
+                        text = part.text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                is ChatPart.Tool -> ToolActivityCard(part)
+                is ChatPart.Text -> if (part.text.isNotBlank()) {
+                    if (isUser) {
+                        Text(
+                            text = part.text,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    } else {
+                        AnrealMarkdown(content = part.text)
+                    }
+                }
+            }
         }
     }
 }
@@ -183,6 +192,32 @@ private fun MessageBubbleReasoningPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
             MessageBubble(previewReasoningAssistant)
+        }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun MessageBubbleMixedPreview() {
+    AnrealPreview {
+        Column(modifier = Modifier.padding(AnrealSpacing.md)) {
+            MessageBubble(
+                ChatMessage(
+                    id = "mix",
+                    role = ChatRole.Assistant,
+                    parts = listOf(
+                        ChatPart.Reasoning(id = "r", text = "Looking up the table."),
+                        ChatPart.Tool(
+                            id = "t",
+                            toolName = "find_documents",
+                            toolCallId = "c",
+                            state = "output-available",
+                        ),
+                        ChatPart.Text(id = "p", text = "## Result\nRevenue grew **12%**."),
+                    ),
+                    isComplete = true,
+                ),
+            )
         }
     }
 }

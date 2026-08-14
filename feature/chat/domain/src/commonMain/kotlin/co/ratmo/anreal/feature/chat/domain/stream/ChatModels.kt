@@ -1,5 +1,8 @@
 package co.ratmo.anreal.feature.chat.domain.stream
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 enum class ChatRole {
     User,
     Assistant,
@@ -7,19 +10,26 @@ enum class ChatRole {
     Tool,
 }
 
+@Serializable
 sealed interface ChatPart {
     val id: String
 
+    @Serializable
+    @SerialName("text")
     data class Text(
         override val id: String,
         val text: String,
     ) : ChatPart
 
+    @Serializable
+    @SerialName("reasoning")
     data class Reasoning(
         override val id: String,
         val text: String,
     ) : ChatPart
 
+    @Serializable
+    @SerialName("tool")
     data class Tool(
         override val id: String,
         val toolName: String,

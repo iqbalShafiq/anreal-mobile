@@ -25,5 +25,7 @@ kotlin {
         implementation(libs.haze)
         implementation(libs.haze.materials)
         implementation(libs.icons.material.symbols.rounded)
+        implementation(libs.markdown.renderer)
+        implementation(libs.markdown.renderer.m3)
     }
 }

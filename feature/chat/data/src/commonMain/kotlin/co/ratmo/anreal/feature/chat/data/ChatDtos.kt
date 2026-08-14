@@ -81,6 +81,10 @@ data class HistoryMessageDto(
 data class HistoryContentDto(
     val type: String,
     val text: String? = null,
+    val id: String? = null,
+    val toolName: String? = null,
+    val toolCallId: String? = null,
+    val state: String? = null,
 )
 
 fun SessionListItemDto.toSession(): ChatSession = ChatSession(
@@ -99,7 +103,20 @@ fun SessionMutationDto.toSession(): ChatSession = ChatSession(
 )
 
 fun HistoryMessageDto.toMessage(index: Int): ChatMessage {
-    val text = content.filter { it.type == "text" }.mapNotNull { it.text }.joinToString("")
+    val parts = content.mapIndexedNotNull { partIndex, dto ->
+        val id = dto.id ?: "history-$index-$partIndex"
+        when (dto.type) {
+            "text" -> ChatPart.Text(id = id, text = dto.text.orEmpty())
+            "reasoning" -> ChatPart.Reasoning(id = id, text = dto.text.orEmpty())
+            "tool" -> ChatPart.Tool(
+                id = id,
+                toolName = dto.toolName.orEmpty(),
+                toolCallId = dto.toolCallId.orEmpty(),
+                state = dto.state ?: "input-streaming",
+            )
+            else -> null
+        }
+    }
     return ChatMessage(
         id = "history-$index",
         role = when (role) {
@@ -108,7 +125,7 @@ fun HistoryMessageDto.toMessage(index: Int): ChatMessage {
             "tool" -> ChatRole.Tool
             else -> ChatRole.Assistant
         },
-        parts = if (text.isEmpty()) emptyList() else listOf(ChatPart.Text(id = "history-$index-text", text = text)),
+        parts = parts,
         isComplete = true,
     )
 }
