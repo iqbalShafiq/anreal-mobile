@@ -10,14 +10,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 
 @Database(
-    entities = [SessionEntity::class, MessageEntity::class],
-    version = 2,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    entities = [SessionEntity::class, MessageEntity::class, QueuedItemEntity::class],
+    version = 3,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2),
+        AutoMigration(from = 2, to = 3),
+    ],
 )
 @ConstructedBy(AnrealDatabaseConstructor::class)
 abstract class AnrealDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
     abstract fun messageDao(): MessageDao
+    abstract fun queuedItemDao(): QueuedItemDao
 }
 
 @Suppress("KotlinNoActualForExpect")

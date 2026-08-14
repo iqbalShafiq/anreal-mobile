@@ -181,6 +181,113 @@ class ChatViewModelTest {
             .isEqualTo(UiText.StringResource(AnrealCopy.ERROR_CONFLICT))
     }
 
+    @Test
+    fun send_while_streaming_queues_and_does_not_call_repository() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+
+        viewModel.onAction(ChatAction.OnDraftChange("Follow up"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.sentText).isEqualTo("Hello")
+        assertThat(viewModel.state.value.draft).isEqualTo("")
+        assertThat(viewModel.state.value.queue.single().text).isEqualTo("Follow up")
+        fake.allowSendToFinish.complete(Unit)
+    }
+
+    @Test
+    fun stop_holds_auto_flush() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        viewModel.onAction(ChatAction.OnStop)
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(fake.sentText).isEqualTo("Hello")
+        assertThat(viewModel.state.value.queue.single().text).isEqualTo("Queued")
+    }
+
+    @Test
+    fun completed_without_hold_flushes_pending_item() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.holdSend = false
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(fake.sentText).isEqualTo("Queued")
+        assertThat(viewModel.state.value.queue).isEqualTo(emptyList())
+    }
+
+    @Test
+    fun steer_no_active_run_falls_back_to_send() = runTest {
+        val fake = populatedRepo().apply {
+            holdSend = true
+            steerResult = Result.Error(ChatError.NoActiveRun)
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        viewModel.onAction(ChatAction.OnStop)
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+        fake.sentText = null
+        fake.holdSend = false
+
+        viewModel.onAction(ChatAction.OnSendNow)
+        advanceUntilIdle()
+
+        assertThat(fake.sentText).isEqualTo("Queued")
+    }
+
+    @Test
+    fun idle_with_queue_opens_conflict_and_send_new_keeps_queue() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        viewModel.onAction(ChatAction.OnStop)
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+        fake.holdSend = false
+
+        viewModel.onAction(ChatAction.OnDraftChange("Another"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.queueConflict).isTrue()
+        val queuedBefore = viewModel.state.value.queue.size
+        viewModel.onAction(ChatAction.OnSendNewMessage)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.queueConflict).isFalse()
+        assertThat(viewModel.state.value.queue.size).isEqualTo(queuedBefore)
+    }
+
     private fun populatedRepo(): FakeChatRepository = FakeChatRepository().apply {
         refreshResult = Result.Success(
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),

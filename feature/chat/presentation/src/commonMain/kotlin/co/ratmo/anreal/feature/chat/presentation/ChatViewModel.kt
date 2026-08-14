@@ -13,11 +13,25 @@ import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
+import co.ratmo.anreal.feature.chat.domain.queue.addItem
+import co.ratmo.anreal.feature.chat.domain.queue.applyAck
+import co.ratmo.anreal.feature.chat.domain.queue.cancelEdit
+import co.ratmo.anreal.feature.chat.domain.queue.finishEdit
+import co.ratmo.anreal.feature.chat.domain.queue.markInflight
+import co.ratmo.anreal.feature.chat.domain.queue.nextFlushable
+import co.ratmo.anreal.feature.chat.domain.queue.removeItem
+import co.ratmo.anreal.feature.chat.domain.queue.restoreQueue
+import co.ratmo.anreal.feature.chat.domain.queue.revertInflight
+import co.ratmo.anreal.feature.chat.domain.queue.startEdit
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import co.ratmo.anreal.feature.chat.domain.stream.ChatStreamEvent
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
+import co.ratmo.anreal.feature.chat.domain.stream.StreamEnvelope
 import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
 import kotlinx.coroutines.channels.Channel
@@ -51,6 +65,10 @@ data class ChatState(
     val deleteSessionId: String? = null,
     val deleteError: UiText? = null,
     val sessionBusy: Boolean = false,
+    val queue: List<QueuedItem> = emptyList(),
+    val queueExpanded: Boolean = false,
+    val queueHidden: Boolean = false,
+    val queueConflict: Boolean = false,
 )
 
 sealed interface ChatAction {
@@ -66,6 +84,16 @@ sealed interface ChatAction {
     data class OnDraftChange(val draft: String) : ChatAction
     data object OnSend : ChatAction
     data object OnStop : ChatAction
+    data object OnSendNow : ChatAction
+    data class OnRemoveQueued(val id: String) : ChatAction
+    data class OnRecallQueued(val id: String) : ChatAction
+    data object OnCancelQueueEdit : ChatAction
+    data object OnHideQueue : ChatAction
+    data object OnShowQueue : ChatAction
+    data object OnToggleQueueExpanded : ChatAction
+    data object OnSendQueue : ChatAction
+    data object OnSendNewMessage : ChatAction
+    data object OnDismissQueueConflict : ChatAction
     data object OnResumeConflict : ChatAction
     data object OnDismissConflict : ChatAction
     data object OnRetryHistory : ChatAction
@@ -90,6 +118,7 @@ class ChatViewModel(
 
     private val _events = Channel<ChatEvent>()
     val events = _events.receiveAsFlow()
+    private var hold: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -117,8 +146,18 @@ class ChatViewModel(
                 savedStateHandle[DRAFT_KEY] = action.draft
                 _state.update { it.copy(draft = action.draft) }
             }
-            ChatAction.OnSend -> viewModelScope.launch { send() }
+            ChatAction.OnSend -> viewModelScope.launch { submitComposer() }
             ChatAction.OnStop -> viewModelScope.launch { stop() }
+            ChatAction.OnSendNow -> viewModelScope.launch { sendNow() }
+            is ChatAction.OnRemoveQueued -> viewModelScope.launch { dropQueued(action.id) }
+            is ChatAction.OnRecallQueued -> recallQueued(action.id)
+            ChatAction.OnCancelQueueEdit -> cancelQueueEdit()
+            ChatAction.OnHideQueue -> _state.update { it.copy(queueHidden = true) }
+            ChatAction.OnShowQueue -> _state.update { it.copy(queueHidden = false) }
+            ChatAction.OnToggleQueueExpanded -> _state.update { it.copy(queueExpanded = !it.queueExpanded) }
+            ChatAction.OnSendQueue -> viewModelScope.launch { sendQueueFromConflict() }
+            ChatAction.OnSendNewMessage -> viewModelScope.launch { sendNewFromConflict() }
+            ChatAction.OnDismissQueueConflict -> _state.update { it.copy(queueConflict = false) }
             ChatAction.OnResumeConflict -> viewModelScope.launch {
                 _state.update { it.copy(runActiveConflict = false) }
                 resumeActiveRun()
@@ -243,11 +282,15 @@ class ChatViewModel(
 
     private suspend fun selectSession(sessionId: String) {
         savedStateHandle[SESSION_KEY] = sessionId
+        val queue = restoreQueue(chatRepository.loadQueue(sessionId))
         _state.update {
             it.copy(
                 selectedSessionId = sessionId,
                 runActiveConflict = false,
+                queueConflict = false,
                 thread = ChatThreadState(),
+                queue = queue,
+                queueHidden = false,
             )
         }
         loadHistory(sessionId)
@@ -273,22 +316,46 @@ class ChatViewModel(
             }
     }
 
-    private suspend fun send() {
-        val current = _state.value
-        val sessionId = current.selectedSessionId ?: return
-        val text = current.draft.trim()
-        if (text.isEmpty() || current.isSending) return
+    private fun isStreaming(state: ChatState): Boolean {
+        return state.isSending || state.thread.status == RunStatus.Streaming
+    }
 
+    private suspend fun submitComposer() {
+        val current = _state.value
+        val editingId = current.queue.firstOrNull { it.status == QueueStatus.Editing }?.id
+        if (editingId != null) {
+            val text = current.draft.trim()
+            if (text.isEmpty()) return
+            updateQueue(finishEdit(current.queue, editingId, text))
+            setDraft("")
+            return
+        }
+        val text = current.draft.trim()
+        if (text.isEmpty()) return
+        when {
+            isStreaming(current) -> enqueue(text)
+            current.queue.isNotEmpty() -> _state.update { it.copy(queueConflict = true) }
+            else -> sendText(text, newClientMessageId())
+        }
+    }
+
+    private suspend fun enqueue(text: String) {
+        val item = QueuedItem(id = newClientMessageId(), text = text)
+        updateQueue(addItem(_state.value.queue, item))
+        setDraft("")
+    }
+
+    private suspend fun sendText(text: String, clientMessageId: String) {
+        val sessionId = _state.value.selectedSessionId ?: return
         val userMessage = ChatMessage(
-            id = "user-${current.thread.messages.size}",
+            id = clientMessageId,
             role = ChatRole.User,
-            parts = listOf(ChatPart.Text(id = "user-text-${current.thread.messages.size}", text = text)),
+            parts = listOf(ChatPart.Text(id = "$clientMessageId-text", text = text)),
             isComplete = true,
         )
-        savedStateHandle[DRAFT_KEY] = ""
+        setDraft("")
         _state.update {
             it.copy(
-                draft = "",
                 isSending = true,
                 thread = it.thread.copy(
                     messages = it.thread.messages + userMessage,
@@ -296,15 +363,142 @@ class ChatViewModel(
                 ),
             )
         }
-
-        val result = chatRepository.sendMessage(sessionId, text) { line ->
+        val result = chatRepository.sendMessage(sessionId, text, clientMessageId) { line ->
             applyLine(sessionId, line)
         }
-        _state.update { it.copy(isSending = false) }
+        _state.update { current ->
+            val status = if (result is Result.Success && current.thread.status == RunStatus.Streaming) {
+                RunStatus.Completed
+            } else {
+                current.thread.status
+            }
+            current.copy(isSending = false, thread = current.thread.copy(status = status))
+        }
         result.onFailure { error -> handleSendError(error) }
+        if (result is Result.Success) {
+            maybeAutoFlush()
+        }
+    }
+
+    private suspend fun sendNow() {
+        hold = false
+        val sessionId = _state.value.selectedSessionId ?: return
+        val flushable = mutableListOf<QueuedItem>()
+        var remaining = _state.value.queue
+        while (true) {
+            val next = nextFlushable(remaining) ?: break
+            flushable += next
+            remaining = markInflight(remaining, listOf(next.id))
+        }
+        if (flushable.isEmpty()) return
+        updateQueue(markInflight(_state.value.queue, flushable.map { it.id }))
+        chatRepository.steer(sessionId, flushable)
+            .onFailure { error ->
+                updateQueue(revertInflight(_state.value.queue))
+                if (error is ChatError.NoActiveRun) {
+                    val first = flushable.first()
+                    updateQueue(removeItem(_state.value.queue, first.id))
+                    sendText(first.text, first.id)
+                } else {
+                    _events.send(ChatEvent.ShowMessage(error.toUiText()))
+                }
+            }
+    }
+
+    private suspend fun sendQueueFromConflict() {
+        val draft = _state.value.draft.trim()
+        _state.update { it.copy(queueConflict = false) }
+        if (draft.isNotEmpty()) enqueue(draft)
+        hold = false
+        sendNow()
+        if (!isStreaming(_state.value)) {
+            maybeAutoFlush()
+        }
+    }
+
+    private suspend fun sendNewFromConflict() {
+        val text = _state.value.draft.trim()
+        _state.update { it.copy(queueConflict = false) }
+        if (text.isEmpty()) return
+        sendText(text, newClientMessageId())
+    }
+
+    private suspend fun dropQueued(id: String) {
+        updateQueue(removeItem(_state.value.queue, id))
+    }
+
+    private fun recallQueued(id: String) {
+        val item = _state.value.queue.firstOrNull { it.id == id } ?: return
+        updateQueue(startEdit(_state.value.queue, id))
+        setDraft(item.text)
+    }
+
+    private fun cancelQueueEdit() {
+        val editingId = _state.value.queue.firstOrNull { it.status == QueueStatus.Editing }?.id ?: return
+        updateQueue(cancelEdit(_state.value.queue, editingId))
+        setDraft("")
+    }
+
+    private fun setDraft(value: String) {
+        savedStateHandle[DRAFT_KEY] = value
+        _state.update { it.copy(draft = value) }
+    }
+
+    private fun updateQueue(items: List<QueuedItem>) {
+        _state.update {
+            it.copy(
+                queue = items,
+                queueHidden = if (items.isEmpty()) false else it.queueHidden,
+            )
+        }
+        val sessionId = _state.value.selectedSessionId ?: return
+        viewModelScope.launch { chatRepository.replaceQueue(sessionId, items) }
+    }
+
+    private suspend fun maybeAutoFlush() {
+        if (hold) return
+        if (_state.value.thread.status == RunStatus.Failed) return
+        if (isStreaming(_state.value)) return
+        val sessionId = _state.value.selectedSessionId ?: return
+        val ids = _state.value.queue.map { it.id }
+        if (ids.isNotEmpty()) {
+            chatRepository.syncQueue(sessionId, ids)
+                .onSuccess { applied ->
+                    var next = _state.value.queue
+                    applied.forEach { id -> next = applyAck(next, id) }
+                    updateQueue(next)
+                }
+        }
+        val next = nextFlushable(_state.value.queue) ?: return
+        updateQueue(removeItem(_state.value.queue, next.id))
+        sendText(next.text, next.id)
+    }
+
+    private fun ackQueued(event: ChatStreamEvent.QueuedMessageApplied) {
+        val item = _state.value.queue.firstOrNull { it.id == event.clientMessageId }
+        updateQueue(applyAck(_state.value.queue, event.clientMessageId))
+        val exists = _state.value.thread.messages.any { it.id == event.clientMessageId }
+        if (!exists) {
+            val text = item?.text ?: event.text
+            if (text.isNotBlank()) {
+                _state.update {
+                    it.copy(
+                        thread = it.thread.copy(
+                            messages = it.thread.messages + ChatMessage(
+                                id = event.clientMessageId,
+                                role = ChatRole.User,
+                                parts = listOf(ChatPart.Text(id = "${event.clientMessageId}-text", text = text)),
+                                isComplete = true,
+                            ),
+                        ),
+                    )
+                }
+            }
+        }
     }
 
     private suspend fun stop() {
+        hold = true
         val streamId = _state.value.thread.streamId ?: return
         chatRepository.stop(streamId)
         _state.update { it.copy(isSending = false, thread = it.thread.copy(status = RunStatus.Idle)) }
@@ -335,12 +529,19 @@ class ChatViewModel(
 
     private suspend fun applyLine(sessionId: String, line: String) {
         val envelope = parseStreamLine(line) ?: return
+        if (envelope is StreamEnvelope.Event) {
+            val event = envelope.event
+            if (event is ChatStreamEvent.QueuedMessageApplied) {
+                ackQueued(event)
+            }
+        }
         _state.update { it.copy(thread = it.thread.reduce(envelope)) }
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)
     }
 
     private fun handleSendError(error: ChatError) {
+        hold = true
         if (error is ChatError.RunActive) {
             _state.update { it.copy(runActiveConflict = true, isSending = false) }
         } else {
@@ -359,6 +560,11 @@ class ChatViewModel(
 
 internal fun normalizeSessionTitle(raw: String): String {
     return raw.trim().replace(WHITESPACE, " ").take(48)
+}
+
+internal fun newClientMessageId(): String {
+    val alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+    return buildString(20) { repeat(20) { append(alphabet.random()) } }
 }
 
 private val WHITESPACE = Regex("\\s+")

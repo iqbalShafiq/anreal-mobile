@@ -120,7 +120,7 @@ Chat streaming:
 - Parser + **pure reducer** live in `feature:chat:domain`. This is the protocol/headless layer.
 - ViewModels apply reducer output. Composables do not parse JSONL.
 - Extend the reducer for tools/images/queue. Do not fork a second stream pipeline.
-- The composer **stays editable while a run is streaming** (queue later). Never lock the field the way stock `@anvia/react-ui` does — the web repo patches that SDK; we own the composer so we do not port the lock.
+- The composer **stays editable while a run is streaming**. A filled composer queues (`POST /api/chat/steer`); an empty one Stops. Queue mutations live in `feature:chat:domain/queue` and persist in Room. Hold is in-memory. Never lock the field the way stock `@anvia/react-ui` does.
 
 Do **not** add a `:core:chat-ui` / Anvia-style headless module until a second feature needs the same unstyled thread/composer/tool primitives. Until then, slot composables stay in `feature:chat:presentation/component/` (`ThreadPane`, `ComposerBar`, later tool cards). Do not clone `@anvia/react-ui`.
 

@@ -8,6 +8,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 fun ChatError.toUiText(): UiText {
     return when (this) {
         ChatError.RunActive -> UiText.StringResource(AnrealCopy.ERROR_RUN_ACTIVE)
+        ChatError.NoActiveRun -> UiText.StringResource(AnrealCopy.ERROR_NO_ACTIVE_RUN)
         is ChatError.Network -> error.toUiText()
         is ChatError.Local -> error.toUiText()
     }

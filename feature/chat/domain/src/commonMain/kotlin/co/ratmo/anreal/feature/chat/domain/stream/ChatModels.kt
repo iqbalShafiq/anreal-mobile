@@ -115,6 +115,11 @@ sealed interface ChatStreamEvent {
         val message: String,
     ) : ChatStreamEvent
 
+    data class QueuedMessageApplied(
+        val clientMessageId: String,
+        val text: String,
+    ) : ChatStreamEvent
+
     data class Unknown(
         val type: String,
     ) : ChatStreamEvent

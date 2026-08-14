@@ -92,4 +92,21 @@ class ChatStreamParserTest {
             ),
         )
     }
+
+    @Test
+    fun parses_queued_message_applied() {
+        val envelope = parseStreamLine(
+            """{"type":"stream_event","streamId":"s1","eventId":6,"event":{"type":"queued_message_applied","clientMessageId":"q1","text":"Follow up"}}""",
+        )
+        assertThat(envelope).isEqualTo(
+            StreamEnvelope.Event(
+                streamId = "s1",
+                eventId = 6,
+                event = ChatStreamEvent.QueuedMessageApplied(
+                    clientMessageId = "q1",
+                    text = "Follow up",
+                ),
+            ),
+        )
+    }
 }

@@ -46,6 +46,7 @@ private fun ChatThreadState.applyEvent(envelope: StreamEnvelope.Event): ChatThre
             error = event.message,
             status = RunStatus.Failed,
         )
+        is ChatStreamEvent.QueuedMessageApplied -> advanced
         is ChatStreamEvent.Unknown -> advanced
     }
 }

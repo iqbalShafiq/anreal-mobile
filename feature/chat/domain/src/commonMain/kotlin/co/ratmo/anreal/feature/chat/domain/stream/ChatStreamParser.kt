@@ -103,6 +103,17 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             if (messageId == null) ChatStreamEvent.Unknown(type = type)
             else ChatStreamEvent.MessageEnd(messageId = messageId)
         }
+        "queued_message_applied" -> {
+            val clientMessageId = event.string("clientMessageId")
+            if (clientMessageId == null) {
+                ChatStreamEvent.Unknown(type = type)
+            } else {
+                ChatStreamEvent.QueuedMessageApplied(
+                    clientMessageId = clientMessageId,
+                    text = event.string("text").orEmpty(),
+                )
+            }
+        }
         "error" -> {
             val message = event["error"]?.let { error ->
                 if (error is JsonObject) error.string("message") else error.jsonPrimitive.content

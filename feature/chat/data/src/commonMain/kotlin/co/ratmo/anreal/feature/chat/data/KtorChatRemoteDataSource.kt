@@ -15,6 +15,7 @@ import co.ratmo.anreal.core.domain.util.mapError
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import io.ktor.client.HttpClient
 
@@ -70,17 +71,40 @@ class KtorChatRemoteDataSource(
         sessionId: String,
         messages: List<ChatMessage>,
         resume: ResumeDto? = null,
+        clientMessageId: String? = null,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
         return httpClient.postJsonl(
             route = "/api/chat",
             body = ChatRequestDto(
                 sessionId = sessionId,
-                messages = messages.map { it.toHistoryDto() },
+                messages = messages.map { it.toHistoryDto(clientMessageId) },
                 resume = resume,
             ),
             onLine = onLine,
         ).toChatResult()
+    }
+
+    suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {
+        return httpClient.post<SteerRequestDto, SteerResponseDto>(
+            route = "/api/chat/steer",
+            body = SteerRequestDto(
+                sessionId = sessionId,
+                messages = items.map { item ->
+                    SteerMessageDto(clientMessageId = item.id, text = item.text)
+                },
+            ),
+        ).mapError { error ->
+            if (error == DataError.Network.CONFLICT) ChatError.NoActiveRun
+            else ChatError.Network(error)
+        }.asEmptyResult()
+    }
+
+    suspend fun syncQueue(sessionId: String, ids: List<String>): Result<List<String>, ChatError> {
+        return httpClient.post<QueueSyncRequestDto, QueueSyncResponseDto>(
+            route = "/api/chat/queue/sync",
+            body = QueueSyncRequestDto(sessionId = sessionId, ids = ids),
+        ).map { it.appliedIds }.mapNetwork()
     }
 
     suspend fun stop(streamId: String): EmptyResult<ChatError> {

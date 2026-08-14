@@ -6,6 +6,7 @@ import co.ratmo.anreal.core.data.auth.InMemorySessionTokenStore
 import co.ratmo.anreal.core.data.network.HttpClientFactory
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -43,6 +44,20 @@ class KtorChatRemoteDataSourceTest {
         val result = source.send("s1", emptyList()) {}
 
         assertThat(result).isEqualTo(Result.Error(ChatError.RunActive))
+    }
+
+    @Test
+    fun steer_maps_409_to_no_active_run() = runTest {
+        val source = source(
+            path = "/api/chat/steer",
+            status = HttpStatusCode.Conflict,
+            body = """{"code":"NO_ACTIVE_RUN"}""",
+        )
+        val result = source.steer(
+            "s1",
+            listOf(QueuedItem(id = "q1", text = "Follow up")),
+        )
+        assertThat(result).isEqualTo(Result.Error(ChatError.NoActiveRun))
     }
 }
 

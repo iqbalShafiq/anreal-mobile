@@ -21,6 +21,7 @@ import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Send
+import com.composables.icons.materialsymbols.rounded.South_west
 import com.composables.icons.materialsymbols.rounded.Stop
 
 @Composable
@@ -28,6 +29,7 @@ internal fun ComposerBar(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
 ) {
+    val streaming = state.isSending || state.thread.status == RunStatus.Streaming
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -43,22 +45,33 @@ internal fun ComposerBar(
             singleLine = false,
             maxLines = 4,
         )
-        if (state.isSending || state.thread.status == RunStatus.Streaming) {
-            FilledIconButton(onClick = { onAction(ChatAction.OnStop) }) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Stop,
-                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_STOP),
-                )
+        when {
+            streaming && state.draft.isBlank() -> {
+                FilledIconButton(onClick = { onAction(ChatAction.OnStop) }) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Stop,
+                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_STOP),
+                    )
+                }
             }
-        } else {
-            FilledIconButton(
-                onClick = { onAction(ChatAction.OnSend) },
-                enabled = state.draft.isNotBlank(),
-            ) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Send,
-                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_SEND),
-                )
+            streaming -> {
+                FilledIconButton(onClick = { onAction(ChatAction.OnSend) }) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.South_west,
+                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_QUEUE),
+                    )
+                }
+            }
+            else -> {
+                FilledIconButton(
+                    onClick = { onAction(ChatAction.OnSend) },
+                    enabled = state.draft.isNotBlank(),
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Send,
+                        contentDescription = AnrealCopy.get(AnrealCopy.ACTION_SEND),
+                    )
+                }
             }
         }
     }
@@ -68,10 +81,7 @@ internal fun ComposerBar(
 @Composable
 private fun ComposerBarEmptyPreview() {
     AnrealPreview {
-        ComposerBar(
-            state = ChatState(draft = ""),
-            onAction = {},
-        )
+        ComposerBar(state = ChatState(draft = ""), onAction = {})
     }
 }
 
@@ -88,7 +98,18 @@ private fun ComposerBarFilledPreview() {
 
 @AnrealPreviews
 @Composable
-private fun ComposerBarStreamingPreview() {
+private fun ComposerBarStreamingStopPreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatPopulatedPreviewState(draft = "", isSending = true, status = RunStatus.Streaming),
+            onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarStreamingQueuePreview() {
     AnrealPreview {
         ComposerBar(
             state = chatPopulatedPreviewState(

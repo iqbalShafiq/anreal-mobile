@@ -72,6 +72,19 @@ object AnrealCopy {
     const val TOOL_EDIT_IMAGE = "tool_edit_image"
     const val TOOL_VIEW_IMAGE = "tool_view_image"
     const val TOOL_DESCRIPTIVE_STATS = "tool_descriptive_stats"
+    const val ERROR_NO_ACTIVE_RUN = "error_no_active_run"
+    const val ACTION_QUEUE = "action_queue"
+    const val ACTION_SEND_NOW = "action_send_now"
+    const val ACTION_SEND_QUEUE = "action_send_queue"
+    const val ACTION_SEND_NEW_MESSAGE = "action_send_new_message"
+    const val DIALOG_QUEUE_CONFLICT_TITLE = "dialog_queue_conflict_title"
+    const val DIALOG_QUEUE_CONFLICT_BODY = "dialog_queue_conflict_body"
+    const val LABEL_QUEUED_COUNT = "label_queued_count"
+    const val LABEL_EDITING = "label_editing"
+    const val CD_HIDE_QUEUE = "cd_hide_queue"
+    const val CD_SHOW_QUEUE = "cd_show_queue"
+    const val CD_REMOVE_QUEUED = "cd_remove_queued"
+    const val CD_EXPAND_QUEUE = "cd_expand_queue"
 
     fun get(key: String): String {
         return when (key) {
@@ -145,6 +158,19 @@ object AnrealCopy {
             TOOL_EDIT_IMAGE -> "Editing image"
             TOOL_VIEW_IMAGE -> "Viewing image"
             TOOL_DESCRIPTIVE_STATS -> "Computing statistics"
+            ERROR_NO_ACTIVE_RUN -> "That run already finished. Send this as a new message."
+            ACTION_QUEUE -> "Queue"
+            ACTION_SEND_NOW -> "Send now"
+            ACTION_SEND_QUEUE -> "Send queue"
+            ACTION_SEND_NEW_MESSAGE -> "Send new message"
+            DIALOG_QUEUE_CONFLICT_TITLE -> "Send now or keep the queue?"
+            DIALOG_QUEUE_CONFLICT_BODY -> "You have follow-ups waiting. Send the queue first, or send this new message and hold the queue."
+            LABEL_QUEUED_COUNT -> "{0} queued"
+            LABEL_EDITING -> "Editing…"
+            CD_HIDE_QUEUE -> "Hide queue"
+            CD_SHOW_QUEUE -> "Show queue"
+            CD_REMOVE_QUEUED -> "Remove queued message"
+            CD_EXPAND_QUEUE -> "Show all queued messages"
             else -> key
         }
     }

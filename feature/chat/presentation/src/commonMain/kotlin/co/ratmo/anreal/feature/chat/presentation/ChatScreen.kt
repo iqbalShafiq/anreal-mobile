@@ -31,6 +31,8 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
 import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
+import co.ratmo.anreal.feature.chat.presentation.component.MessageQueueDock
+import co.ratmo.anreal.feature.chat.presentation.component.QueueConflictDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RenameSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RunActiveDialog
 import co.ratmo.anreal.feature.chat.presentation.component.SessionDrawer
@@ -42,6 +44,8 @@ import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatDeletePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatRenamePreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatQueueConflictPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatQueuedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatStreamingPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
@@ -133,6 +137,7 @@ fun ChatScreen(
                     onAction = onAction,
                     modifier = Modifier.weight(1f),
                 )
+                MessageQueueDock(state = state, onAction = onAction)
                 ComposerBar(state = state, onAction = onAction)
             }
         }
@@ -146,6 +151,9 @@ fun ChatScreen(
     }
     if (state.deleteSessionId != null) {
         DeleteSessionDialog(state = state, onAction = onAction)
+    }
+    if (state.queueConflict) {
+        QueueConflictDialog(onAction = onAction)
     }
 }
 
@@ -210,5 +218,21 @@ private fun ChatRenamePreview() {
 private fun ChatDeletePreview() {
     AnrealPreview {
         ChatScreen(state = chatDeletePreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatQueuedPreview() {
+    AnrealPreview {
+        ChatScreen(state = chatQueuedPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatQueueConflictPreview() {
+    AnrealPreview {
+        ChatScreen(state = chatQueueConflictPreviewState(), onAction = {})
     }
 }

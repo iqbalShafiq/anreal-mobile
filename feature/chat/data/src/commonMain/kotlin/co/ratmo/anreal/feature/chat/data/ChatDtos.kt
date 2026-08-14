@@ -72,9 +72,46 @@ data class ResumeDto(
 )
 
 @Serializable
+data class HistoryMetadataDto(
+    val clientMessageId: String? = null,
+    val queued: Boolean? = null,
+)
+
+@Serializable
 data class HistoryMessageDto(
     val role: String,
     val content: List<HistoryContentDto> = emptyList(),
+    val metadata: HistoryMetadataDto? = null,
+)
+
+@Serializable
+data class SteerMessageDto(
+    val clientMessageId: String,
+    val text: String,
+)
+
+@Serializable
+data class SteerRequestDto(
+    val sessionId: String,
+    val messages: List<SteerMessageDto>,
+)
+
+@Serializable
+data class SteerResponseDto(
+    val ok: Boolean = true,
+    val streamId: String? = null,
+    val queued: Int = 0,
+)
+
+@Serializable
+data class QueueSyncRequestDto(
+    val sessionId: String,
+    val ids: List<String>,
+)
+
+@Serializable
+data class QueueSyncResponseDto(
+    val appliedIds: List<String> = emptyList(),
 )
 
 @Serializable
@@ -130,7 +167,7 @@ fun HistoryMessageDto.toMessage(index: Int): ChatMessage {
     )
 }
 
-fun ChatMessage.toHistoryDto(): HistoryMessageDto {
+fun ChatMessage.toHistoryDto(clientMessageId: String? = null): HistoryMessageDto {
     val text = parts.filterIsInstance<ChatPart.Text>().joinToString("") { it.text }
     return HistoryMessageDto(
         role = when (role) {
@@ -140,5 +177,6 @@ fun ChatMessage.toHistoryDto(): HistoryMessageDto {
             ChatRole.Assistant -> "assistant"
         },
         content = listOf(HistoryContentDto(type = "text", text = text)),
+        metadata = clientMessageId?.let { HistoryMetadataDto(clientMessageId = it) },
     )
 }

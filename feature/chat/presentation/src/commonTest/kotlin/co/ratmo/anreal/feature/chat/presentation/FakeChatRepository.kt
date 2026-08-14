@@ -7,7 +7,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -18,6 +20,14 @@ class FakeChatRepository : ChatRepository {
     var history: Result<List<ChatMessage>, ChatError> = Result.Success(emptyList())
     var sendResult: EmptyResult<ChatError> = Result.Success(Unit)
     var sentText: String? = null
+    var sentClientMessageId: String? = null
+    var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
+    var steered: List<QueuedItem> = emptyList()
+    var syncResult: Result<List<String>, ChatError> = Result.Success(emptyList())
+    var queues: MutableMap<String, List<QueuedItem>> = mutableMapOf()
+    var holdSend: Boolean = false
+    var sendStarted: CompletableDeferred<Unit> = CompletableDeferred()
+    var allowSendToFinish: CompletableDeferred<Unit> = CompletableDeferred()
     var lastRenamed: Pair<String, String>? = null
     var lastDeleted: String? = null
     var renameResult: Result<ChatSession, ChatError>? = null
@@ -64,10 +74,33 @@ class FakeChatRepository : ChatRepository {
     override suspend fun sendMessage(
         sessionId: String,
         text: String,
+        clientMessageId: String?,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
         sentText = text
+        sentClientMessageId = clientMessageId
+        if (holdSend) {
+            if (!sendStarted.isCompleted) sendStarted.complete(Unit)
+            allowSendToFinish.await()
+        }
         return sendResult
+    }
+
+    override suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {
+        steered = items
+        return steerResult
+    }
+
+    override suspend fun syncQueue(sessionId: String, ids: List<String>): Result<List<String>, ChatError> {
+        return syncResult
+    }
+
+    override suspend fun loadQueue(sessionId: String): List<QueuedItem> {
+        return queues[sessionId].orEmpty()
+    }
+
+    override suspend fun replaceQueue(sessionId: String, items: List<QueuedItem>) {
+        queues[sessionId] = items
     }
 
     override suspend fun resume(

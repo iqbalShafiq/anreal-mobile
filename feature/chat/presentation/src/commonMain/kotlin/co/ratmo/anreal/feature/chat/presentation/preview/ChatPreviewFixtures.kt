@@ -7,6 +7,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.presentation.ChatSessionUi
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 
@@ -114,4 +115,16 @@ internal fun chatRenamePreviewState(): ChatState = chatPopulatedPreviewState().c
 
 internal fun chatDeletePreviewState(): ChatState = chatPopulatedPreviewState().copy(
     deleteSessionId = previewUnreadSession.id,
+)
+
+internal fun chatQueuedPreviewState(): ChatState = chatStreamingPreviewState().copy(
+    draft = "And margins?",
+    queue = listOf(QueuedItem(id = "q1", text = "What about costs?")),
+)
+
+internal fun chatQueueConflictPreviewState(): ChatState = chatPopulatedPreviewState(
+    draft = "Another question",
+).copy(
+    queue = listOf(QueuedItem(id = "q1", text = "What about costs?")),
+    queueConflict = true,
 )

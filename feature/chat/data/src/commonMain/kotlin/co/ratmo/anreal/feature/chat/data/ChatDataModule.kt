@@ -5,6 +5,6 @@ import org.koin.dsl.module
 
 val chatDataModule = module {
     single { KtorChatRemoteDataSource(get()) }
-    single { RoomChatLocalDataSource(get(), get()) }
+    single { RoomChatLocalDataSource(get(), get(), get()) }
     single<ChatRepository> { OfflineFirstChatRepository(get(), get()) }
 }

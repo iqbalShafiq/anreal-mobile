@@ -7,4 +7,5 @@ actual val databaseModule: Module = module {
     single { getRoomDatabase(getDatabaseBuilder()) }
     single { get<AnrealDatabase>().sessionDao() }
     single { get<AnrealDatabase>().messageDao() }
+    single { get<AnrealDatabase>().queuedItemDao() }
 }

@@ -3,6 +3,7 @@ package co.ratmo.anreal.feature.chat.domain
 import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import kotlinx.coroutines.flow.Flow
 
@@ -28,8 +29,13 @@ interface ChatRepository {
     suspend fun sendMessage(
         sessionId: String,
         text: String,
+        clientMessageId: String? = null,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError>
+    suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError>
+    suspend fun syncQueue(sessionId: String, ids: List<String>): Result<List<String>, ChatError>
+    suspend fun loadQueue(sessionId: String): List<QueuedItem>
+    suspend fun replaceQueue(sessionId: String, items: List<QueuedItem>)
     suspend fun resume(
         sessionId: String,
         streamId: String,

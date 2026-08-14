@@ -8,6 +8,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -58,15 +59,36 @@ class OfflineFirstChatRepository(
     override suspend fun sendMessage(
         sessionId: String,
         text: String,
+        clientMessageId: String?,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
+        val id = clientMessageId ?: "local-user"
         val user = ChatMessage(
-            id = "local-user",
+            id = id,
             role = ChatRole.User,
-            parts = listOf(ChatPart.Text(id = "local-user-text", text = text)),
+            parts = listOf(ChatPart.Text(id = "$id-text", text = text)),
             isComplete = true,
         )
-        return remote.send(sessionId, listOf(user), onLine = onLine)
+        return remote.send(
+            sessionId = sessionId,
+            messages = listOf(user),
+            clientMessageId = clientMessageId,
+            onLine = onLine,
+        )
+    }
+
+    override suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {
+        return remote.steer(sessionId, items)
+    }
+
+    override suspend fun syncQueue(sessionId: String, ids: List<String>): Result<List<String>, ChatError> {
+        return remote.syncQueue(sessionId, ids)
+    }
+
+    override suspend fun loadQueue(sessionId: String): List<QueuedItem> = local.loadQueue(sessionId)
+
+    override suspend fun replaceQueue(sessionId: String, items: List<QueuedItem>) {
+        local.replaceQueue(sessionId, items)
     }
 
     override suspend fun resume(
