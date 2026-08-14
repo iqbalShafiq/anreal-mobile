@@ -20,4 +20,10 @@ kotlin {
             isIncludeAndroidResources = true
         }
     }
+    sourceSets.commonMain.dependencies {
+        implementation(libs.materialKolor)
+        implementation(libs.haze)
+        implementation(libs.haze.materials)
+        implementation(libs.icons.material.symbols.rounded)
+    }
 }

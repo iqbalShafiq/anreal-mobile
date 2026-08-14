@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import co.ratmo.anreal.core.designsystem.theme.AnrealTheme
 import org.jetbrains.compose.resources.painterResource
 
 import anreal_mobile.shared.generated.resources.Res
@@ -22,7 +23,7 @@ import anreal_mobile.shared.generated.resources.compose_multiplatform
 @Composable
 @Preview
 fun App() {
-    MaterialTheme {
+    AnrealTheme {
         var showContent by remember { mutableStateOf(false) }
         Column(
             modifier = Modifier

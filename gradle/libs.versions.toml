@@ -13,7 +13,9 @@ assertk = "0.28.1"
 composeMultiplatform = "1.11.1"
 junit = "4.13.2"
 junit5 = "5.13.4"
+haze = "1.6.10"
 koin = "4.1.1"
+materialKolor = "2.1.0"
 kotlin = "2.4.10"
 kotlinx-coroutines = "1.10.2"
 kotlinx-serialization = "1.9.0"
@@ -61,6 +63,11 @@ ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+
+materialKolor = { module = "com.materialkolor:material-kolor", version.ref = "materialKolor" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+haze-materials = { module = "dev.chrisbanes.haze:haze-materials", version.ref = "haze" }
+icons-material-symbols-rounded = { module = "com.composables:icons-material-symbols-rounded-cmp", version = "2.2.1" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
