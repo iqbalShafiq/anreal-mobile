@@ -9,7 +9,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -124,5 +126,20 @@ class OfflineFirstChatRepository(
 
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) {
         local.saveResume(sessionId, streamId, lastEventId)
+    }
+
+    override suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError> {
+        return remote.listSessionDocuments(sessionId)
+    }
+
+    override suspend fun unlinkSessionDocument(
+        sessionId: String,
+        documentId: String,
+    ): EmptyResult<ChatError> {
+        return remote.unlinkSessionDocument(sessionId, documentId)
+    }
+
+    override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
+        return remote.listRecentProjects()
     }
 }

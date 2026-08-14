@@ -3,6 +3,7 @@ package co.ratmo.anreal.feature.auth.presentation
 import app.cash.turbine.test
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import co.ratmo.anreal.core.domain.model.User
 import co.ratmo.anreal.feature.auth.domain.AuthSession
 import co.ratmo.anreal.feature.auth.domain.SessionStatus
 import kotlinx.coroutines.Dispatchers
@@ -48,7 +49,13 @@ private class FakeAuthSession(
     initial: SessionStatus,
 ) : AuthSession {
     private val values = MutableStateFlow(initial)
+    private val users = MutableStateFlow<User?>(null)
     override val status: Flow<SessionStatus> = values
+    override val user: Flow<User?> = users
+    override suspend fun signOut() {
+        users.value = null
+        values.value = SessionStatus.SignedOut
+    }
     fun emit(status: SessionStatus) {
         values.value = status
     }

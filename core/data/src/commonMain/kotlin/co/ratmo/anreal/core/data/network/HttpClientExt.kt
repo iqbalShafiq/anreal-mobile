@@ -76,6 +76,17 @@ suspend inline fun HttpClient.delete(
     }
 }
 
+suspend inline fun <reified Request : Any> HttpClient.delete(
+    route: String,
+    body: Request,
+): Result<Unit, DataError.Network> {
+    return safeCall {
+        ktorDelete(urlString = route) {
+            setBody(body)
+        }
+    }
+}
+
 suspend inline fun <reified Request : Any> HttpClient.postJsonl(
     route: String,
     body: Request,

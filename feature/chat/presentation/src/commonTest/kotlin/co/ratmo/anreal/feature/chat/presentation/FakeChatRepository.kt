@@ -8,7 +8,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -41,6 +43,10 @@ class FakeChatRepository : ChatRepository {
     var runStatus: Result<RunStatusSnapshot, ChatError> = Result.Success(
         RunStatusSnapshot(streamId = null, status = "idle", lastEventId = null),
     )
+    var sessionDocuments: Result<List<SessionDocument>, ChatError> = Result.Success(emptyList())
+    var recentProjects: Result<List<RecentProject>, ChatError> = Result.Success(emptyList())
+    var lastUnlinked: Pair<String, String>? = null
+    var unlinkResult: EmptyResult<ChatError> = Result.Success(Unit)
 
     override fun observeSessions(): Flow<List<ChatSession>> = sessions
 
@@ -127,4 +133,18 @@ class FakeChatRepository : ChatRepository {
     override suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError> = runStatus
 
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) = Unit
+
+    override suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError> {
+        return sessionDocuments
+    }
+
+    override suspend fun unlinkSessionDocument(
+        sessionId: String,
+        documentId: String,
+    ): EmptyResult<ChatError> {
+        lastUnlinked = sessionId to documentId
+        return unlinkResult
+    }
+
+    override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> = recentProjects
 }

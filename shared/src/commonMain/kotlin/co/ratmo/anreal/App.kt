@@ -18,6 +18,7 @@ import co.ratmo.anreal.feature.auth.presentation.AppViewModel
 import co.ratmo.anreal.feature.auth.presentation.LoginRoute
 import co.ratmo.anreal.feature.auth.presentation.RegisterRoute
 import co.ratmo.anreal.feature.auth.presentation.authGraph
+import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
 import co.ratmo.anreal.feature.chat.presentation.chatGraph
 import org.koin.compose.viewmodel.koinViewModel
@@ -32,14 +33,18 @@ fun App(
             SessionStatus.Checking -> Box(modifier = Modifier.fillMaxSize())
             SessionStatus.SignedIn,
             SessionStatus.SignedOut,
-            -> AuthenticatedHost(status = status)
+            -> AuthenticatedHost(status = status, viewModel = viewModel)
         }
     }
 }
 
 @Composable
-private fun AuthenticatedHost(status: SessionStatus) {
+private fun AuthenticatedHost(
+    status: SessionStatus,
+    viewModel: AppViewModel,
+) {
     val navController = rememberNavController()
+    val user by viewModel.user.collectAsStateWithLifecycle()
     var hadSession by remember { mutableStateOf(status is SessionStatus.SignedIn) }
     LaunchedEffect(status) {
         when (status) {
@@ -65,6 +70,9 @@ private fun AuthenticatedHost(status: SessionStatus) {
             onNavigateRegister = { navController.navigate(RegisterRoute) },
             onNavigateLogin = { navController.popBackStack() },
         )
-        chatGraph()
+        chatGraph(
+            account = AccountUi(name = user?.name.orEmpty(), email = user?.email.orEmpty()),
+            onSignOut = viewModel::signOut,
+        )
     }
 }

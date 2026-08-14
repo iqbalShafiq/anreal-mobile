@@ -11,22 +11,40 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
+import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatSessionUi
 import co.ratmo.anreal.feature.chat.presentation.ChatState
+import co.ratmo.anreal.feature.chat.presentation.CitedDocumentUi
+import co.ratmo.anreal.feature.chat.presentation.RecentProjectUi
+import co.ratmo.anreal.feature.chat.presentation.SessionDocumentUi
+
+internal val previewAccount = AccountUi(
+    name = "shafiq",
+    email = "shafiq@testing.com",
+)
 
 internal val previewUnreadSession = ChatSessionUi(
     id = "s1",
-    title = "Q3 report",
+    title = "halo boy!",
     unread = true,
+    updatedAt = "2026-08-14T10:00:00Z",
 )
 
 internal val previewReadSession = ChatSessionUi(
     id = "s2",
-    title = "New chat",
+    title = "panduan Anvia",
     unread = false,
+    updatedAt = "2026-08-13T18:00:00Z",
 )
 
-internal val previewSessions = listOf(previewUnreadSession, previewReadSession)
+internal val previewOlderSession = ChatSessionUi(
+    id = "s3",
+    title = "oi, siapa nama gw?",
+    unread = false,
+    updatedAt = "2026-08-12T09:00:00Z",
+)
+
+internal val previewSessions = listOf(previewUnreadSession, previewReadSession, previewOlderSession)
 
 internal val previewUserMessage = ChatMessage(
     id = "u1",
@@ -131,6 +149,29 @@ internal fun chatQueueConflictPreviewState(): ChatState = chatPopulatedPreviewSt
     queue = listOf(QueuedItem(id = "q1", text = "What about costs?")),
     queueConflict = true,
 )
+
+internal fun chatWorkspacePreviewState(): ChatState = chatPopulatedPreviewState().copy(
+    recentProjects = listOf(
+        RecentProjectUi(id = "p1", name = "Agentic Course"),
+        RecentProjectUi(id = "p2", name = "Anvia Project"),
+    ),
+    activeDocuments = listOf(
+        SessionDocumentUi(
+            id = "d1",
+            filename = "Anvia_Framework_Pandua…",
+            summary = "# Anvia Framework — Panduan Lengkap dari Dasar sampai…",
+        ),
+    ),
+    citedDocuments = listOf(
+        CitedDocumentUi(
+            id = "d1",
+            filename = "Anvia_Framework_Panduan_Len…",
+            citationCount = 9,
+        ),
+    ),
+)
+
+internal fun chatDocumentsPreviewState(): ChatState = chatWorkspacePreviewState()
 
 internal fun chatComposerCatalogPreviewState(
     draft: String = "What about costs?",

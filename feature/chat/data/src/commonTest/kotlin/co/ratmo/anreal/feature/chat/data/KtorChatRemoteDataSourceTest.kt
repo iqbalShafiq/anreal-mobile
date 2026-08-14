@@ -47,6 +47,21 @@ class KtorChatRemoteDataSourceTest {
     }
 
     @Test
+    fun listSessionDocuments_maps_array() = runTest {
+        val source = source(
+            path = "/api/documents",
+            body = """[{"id":"d1","filename":"Anvia.pdf","firstPageSummary":"Framework notes"}]""",
+        )
+        when (val result = source.listSessionDocuments("s1")) {
+            is Result.Success -> {
+                assertThat(result.data.single().id).isEqualTo("d1")
+                assertThat(result.data.single().filename).isEqualTo("Anvia.pdf")
+            }
+            is Result.Error -> error("expected success")
+        }
+    }
+
+    @Test
     fun steer_maps_409_to_no_active_run() = runTest {
         val source = source(
             path = "/api/chat/steer",

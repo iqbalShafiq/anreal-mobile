@@ -7,8 +7,11 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ChatRoute(val sessionId: String? = null)
 
-fun NavGraphBuilder.chatGraph() {
+fun NavGraphBuilder.chatGraph(
+    account: AccountUi = AccountUi(),
+    onSignOut: () -> Unit = {},
+) {
     composable<ChatRoute> {
-        ChatRoot()
+        ChatRoot(account = account, onSignOut = onSignOut)
     }
 }

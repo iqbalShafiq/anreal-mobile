@@ -48,4 +48,7 @@ interface ChatRepository {
     suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int)
     suspend fun loadCatalog(): Result<ModelCatalog, ChatError>
     suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError>
+    suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError>
+    suspend fun unlinkSessionDocument(sessionId: String, documentId: String): EmptyResult<ChatError>
+    suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError>
 }

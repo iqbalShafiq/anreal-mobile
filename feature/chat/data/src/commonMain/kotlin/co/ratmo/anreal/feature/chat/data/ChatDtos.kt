@@ -4,7 +4,9 @@ import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
+import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -236,4 +238,40 @@ fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(
 fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(
     webSearchAvailable = webSearchAvailable,
     imageGenerationAvailable = imageGenerationAvailable,
+)
+
+@Serializable
+data class SessionDocumentDto(
+    val id: String,
+    val filename: String,
+    val firstPageSummary: String? = null,
+)
+
+@Serializable
+data class UnlinkDocumentDto(
+    val sessionId: String,
+    val documentId: String,
+)
+
+@Serializable
+data class ProjectListPageDto(
+    val items: List<ProjectListItemDto> = emptyList(),
+    val nextCursor: String? = null,
+)
+
+@Serializable
+data class ProjectListItemDto(
+    val id: String,
+    val name: String,
+)
+
+fun SessionDocumentDto.toDocument(): SessionDocument = SessionDocument(
+    id = id,
+    filename = filename,
+    summary = firstPageSummary.orEmpty(),
+)
+
+fun ProjectListItemDto.toProject(): RecentProject = RecentProject(
+    id = id,
+    name = name,
 )

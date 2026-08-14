@@ -16,7 +16,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -145,6 +147,30 @@ class KtorChatRemoteDataSource(
                 lastEventId = dto.lastEventId,
             )
         }.mapNetwork()
+    }
+
+    suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError> {
+        return httpClient.get<List<SessionDocumentDto>>(
+            route = "/api/documents",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { items -> items.map { it.toDocument() } }.mapNetwork()
+    }
+
+    suspend fun unlinkSessionDocument(
+        sessionId: String,
+        documentId: String,
+    ): EmptyResult<ChatError> {
+        return httpClient.delete(
+            route = "/api/documents/links",
+            body = UnlinkDocumentDto(sessionId = sessionId, documentId = documentId),
+        ).mapNetwork().asEmptyResult()
+    }
+
+    suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
+        return httpClient.get<ProjectListPageDto>(
+            route = "/api/projects",
+            queryParameters = mapOf("limit" to 5, "sort" to "lastOpenedAt"),
+        ).map { page -> page.items.map { it.toProject() } }.mapNetwork()
     }
 }
 

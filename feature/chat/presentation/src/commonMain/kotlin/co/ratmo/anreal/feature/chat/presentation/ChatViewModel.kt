@@ -16,7 +16,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
+import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
@@ -50,6 +52,29 @@ data class ChatSessionUi(
     val id: String,
     val title: String,
     val unread: Boolean,
+    val updatedAt: String = "",
+)
+
+data class AccountUi(
+    val name: String = "",
+    val email: String = "",
+)
+
+data class RecentProjectUi(
+    val id: String,
+    val name: String,
+)
+
+data class SessionDocumentUi(
+    val id: String,
+    val filename: String,
+    val summary: String = "",
+)
+
+data class CitedDocumentUi(
+    val id: String,
+    val filename: String,
+    val citationCount: Int,
 )
 
 @Stable
@@ -83,6 +108,9 @@ data class ChatState(
     val capabilities: ChatCapabilities = ChatCapabilities(),
     val contextSnippet: String? = null,
     val catalogError: UiText? = null,
+    val recentProjects: List<RecentProjectUi> = emptyList(),
+    val activeDocuments: List<SessionDocumentUi> = emptyList(),
+    val citedDocuments: List<CitedDocumentUi> = emptyList(),
 )
 
 sealed interface ChatAction {
@@ -124,12 +152,20 @@ sealed interface ChatAction {
     data object OnPickPhotos : ChatAction
     data object OnPickLocalDocument : ChatAction
     data object OnOpenLibrary : ChatAction
+    data object OnOpenProjects : ChatAction
+    data object OnOpenDocumentsLibrary : ChatAction
+    data object OnOpenImages : ChatAction
+    data object OnOpenSettings : ChatAction
+    data object OnSignOut : ChatAction
+    data class OnOpenRecentProject(val projectId: String) : ChatAction
+    data class OnRemoveActiveDocument(val documentId: String) : ChatAction
 }
 
 sealed interface ChatEvent {
     data class ShowMessage(val message: UiText) : ChatEvent
     data class CopyText(val text: String) : ChatEvent
     data class PickFiles(val imagesOnly: Boolean) : ChatEvent
+    data object SignOut : ChatEvent
 }
 
 class ChatViewModel(
@@ -157,6 +193,7 @@ class ChatViewModel(
         }
         viewModelScope.launch { bootstrap() }
         viewModelScope.launch { loadCatalog() }
+        viewModelScope.launch { loadRecentProjects() }
     }
 
     fun onAction(action: ChatAction) {
@@ -222,6 +259,25 @@ class ChatViewModel(
             }
             ChatAction.OnOpenLibrary -> viewModelScope.launch {
                 _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ATTACH_LIBRARY_EMPTY)))
+            }
+            ChatAction.OnOpenProjects -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_PROJECTS_SOON)))
+            }
+            ChatAction.OnOpenDocumentsLibrary -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_DOCUMENTS_SOON)))
+            }
+            ChatAction.OnOpenImages -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_IMAGES_SOON)))
+            }
+            ChatAction.OnOpenSettings -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_SETTINGS_SOON)))
+            }
+            ChatAction.OnSignOut -> viewModelScope.launch { _events.send(ChatEvent.SignOut) }
+            is ChatAction.OnOpenRecentProject -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_PROJECTS_SOON)))
+            }
+            is ChatAction.OnRemoveActiveDocument -> viewModelScope.launch {
+                unlinkDocument(action.documentId)
             }
         }
     }
@@ -348,9 +404,12 @@ class ChatViewModel(
                 thread = ChatThreadState(),
                 queue = queue,
                 queueHidden = false,
+                activeDocuments = emptyList(),
+                citedDocuments = emptyList(),
             )
         }
         loadHistory(sessionId)
+        loadSessionDocuments(sessionId)
         chatRepository.markRead(sessionId)
         maybeResume(sessionId)
     }
@@ -664,6 +723,36 @@ class ChatViewModel(
         }
     }
 
+    private suspend fun loadRecentProjects() {
+        chatRepository.listRecentProjects()
+            .onSuccess { projects ->
+                _state.update { it.copy(recentProjects = projects.map { project -> project.toUi() }) }
+            }
+    }
+
+    private suspend fun loadSessionDocuments(sessionId: String) {
+        chatRepository.listSessionDocuments(sessionId)
+            .onSuccess { documents ->
+                _state.update { it.copy(activeDocuments = documents.map { document -> document.toUi() }) }
+            }
+            .onFailure {
+                _state.update { it.copy(activeDocuments = emptyList()) }
+            }
+    }
+
+    private suspend fun unlinkDocument(documentId: String) {
+        val sessionId = _state.value.selectedSessionId ?: return
+        chatRepository.unlinkSessionDocument(sessionId, documentId)
+            .onSuccess {
+                _state.update { current ->
+                    current.copy(activeDocuments = current.activeDocuments.filterNot { it.id == documentId })
+                }
+            }
+            .onFailure { error ->
+                _events.send(ChatEvent.ShowMessage(error.toUiText()))
+            }
+    }
+
     private companion object {
         const val SESSION_KEY = "sessionId"
         const val DRAFT_KEY = "draft"
@@ -686,4 +775,13 @@ private fun ChatSession.toUi(): ChatSessionUi = ChatSessionUi(
     id = id,
     title = title.ifBlank { AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT) },
     unread = unread,
+    updatedAt = updatedAt,
+)
+
+private fun RecentProject.toUi(): RecentProjectUi = RecentProjectUi(id = id, name = name)
+
+private fun SessionDocument.toUi(): SessionDocumentUi = SessionDocumentUi(
+    id = id,
+    filename = filename,
+    summary = summary,
 )
