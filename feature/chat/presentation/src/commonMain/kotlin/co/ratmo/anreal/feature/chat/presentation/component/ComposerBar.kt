@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
@@ -33,12 +35,10 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
-import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
-import co.ratmo.anreal.feature.chat.domain.ChatModel
-import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
@@ -53,14 +53,13 @@ import com.composables.icons.materialsymbols.rounded.Stop
 internal fun ComposerBar(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
+    initialSheet: ComposerSheet? = null,
 ) {
-    var sheet by remember { mutableStateOf<ComposerSheet?>(null) }
+    var sheet by remember { mutableStateOf(initialSheet) }
     val streaming = state.isSending || state.thread.status == RunStatus.Streaming
     val canSubmit = state.draft.isNotBlank()
-    val modelLabel = state.models.firstOrNull { it.id == state.selectedModelId }?.label
-        ?: AnrealCopy.get(AnrealCopy.LABEL_MODEL)
-    val reasoningLabel = state.reasoningEfforts.firstOrNull { it.key == state.selectedReasoning }?.label
-        ?: AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE)
+    val modelTriggerLabel = modelAndReasoningLabel(state)
+    val modelTriggerDescription = AnrealCopy.get(AnrealCopy.CD_MODEL)
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
@@ -126,20 +125,14 @@ internal fun ComposerBar(
                         },
                     )
                 }
-                TextButton(onClick = { sheet = ComposerSheet.Model }) {
+                TextButton(
+                    onClick = { sheet = ComposerSheet.Model },
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .semantics { contentDescription = modelTriggerDescription },
+                ) {
                     Text(
-                        text = modelLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Expand_more,
-                        contentDescription = null,
-                    )
-                }
-                TextButton(onClick = { sheet = ComposerSheet.Reasoning }) {
-                    Text(
-                        text = reasoningLabel,
+                        text = modelTriggerLabel,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -226,6 +219,15 @@ private fun ComposerSubmitButton(
     }
 }
 
+internal fun modelAndReasoningLabel(state: ChatState): String {
+    val modelLabel = state.models.firstOrNull { it.id == state.selectedModelId }?.label
+        ?: AnrealCopy.get(AnrealCopy.LABEL_MODEL)
+    val effortLabel = state.selectedReasoning?.let { key ->
+        state.reasoningEfforts.firstOrNull { it.key == key }?.label
+    }
+    return if (effortLabel.isNullOrBlank()) modelLabel else "$modelLabel $effortLabel"
+}
+
 @AnrealPreviews
 @Composable
 private fun ComposerBarEmptyPreview() {
@@ -239,14 +241,18 @@ private fun ComposerBarEmptyPreview() {
 private fun ComposerBarFilledPreview() {
     AnrealPreview {
         ComposerBar(
-            state = chatPopulatedPreviewState(draft = "What about costs?").copy(
-                models = listOf(ChatModel(id = "m1", label = "DeepSeek")),
-                selectedModelId = "m1",
-                reasoningEfforts = listOf(ReasoningEffort(key = "high", label = "High")),
-                selectedReasoning = "high",
-                webSearchEnabled = true,
-                capabilities = ChatCapabilities(webSearchAvailable = true, imageGenerationAvailable = true),
-            ),
+            state = chatComposerCatalogPreviewState(),
+            onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarReasoningNonePreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatComposerCatalogPreviewState(selectedReasoning = null),
             onAction = {},
         )
     }
@@ -274,6 +280,42 @@ private fun ComposerBarStreamingQueuePreview() {
                 status = RunStatus.Streaming,
             ),
             onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarFeaturesSheetPreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatComposerCatalogPreviewState(),
+            onAction = {},
+            initialSheet = ComposerSheet.Features,
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarModelSheetPreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatComposerCatalogPreviewState(),
+            onAction = {},
+            initialSheet = ComposerSheet.Model,
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarAttachSheetPreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatComposerCatalogPreviewState(),
+            onAction = {},
+            initialSheet = ComposerSheet.Attach,
         )
     }
 }

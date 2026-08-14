@@ -2,6 +2,9 @@ package co.ratmo.anreal.feature.chat.presentation.preview
 
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -127,4 +130,39 @@ internal fun chatQueueConflictPreviewState(): ChatState = chatPopulatedPreviewSt
 ).copy(
     queue = listOf(QueuedItem(id = "q1", text = "What about costs?")),
     queueConflict = true,
+)
+
+internal fun chatComposerCatalogPreviewState(
+    draft: String = "What about costs?",
+    selectedReasoning: String? = "xhigh",
+    webSearchEnabled: Boolean = true,
+    imageGenerationEnabled: Boolean = false,
+): ChatState = chatPopulatedPreviewState(draft = draft).copy(
+    models = listOf(
+        ChatModel(
+            id = "luna",
+            label = "GPT Luna 5.6",
+            reasoningEfforts = listOf("low", "high", "xhigh"),
+            contextWindowTokens = 200_000,
+        ),
+        ChatModel(
+            id = "ds",
+            label = "DeepSeek",
+            reasoningEfforts = listOf("low", "high"),
+            contextWindowTokens = 128_000,
+        ),
+    ),
+    selectedModelId = "luna",
+    reasoningEfforts = listOf(
+        ReasoningEffort(key = "low", label = "Low", description = "Faster"),
+        ReasoningEffort(key = "high", label = "High", description = "Deeper"),
+        ReasoningEffort(key = "xhigh", label = "Xhigh", description = "Deepest"),
+    ),
+    selectedReasoning = selectedReasoning,
+    webSearchEnabled = webSearchEnabled,
+    imageGenerationEnabled = imageGenerationEnabled,
+    capabilities = ChatCapabilities(
+        webSearchAvailable = true,
+        imageGenerationAvailable = true,
+    ),
 )

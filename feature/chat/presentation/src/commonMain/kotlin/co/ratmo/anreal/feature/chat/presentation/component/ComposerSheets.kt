@@ -2,21 +2,25 @@ package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -26,14 +30,12 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
-import co.ratmo.anreal.feature.chat.domain.ChatModel
-import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
 
 internal enum class ComposerSheet {
     Model,
-    Reasoning,
     Features,
     Attach,
 }
@@ -47,18 +49,54 @@ internal fun ComposerSheets(
     onDismiss: () -> Unit,
 ) {
     if (sheet == null) return
+    if (LocalInspectionMode.current) {
+        InspectionBottomSheet {
+            ComposerSheetBody(sheet = sheet, state = state, onAction = onAction, onDismiss = onDismiss)
+        }
+        return
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        when (sheet) {
-            ComposerSheet.Model -> ModelSheet(state = state, onAction = onAction, onDismiss = onDismiss)
-            ComposerSheet.Reasoning -> ReasoningSheet(state = state, onAction = onAction, onDismiss = onDismiss)
-            ComposerSheet.Features -> FeaturesSheet(state = state, onAction = onAction)
-            ComposerSheet.Attach -> AttachSheet(onAction = onAction, onDismiss = onDismiss)
+        ComposerSheetBody(sheet = sheet, state = state, onAction = onAction, onDismiss = onDismiss)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InspectionBottomSheet(content: @Composable () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = BottomSheetDefaults.ExpandedShape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = BottomSheetDefaults.Elevation,
+    ) {
+        Column {
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                BottomSheetDefaults.DragHandle()
+            }
+            content()
         }
+    }
+}
+
+@Composable
+private fun ComposerSheetBody(
+    sheet: ComposerSheet,
+    state: ChatState,
+    onAction: (ChatAction) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    when (sheet) {
+        ComposerSheet.Model -> ModelAndReasoningSheet(state = state, onAction = onAction)
+        ComposerSheet.Features -> FeaturesSheet(state = state, onAction = onAction)
+        ComposerSheet.Attach -> AttachSheet(onAction = onAction, onDismiss = onDismiss)
     }
 }
 
@@ -117,11 +155,11 @@ private fun SheetOption(
 }
 
 @Composable
-private fun ModelSheet(
+private fun ModelAndReasoningSheet(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
-    onDismiss: () -> Unit,
 ) {
+    val allowed = state.models.firstOrNull { it.id == state.selectedModelId }?.reasoningEfforts.orEmpty()
     Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = AnrealSpacing.lg)) {
         SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
         state.models.forEach { model ->
@@ -133,42 +171,22 @@ private fun ModelSheet(
                     null
                 },
                 selected = model.id == state.selectedModelId,
-                onClick = {
-                    onAction(ChatAction.OnSelectModel(model.id))
-                    onDismiss()
-                },
+                onClick = { onAction(ChatAction.OnSelectModel(model.id)) },
             )
         }
-    }
-}
-
-@Composable
-private fun ReasoningSheet(
-    state: ChatState,
-    onAction: (ChatAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val allowed = state.models.firstOrNull { it.id == state.selectedModelId }?.reasoningEfforts.orEmpty()
-    Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = AnrealSpacing.lg)) {
         SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_REASONING))
         SheetOption(
             title = AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE),
             subtitle = null,
             selected = state.selectedReasoning == null,
-            onClick = {
-                onAction(ChatAction.OnSelectReasoning(null))
-                onDismiss()
-            },
+            onClick = { onAction(ChatAction.OnSelectReasoning(null)) },
         )
         state.reasoningEfforts.filter { it.key in allowed || allowed.isEmpty() }.forEach { effort ->
             SheetOption(
                 title = effort.label,
                 subtitle = effort.description,
                 selected = state.selectedReasoning == effort.key,
-                onClick = {
-                    onAction(ChatAction.OnSelectReasoning(effort.key))
-                    onDismiss()
-                },
+                onClick = { onAction(ChatAction.OnSelectReasoning(effort.key)) },
             )
         }
     }
@@ -259,16 +277,11 @@ private fun AttachSheet(
 
 @AnrealPreviews
 @Composable
-private fun ModelSheetPreview() {
+private fun ModelAndReasoningSheetPreview() {
     AnrealPreview {
-        ModelSheet(
-            state = ChatState(
-                models = listOf(
-                    ChatModel(id = "m1", label = "DeepSeek", contextWindowTokens = 128000),
-                    ChatModel(id = "m2", label = "GPT", contextWindowTokens = 200000),
-                ),
-                selectedModelId = "m1",
-            ),
+        ComposerSheets(
+            sheet = ComposerSheet.Model,
+            state = chatComposerCatalogPreviewState(),
             onAction = {},
             onDismiss = {},
         )
@@ -279,15 +292,11 @@ private fun ModelSheetPreview() {
 @Composable
 private fun FeaturesSheetPreview() {
     AnrealPreview {
-        FeaturesSheet(
-            state = ChatState(
-                webSearchEnabled = true,
-                capabilities = co.ratmo.anreal.feature.chat.domain.ChatCapabilities(
-                    webSearchAvailable = true,
-                    imageGenerationAvailable = false,
-                ),
-            ),
+        ComposerSheets(
+            sheet = ComposerSheet.Features,
+            state = chatComposerCatalogPreviewState(),
             onAction = {},
+            onDismiss = {},
         )
     }
 }
@@ -296,24 +305,9 @@ private fun FeaturesSheetPreview() {
 @Composable
 private fun AttachSheetPreview() {
     AnrealPreview {
-        AttachSheet(onAction = {}, onDismiss = {})
-    }
-}
-
-@AnrealPreviews
-@Composable
-private fun ReasoningSheetPreview() {
-    AnrealPreview {
-        ReasoningSheet(
-            state = ChatState(
-                models = listOf(ChatModel(id = "m1", label = "DeepSeek", reasoningEfforts = listOf("low", "high"))),
-                selectedModelId = "m1",
-                selectedReasoning = "high",
-                reasoningEfforts = listOf(
-                    ReasoningEffort(key = "low", label = "Low", description = "Faster"),
-                    ReasoningEffort(key = "high", label = "High", description = "Deeper"),
-                ),
-            ),
+        ComposerSheets(
+            sheet = ComposerSheet.Attach,
+            state = chatComposerCatalogPreviewState(),
             onAction = {},
             onDismiss = {},
         )

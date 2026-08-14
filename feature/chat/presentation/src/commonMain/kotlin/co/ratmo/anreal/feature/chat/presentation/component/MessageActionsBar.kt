@@ -5,10 +5,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -35,53 +37,55 @@ internal fun MessageActionsBar(
     val isUser = message.role == ChatRole.User
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(0.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(
+        MessageActionButton(
             onClick = { onAction(ChatAction.OnCopyMessage(text)) },
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(
-                imageVector = MaterialSymbols.Rounded.Content_copy,
-                contentDescription = AnrealCopy.get(AnrealCopy.CD_COPY_MESSAGE),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(
+            imageVector = MaterialSymbols.Rounded.Content_copy,
+            contentDescription = AnrealCopy.get(AnrealCopy.CD_COPY_MESSAGE),
+        )
+        MessageActionButton(
             onClick = { onAction(ChatAction.OnAddContext(text)) },
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(
-                imageVector = MaterialSymbols.Rounded.Reply,
-                contentDescription = AnrealCopy.get(AnrealCopy.CD_ADD_CONTEXT),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            imageVector = MaterialSymbols.Rounded.Reply,
+            contentDescription = AnrealCopy.get(AnrealCopy.CD_ADD_CONTEXT),
+        )
+        if (isUser) {
+            MessageActionButton(
+                onClick = { onAction(ChatAction.OnEditMessage(message.id)) },
+                imageVector = MaterialSymbols.Rounded.Edit,
+                contentDescription = AnrealCopy.get(AnrealCopy.CD_EDIT_MESSAGE),
+                enabled = !busy && text.isNotBlank(),
+            )
+            MessageActionButton(
+                onClick = { onAction(ChatAction.OnRegenerateMessage(message.id)) },
+                imageVector = MaterialSymbols.Rounded.Refresh,
+                contentDescription = AnrealCopy.get(AnrealCopy.CD_REGENERATE),
+                enabled = !busy,
             )
         }
-        if (isUser) {
-            IconButton(
-                onClick = { onAction(ChatAction.OnEditMessage(message.id)) },
-                enabled = !busy && text.isNotBlank(),
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Edit,
-                    contentDescription = AnrealCopy.get(AnrealCopy.CD_EDIT_MESSAGE),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            IconButton(
-                onClick = { onAction(ChatAction.OnRegenerateMessage(message.id)) },
-                enabled = !busy,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Refresh,
-                    contentDescription = AnrealCopy.get(AnrealCopy.CD_REGENERATE),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+    }
+}
+
+@Composable
+private fun MessageActionButton(
+    onClick: () -> Unit,
+    imageVector: ImageVector,
+    contentDescription: String,
+    enabled: Boolean = true,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(IconButtonDefaults.extraSmallContainerSize()),
+        shape = IconButtonDefaults.extraSmallRoundShape,
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(IconButtonDefaults.extraSmallIconSize),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

@@ -5,7 +5,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,7 +31,10 @@ import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Close
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MessageQueueDock(
     state: ChatState,
@@ -68,9 +79,14 @@ internal fun MessageQueueDock(
                     )
                 }
             }
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.queue.any { it.status == QueueStatus.Pending }) {
-                    TextButton(onClick = { onAction(ChatAction.OnSendNow) }) {
+                    val sendNowHeight = ButtonDefaults.ExtraSmallContainerHeight
+                    FilledTonalButton(
+                        onClick = { onAction(ChatAction.OnSendNow) },
+                        modifier = Modifier.heightIn(sendNowHeight),
+                        contentPadding = ButtonDefaults.contentPaddingFor(sendNowHeight),
+                    ) {
                         Text(AnrealCopy.get(AnrealCopy.ACTION_SEND_NOW))
                     }
                 }
@@ -113,8 +129,21 @@ private fun QueueChip(
                 )
             }
         }
-        TextButton(onClick = if (item.status == QueueStatus.Editing) onCancelEdit else onRemove) {
-            Text(AnrealCopy.get(AnrealCopy.CD_REMOVE_QUEUED))
+        IconButton(
+            onClick = if (item.status == QueueStatus.Editing) onCancelEdit else onRemove,
+            modifier = Modifier.size(IconButtonDefaults.extraSmallContainerSize()),
+            shape = IconButtonDefaults.extraSmallRoundShape,
+        ) {
+            Icon(
+                imageVector = MaterialSymbols.Rounded.Close,
+                contentDescription = if (item.status == QueueStatus.Editing) {
+                    AnrealCopy.get(AnrealCopy.ACTION_CANCEL)
+                } else {
+                    AnrealCopy.get(AnrealCopy.CD_REMOVE_QUEUED)
+                },
+                modifier = Modifier.size(IconButtonDefaults.extraSmallIconSize),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
