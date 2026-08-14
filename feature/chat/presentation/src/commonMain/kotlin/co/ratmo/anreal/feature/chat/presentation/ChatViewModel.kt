@@ -10,8 +10,13 @@ import co.ratmo.anreal.core.domain.util.onFailure
 import co.ratmo.anreal.core.domain.util.onSuccess
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
+import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
@@ -69,6 +74,15 @@ data class ChatState(
     val queueExpanded: Boolean = false,
     val queueHidden: Boolean = false,
     val queueConflict: Boolean = false,
+    val models: List<ChatModel> = emptyList(),
+    val reasoningEfforts: List<ReasoningEffort> = emptyList(),
+    val selectedModelId: String? = null,
+    val selectedReasoning: String? = null,
+    val webSearchEnabled: Boolean = false,
+    val imageGenerationEnabled: Boolean = false,
+    val capabilities: ChatCapabilities = ChatCapabilities(),
+    val contextSnippet: String? = null,
+    val catalogError: UiText? = null,
 )
 
 sealed interface ChatAction {
@@ -97,10 +111,25 @@ sealed interface ChatAction {
     data object OnResumeConflict : ChatAction
     data object OnDismissConflict : ChatAction
     data object OnRetryHistory : ChatAction
+    data class OnSelectModel(val modelId: String) : ChatAction
+    data class OnSelectReasoning(val effort: String?) : ChatAction
+    data object OnToggleWebSearch : ChatAction
+    data object OnToggleImageGeneration : ChatAction
+    data object OnRetryCatalog : ChatAction
+    data class OnCopyMessage(val text: String) : ChatAction
+    data class OnAddContext(val text: String) : ChatAction
+    data object OnClearContext : ChatAction
+    data class OnEditMessage(val messageId: String) : ChatAction
+    data class OnRegenerateMessage(val messageId: String) : ChatAction
+    data object OnPickPhotos : ChatAction
+    data object OnPickLocalDocument : ChatAction
+    data object OnOpenLibrary : ChatAction
 }
 
 sealed interface ChatEvent {
     data class ShowMessage(val message: UiText) : ChatEvent
+    data class CopyText(val text: String) : ChatEvent
+    data class PickFiles(val imagesOnly: Boolean) : ChatEvent
 }
 
 class ChatViewModel(
@@ -127,6 +156,7 @@ class ChatViewModel(
             }
         }
         viewModelScope.launch { bootstrap() }
+        viewModelScope.launch { loadCatalog() }
     }
 
     fun onAction(action: ChatAction) {
@@ -165,6 +195,33 @@ class ChatViewModel(
             ChatAction.OnDismissConflict -> _state.update { it.copy(runActiveConflict = false) }
             ChatAction.OnRetryHistory -> viewModelScope.launch {
                 _state.value.selectedSessionId?.let { loadHistory(it) }
+            }
+            is ChatAction.OnSelectModel -> selectModel(action.modelId)
+            is ChatAction.OnSelectReasoning -> _state.update { it.copy(selectedReasoning = action.effort) }
+            ChatAction.OnToggleWebSearch -> _state.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
+            ChatAction.OnToggleImageGeneration -> _state.update {
+                it.copy(imageGenerationEnabled = !it.imageGenerationEnabled)
+            }
+            ChatAction.OnRetryCatalog -> viewModelScope.launch { loadCatalog() }
+            is ChatAction.OnCopyMessage -> viewModelScope.launch {
+                _events.send(ChatEvent.CopyText(action.text))
+            }
+            is ChatAction.OnAddContext -> _state.update { it.copy(contextSnippet = action.text) }
+            ChatAction.OnClearContext -> _state.update { it.copy(contextSnippet = null) }
+            is ChatAction.OnEditMessage -> editMessage(action.messageId)
+            is ChatAction.OnRegenerateMessage -> viewModelScope.launch {
+                _events.send(
+                    ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_REGENERATE_SOON)),
+                )
+            }
+            ChatAction.OnPickPhotos -> viewModelScope.launch {
+                _events.send(ChatEvent.PickFiles(imagesOnly = true))
+            }
+            ChatAction.OnPickLocalDocument -> viewModelScope.launch {
+                _events.send(ChatEvent.PickFiles(imagesOnly = false))
+            }
+            ChatAction.OnOpenLibrary -> viewModelScope.launch {
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ATTACH_LIBRARY_EMPTY)))
             }
         }
     }
@@ -363,7 +420,12 @@ class ChatViewModel(
                 ),
             )
         }
-        val result = chatRepository.sendMessage(sessionId, text, clientMessageId) { line ->
+        val result = chatRepository.sendMessage(
+            sessionId = sessionId,
+            text = text,
+            clientMessageId = clientMessageId,
+            options = currentRunOptions(),
+        ) { line ->
             applyLine(sessionId, line)
         }
         _state.update { current ->
@@ -538,6 +600,57 @@ class ChatViewModel(
         _state.update { it.copy(thread = it.thread.reduce(envelope)) }
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)
+    }
+
+    private suspend fun loadCatalog() {
+        chatRepository.loadCatalog()
+            .onSuccess { catalog ->
+                val selected = _state.value.selectedModelId
+                    ?: catalog.models.firstOrNull()?.id
+                val allowed = catalog.models.firstOrNull { it.id == selected }?.reasoningEfforts.orEmpty()
+                val reasoning = _state.value.selectedReasoning?.takeIf { it in allowed }
+                _state.update {
+                    it.copy(
+                        models = catalog.models,
+                        reasoningEfforts = catalog.efforts,
+                        selectedModelId = selected,
+                        selectedReasoning = reasoning,
+                        catalogError = null,
+                    )
+                }
+            }
+            .onFailure { error ->
+                _state.update { it.copy(catalogError = error.toUiText()) }
+            }
+        chatRepository.loadCapabilities()
+            .onSuccess { capabilities ->
+                _state.update { it.copy(capabilities = capabilities) }
+            }
+    }
+
+    private fun selectModel(modelId: String) {
+        val model = _state.value.models.firstOrNull { it.id == modelId } ?: return
+        val allowed = model.reasoningEfforts
+        val reasoning = _state.value.selectedReasoning?.takeIf { it in allowed }
+        _state.update {
+            it.copy(selectedModelId = modelId, selectedReasoning = reasoning)
+        }
+    }
+
+    private fun editMessage(messageId: String) {
+        val message = _state.value.thread.messages.firstOrNull { it.id == messageId } ?: return
+        val text = message.parts.filterIsInstance<ChatPart.Text>().joinToString("") { it.text }
+        setDraft(text)
+    }
+
+    private fun currentRunOptions(): ChatRunOptions {
+        val current = _state.value
+        return ChatRunOptions(
+            model = current.selectedModelId,
+            reasoningEffort = current.selectedReasoning,
+            webSearchEnabled = current.webSearchEnabled,
+            imageGenerationEnabled = current.imageGenerationEnabled,
+        )
     }
 
     private fun handleSendError(error: ChatError) {

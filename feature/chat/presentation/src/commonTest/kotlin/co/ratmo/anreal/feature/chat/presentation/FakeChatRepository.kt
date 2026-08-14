@@ -3,8 +3,11 @@ package co.ratmo.anreal.feature.chat.presentation
 import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
+import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
@@ -21,6 +24,9 @@ class FakeChatRepository : ChatRepository {
     var sendResult: EmptyResult<ChatError> = Result.Success(Unit)
     var sentText: String? = null
     var sentClientMessageId: String? = null
+    var sentOptions: ChatRunOptions? = null
+    var catalogResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
+    var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
     var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
     var steered: List<QueuedItem> = emptyList()
     var syncResult: Result<List<String>, ChatError> = Result.Success(emptyList())
@@ -75,10 +81,12 @@ class FakeChatRepository : ChatRepository {
         sessionId: String,
         text: String,
         clientMessageId: String?,
+        options: ChatRunOptions,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
         sentText = text
         sentClientMessageId = clientMessageId
+        sentOptions = options
         if (holdSend) {
             if (!sendStarted.isCompleted) sendStarted.complete(Unit)
             allowSendToFinish.await()
@@ -102,6 +110,10 @@ class FakeChatRepository : ChatRepository {
     override suspend fun replaceQueue(sessionId: String, items: List<QueuedItem>) {
         queues[sessionId] = items
     }
+
+    override suspend fun loadCatalog(): Result<ModelCatalog, ChatError> = catalogResult
+
+    override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> = capabilitiesResult
 
     override suspend fun resume(
         sessionId: String,

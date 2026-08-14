@@ -12,7 +12,10 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.domain.util.asEmptyResult
 import co.ratmo.anreal.core.domain.util.map
 import co.ratmo.anreal.core.domain.util.mapError
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
@@ -72,6 +75,7 @@ class KtorChatRemoteDataSource(
         messages: List<ChatMessage>,
         resume: ResumeDto? = null,
         clientMessageId: String? = null,
+        options: ChatRunOptions = ChatRunOptions(),
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
         return httpClient.postJsonl(
@@ -80,9 +84,25 @@ class KtorChatRemoteDataSource(
                 sessionId = sessionId,
                 messages = messages.map { it.toHistoryDto(clientMessageId) },
                 resume = resume,
+                model = options.model,
+                reasoningEffort = options.reasoningEffort,
+                webSearchEnabled = options.webSearchEnabled,
+                imageGenerationEnabled = options.imageGenerationEnabled,
             ),
             onLine = onLine,
         ).toChatResult()
+    }
+
+    suspend fun loadCatalog(): Result<ModelCatalog, ChatError> {
+        return httpClient.get<ModelCatalogDto>(route = "/api/models")
+            .map { it.toCatalog() }
+            .mapNetwork()
+    }
+
+    suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
+        return httpClient.get<CapabilitiesDto>(route = "/api/chat/capabilities")
+            .map { it.toCapabilities() }
+            .mapNetwork()
     }
 
     suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {

@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Auto_awesome
 import com.composables.icons.materialsymbols.rounded.Expand_more
 import com.composables.icons.materialsymbols.rounded.Expand_less
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
@@ -41,6 +42,7 @@ import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
@@ -76,7 +78,8 @@ internal fun ThreadPane(
         }
         state.thread.messages.isEmpty() -> {
             AnrealEmpty(
-                modifier = modifier,
+                modifier = modifier.fillMaxSize(),
+                icon = MaterialSymbols.Rounded.Auto_awesome,
                 title = AnrealCopy.get(AnrealCopy.CHAT_EMPTY_TITLE),
                 body = AnrealCopy.get(AnrealCopy.CHAT_EMPTY_BODY),
             )
@@ -98,7 +101,11 @@ internal fun ThreadPane(
                 verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
             ) {
                 items(state.thread.messages, key = { it.id }) { message ->
-                    MessageBubble(message)
+                    MessageBubble(
+                        message = message,
+                        busy = state.isSending || state.thread.status == RunStatus.Streaming,
+                        onAction = onAction,
+                    )
                 }
             }
         }
@@ -106,7 +113,11 @@ internal fun ThreadPane(
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage) {
+private fun MessageBubble(
+    message: ChatMessage,
+    busy: Boolean,
+    onAction: (ChatAction) -> Unit,
+) {
     val isUser = message.role == ChatRole.User
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -130,6 +141,15 @@ private fun MessageBubble(message: ChatMessage) {
                     }
                 }
             }
+        }
+        val showActions = message.role == ChatRole.User ||
+            (message.role == ChatRole.Assistant && message.isComplete)
+        if (showActions) {
+            MessageActionsBar(
+                message = message,
+                busy = busy,
+                onAction = onAction,
+            )
         }
     }
 }
@@ -237,7 +257,7 @@ private fun ThreadPaneStreamingPreview() {
 private fun MessageBubbleUserPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
-            MessageBubble(previewUserMessage)
+            MessageBubble(previewUserMessage, busy = false, onAction = {})
         }
     }
 }
@@ -247,7 +267,7 @@ private fun MessageBubbleUserPreview() {
 private fun MessageBubbleAssistantPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
-            MessageBubble(previewAssistantMessage)
+            MessageBubble(previewAssistantMessage, busy = false, onAction = {})
         }
     }
 }
@@ -257,7 +277,7 @@ private fun MessageBubbleAssistantPreview() {
 private fun MessageBubbleReasoningPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
-            MessageBubble(previewReasoningAssistant)
+            MessageBubble(previewReasoningAssistant, busy = false, onAction = {})
         }
     }
 }
@@ -268,7 +288,7 @@ private fun MessageBubbleMixedPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
             MessageBubble(
-                ChatMessage(
+                message = ChatMessage(
                     id = "mix",
                     role = ChatRole.Assistant,
                     parts = listOf(
@@ -283,6 +303,8 @@ private fun MessageBubbleMixedPreview() {
                     ),
                     isComplete = true,
                 ),
+                busy = false,
+                onAction = {},
             )
         }
     }
@@ -293,7 +315,7 @@ private fun MessageBubbleMixedPreview() {
 private fun MessageBubbleEmptyPartsPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
-            MessageBubble(previewEmptyPartsMessage)
+            MessageBubble(previewEmptyPartsMessage, busy = false, onAction = {})
         }
     }
 }

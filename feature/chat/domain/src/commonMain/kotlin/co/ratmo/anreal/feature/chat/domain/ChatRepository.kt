@@ -30,6 +30,7 @@ interface ChatRepository {
         sessionId: String,
         text: String,
         clientMessageId: String? = null,
+        options: ChatRunOptions = ChatRunOptions(),
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError>
     suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError>
@@ -45,4 +46,6 @@ interface ChatRepository {
     suspend fun stop(streamId: String): EmptyResult<ChatError>
     suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError>
     suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int)
+    suspend fun loadCatalog(): Result<ModelCatalog, ChatError>
+    suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError>
 }

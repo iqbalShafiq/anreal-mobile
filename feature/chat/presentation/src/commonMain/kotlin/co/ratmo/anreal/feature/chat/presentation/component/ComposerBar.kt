@@ -12,10 +12,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
@@ -24,12 +33,19 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Arrow_upward
+import com.composables.icons.materialsymbols.rounded.Attach_file
+import com.composables.icons.materialsymbols.rounded.Close
+import com.composables.icons.materialsymbols.rounded.Expand_more
 import com.composables.icons.materialsymbols.rounded.South_west
 import com.composables.icons.materialsymbols.rounded.Stop
 
@@ -38,8 +54,13 @@ internal fun ComposerBar(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
 ) {
+    var sheet by remember { mutableStateOf<ComposerSheet?>(null) }
     val streaming = state.isSending || state.thread.status == RunStatus.Streaming
     val canSubmit = state.draft.isNotBlank()
+    val modelLabel = state.models.firstOrNull { it.id == state.selectedModelId }?.label
+        ?: AnrealCopy.get(AnrealCopy.LABEL_MODEL)
+    val reasoningLabel = state.reasoningEfforts.firstOrNull { it.key == state.selectedReasoning }?.label
+        ?: AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE)
     GlassSurface(
         modifier = Modifier
             .fillMaxWidth()
@@ -59,6 +80,27 @@ internal fun ComposerBar(
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
         ) {
             MessageQueueDock(state = state, onAction = onAction)
+            state.contextSnippet?.let { snippet ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = snippet,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    IconButton(
+                        onClick = { onAction(ChatAction.OnClearContext) },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Close,
+                            contentDescription = AnrealCopy.get(AnrealCopy.ACTION_CANCEL),
+                        )
+                    }
+                }
+            }
             AnrealComposerField(
                 value = state.draft,
                 onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
@@ -68,8 +110,55 @@ internal fun ComposerBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
             ) {
+                IconButton(
+                    onClick = { sheet = ComposerSheet.Features },
+                    modifier = Modifier.size(AnrealSpacing.touch),
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Add,
+                        contentDescription = AnrealCopy.get(AnrealCopy.CD_FEATURES),
+                        tint = if (state.webSearchEnabled || state.imageGenerationEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    )
+                }
+                TextButton(onClick = { sheet = ComposerSheet.Model }) {
+                    Text(
+                        text = modelLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Expand_more,
+                        contentDescription = null,
+                    )
+                }
+                TextButton(onClick = { sheet = ComposerSheet.Reasoning }) {
+                    Text(
+                        text = reasoningLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Expand_more,
+                        contentDescription = null,
+                    )
+                }
                 Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { sheet = ComposerSheet.Attach },
+                    modifier = Modifier.size(AnrealSpacing.touch),
+                ) {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Attach_file,
+                        contentDescription = AnrealCopy.get(AnrealCopy.CD_ATTACH),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 ComposerSubmitButton(
                     streaming = streaming,
                     canSubmit = canSubmit,
@@ -78,6 +167,12 @@ internal fun ComposerBar(
             }
         }
     }
+    ComposerSheets(
+        sheet = sheet,
+        state = state,
+        onAction = onAction,
+        onDismiss = { sheet = null },
+    )
 }
 
 @Composable
@@ -144,7 +239,14 @@ private fun ComposerBarEmptyPreview() {
 private fun ComposerBarFilledPreview() {
     AnrealPreview {
         ComposerBar(
-            state = chatPopulatedPreviewState(draft = "What about costs?"),
+            state = chatPopulatedPreviewState(draft = "What about costs?").copy(
+                models = listOf(ChatModel(id = "m1", label = "DeepSeek")),
+                selectedModelId = "m1",
+                reasoningEfforts = listOf(ReasoningEffort(key = "high", label = "High")),
+                selectedReasoning = "high",
+                webSearchEnabled = true,
+                capabilities = ChatCapabilities(webSearchAvailable = true, imageGenerationAvailable = true),
+            ),
             onAction = {},
         )
     }

@@ -13,6 +13,9 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import kotlinx.coroutines.Dispatchers
@@ -286,6 +289,32 @@ class ChatViewModelTest {
         advanceUntilIdle()
         assertThat(viewModel.state.value.queueConflict).isFalse()
         assertThat(viewModel.state.value.queue.size).isEqualTo(queuedBefore)
+    }
+
+    @Test
+    fun selecting_model_and_send_stamps_run_options() = runTest {
+        val fake = populatedRepo().apply {
+            catalogResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(
+                        ChatModel(id = "m1", label = "DeepSeek", reasoningEfforts = listOf("high")),
+                    ),
+                    efforts = listOf(ReasoningEffort(key = "high", label = "High")),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnSelectModel("m1"))
+        viewModel.onAction(ChatAction.OnSelectReasoning("high"))
+        viewModel.onAction(ChatAction.OnToggleWebSearch)
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.sentOptions?.model).isEqualTo("m1")
+        assertThat(fake.sentOptions?.reasoningEffort).isEqualTo("high")
+        assertThat(fake.sentOptions?.webSearchEnabled).isEqualTo(true)
     }
 
     private fun populatedRepo(): FakeChatRepository = FakeChatRepository().apply {

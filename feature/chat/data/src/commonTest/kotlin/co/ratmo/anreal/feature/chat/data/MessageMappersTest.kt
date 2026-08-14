@@ -65,6 +65,19 @@ class MessageMappersTest {
     }
 
     @Test
+    fun catalog_filters_image_models() {
+        val catalog = ModelCatalogDto(
+            models = listOf(
+                ModelInfoDto(modelId = "chat-1", label = "DeepSeek", outputType = "text"),
+                ModelInfoDto(modelId = "img-1", label = "Flux", outputType = "image"),
+            ),
+            reasoningEfforts = listOf(ReasoningEffortDto(key = "high", label = "High")),
+        ).toCatalog()
+        assertThat(catalog.models.map { it.id }).isEqualTo(listOf("chat-1"))
+        assertThat(catalog.efforts.single().key).isEqualTo("high")
+    }
+
+    @Test
     fun history_dto_maps_tool_content() {
         val dto = HistoryMessageDto(
             role = "assistant",

@@ -1,6 +1,10 @@
 package co.ratmo.anreal.feature.chat.data
 
 import co.ratmo.anreal.core.domain.model.ChatSession
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -63,6 +67,38 @@ data class ChatRequestDto(
     val messages: List<HistoryMessageDto>,
     val stream: Boolean = true,
     val resume: ResumeDto? = null,
+    val model: String? = null,
+    val reasoningEffort: String? = null,
+    val webSearchEnabled: Boolean = false,
+    val imageGenerationEnabled: Boolean = false,
+)
+
+@Serializable
+data class ModelCatalogDto(
+    val models: List<ModelInfoDto> = emptyList(),
+    val reasoningEfforts: List<ReasoningEffortDto> = emptyList(),
+)
+
+@Serializable
+data class ModelInfoDto(
+    val modelId: String,
+    val label: String,
+    val reasoningEfforts: List<String> = emptyList(),
+    val contextWindowTokens: Int = 0,
+    val outputType: String = "text",
+)
+
+@Serializable
+data class ReasoningEffortDto(
+    val key: String,
+    val label: String,
+    val description: String? = null,
+)
+
+@Serializable
+data class CapabilitiesDto(
+    val webSearchAvailable: Boolean = false,
+    val imageGenerationAvailable: Boolean = false,
 )
 
 @Serializable
@@ -180,3 +216,24 @@ fun ChatMessage.toHistoryDto(clientMessageId: String? = null): HistoryMessageDto
         metadata = clientMessageId?.let { HistoryMetadataDto(clientMessageId = it) },
     )
 }
+
+fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(
+    models = models
+        .filter { it.outputType != "image" }
+        .map { dto ->
+            ChatModel(
+                id = dto.modelId,
+                label = dto.label,
+                reasoningEfforts = dto.reasoningEfforts,
+                contextWindowTokens = dto.contextWindowTokens,
+            )
+        },
+    efforts = reasoningEfforts.map { dto ->
+        ReasoningEffort(key = dto.key, label = dto.label, description = dto.description)
+    },
+)
+
+fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(
+    webSearchAvailable = webSearchAvailable,
+    imageGenerationAvailable = imageGenerationAvailable,
+)

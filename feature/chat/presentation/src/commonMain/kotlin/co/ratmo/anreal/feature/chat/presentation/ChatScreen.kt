@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -57,16 +59,26 @@ import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
+@Suppress("DEPRECATION")
 fun ChatRoot(
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
+    @Suppress("DEPRECATION")
+    val clipboard = LocalClipboardManager.current
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             is ChatEvent.ShowMessage -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(event.message.asString())
+            }
+            is ChatEvent.CopyText -> snackbarScope.launch {
+                clipboard.setText(AnnotatedString(event.text))
+                snackbarHostState.showSnackbar(AnrealCopy.get(AnrealCopy.TOAST_COPIED))
+            }
+            is ChatEvent.PickFiles -> snackbarScope.launch {
+                snackbarHostState.showSnackbar(AnrealCopy.get(AnrealCopy.TOAST_PICKER_SOON))
             }
         }
     }

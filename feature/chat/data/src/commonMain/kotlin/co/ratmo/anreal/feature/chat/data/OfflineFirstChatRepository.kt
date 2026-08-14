@@ -4,8 +4,11 @@ import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.domain.util.onSuccess
+import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
+import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
@@ -60,6 +63,7 @@ class OfflineFirstChatRepository(
         sessionId: String,
         text: String,
         clientMessageId: String?,
+        options: ChatRunOptions,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
         val id = clientMessageId ?: "local-user"
@@ -73,8 +77,15 @@ class OfflineFirstChatRepository(
             sessionId = sessionId,
             messages = listOf(user),
             clientMessageId = clientMessageId,
+            options = options,
             onLine = onLine,
         )
+    }
+
+    override suspend fun loadCatalog(): Result<ModelCatalog, ChatError> = remote.loadCatalog()
+
+    override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
+        return remote.loadCapabilities()
     }
 
     override suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {
