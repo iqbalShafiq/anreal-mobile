@@ -42,6 +42,11 @@ object AnrealCopy {
     const val ACTION_STOP = "action_stop"
     const val ACTION_RESUME = "action_resume"
     const val COMPOSER_PLACEHOLDER = "composer_placeholder"
+    const val CD_OPEN_CHATS = "cd_open_chats"
+    const val LABEL_CHATS = "label_chats"
+    const val LABEL_UNREAD = "label_unread"
+    const val DIALOG_RUN_ACTIVE_TITLE = "dialog_run_active_title"
+    const val ACTION_WAIT = "action_wait"
 
     fun get(key: String): String {
         return when (key) {
@@ -85,6 +90,11 @@ object AnrealCopy {
             ACTION_STOP -> "Stop"
             ACTION_RESUME -> "Resume"
             COMPOSER_PLACEHOLDER -> "Ask a question"
+            CD_OPEN_CHATS -> "Open chats"
+            LABEL_CHATS -> "Chats"
+            LABEL_UNREAD -> "Unread"
+            DIALOG_RUN_ACTIVE_TITLE -> "Chat already running"
+            ACTION_WAIT -> "Wait"
             else -> key
         }
     }

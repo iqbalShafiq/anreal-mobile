@@ -9,6 +9,7 @@ import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.SessionPage
+import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -65,7 +66,7 @@ class ChatViewModelTest {
 
         assertThat(fake.sentText).isEqualTo("Hello docs")
         assertThat(viewModel.state.value.draft).isEqualTo("")
-        assertThat(viewModel.state.value.thread.messages.any { it.role.name == "User" }).isTrue()
+        assertThat(viewModel.state.value.thread.messages.any { it.role == ChatRole.User }).isTrue()
     }
 
     @Test

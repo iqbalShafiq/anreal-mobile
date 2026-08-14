@@ -23,10 +23,13 @@ class KtorChatRemoteDataSourceTest {
             body = """{"items":[{"sessionId":"s1","title":"Docs","updatedAt":"2026-08-14T00:00:00Z","unread":true}],"nextCursor":null}""",
         )
 
-        val result = source.listSessions()
-
-        assertThat((result as Result.Success).data.items.single().id).isEqualTo("s1")
-        assertThat(result.data.items.single().unread).isEqualTo(true)
+        when (val result = source.listSessions()) {
+            is Result.Success -> {
+                assertThat(result.data.items.single().id).isEqualTo("s1")
+                assertThat(result.data.items.single().unread).isEqualTo(true)
+            }
+            is Result.Error -> error("expected success")
+        }
     }
 
     @Test

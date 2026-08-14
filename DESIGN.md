@@ -119,6 +119,14 @@ Do not rebuild buttons, fields, dialogs, lists, or navigation. Theme them.
 
 Pressable things scale to **0.97** on press (see Motion). Hover styles are pointer-fine only.
 
+### 5.1 Chat UI is app-owned
+
+We do **not** port `@anvia/react-ui`. On web that package is headless (structure + `data-anvia-*`) and is patched so the composer stays editable while streaming. Mobile already owns the composer, so that lock must never ship.
+
+- Thread, composer, and later tool/approval cards are **slot composables** in `feature:chat:presentation` (typed params, M3 + Anreal tokens).
+- Do not add a separate unstyled chat-ui module until a second feature needs the same primitives.
+- Composer field stays enabled during a run. Stop replaces Send. Queue (later) uses the same field.
+
 ---
 
 ## 6. Glassmorphism (Haze — the only correct path)
@@ -257,7 +265,7 @@ UX is the product. A screen that only implements the happy path is unfinished. E
 | **Confirm destructive** | Dialog: what is lost, confirm verb, cancel | “Delete chat” not “OK”. |
 | **Permission / approval** | Allow once / Allow for session / Reject | Same copy as web. |
 | **Conflict / stale** | Dialog with a resume path | 409 `RUN_ACTIVE`, stale session. |
-| **Streaming** | Tokens appear; stop is always available | Composer stays editable (queue). |
+| **Streaming** | Tokens appear; stop is always available | Composer **stays editable**. Send becomes Stop. Do not lock the field. |
 
 ### 8.2 Per-surface checklist
 

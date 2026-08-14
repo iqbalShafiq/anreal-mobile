@@ -23,6 +23,7 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 :build-logic
 :core:domain
 :core:data
+:core:database          ← Room 3 KMP (sessions, messages)
 :core:presentation
 :core:design-system
 :feature:<name>:domain
@@ -69,7 +70,7 @@ A concern becomes its own `:core:*` module only when it has a non-trivial API. O
 | Tests | JUnit 5, Turbine, AssertK, coroutines-test, fakes |
 | Screenshots | Roborazzi |
 
-No Room in v1 (online-first). No Anvia Kotlin SDK — chat owns a JSONL parser + reducer.
+Local cache is **Room 3** (`androidx.room3` + bundled SQLite) in `:core:database`. Do not add Room 2.x. No Anvia Kotlin SDK — chat owns a JSONL parser + reducer.
 
 Versions live in `gradle/libs.versions.toml` only.
 
@@ -110,9 +111,12 @@ Each `Screen` needs previews for light/dark and at least populated + one of load
 
 Chat streaming:
 
-- Parser + **pure reducer** live in `feature:chat:domain` (or data for IO, domain for reduce).
+- Parser + **pure reducer** live in `feature:chat:domain`. This is the protocol/headless layer.
 - ViewModels apply reducer output. Composables do not parse JSONL.
 - Extend the reducer for tools/images/queue. Do not fork a second stream pipeline.
+- The composer **stays editable while a run is streaming** (queue later). Never lock the field the way stock `@anvia/react-ui` does — the web repo patches that SDK; we own the composer so we do not port the lock.
+
+Do **not** add a `:core:chat-ui` / Anvia-style headless module until a second feature needs the same unstyled thread/composer/tool primitives. Until then, slot composables stay in `feature:chat:presentation` (`ThreadPane`, `ComposerBar`, later tool cards). Do not clone `@anvia/react-ui`.
 
 ---
 
@@ -166,7 +170,16 @@ Read `DESIGN.md` before writing UI.
 
 ---
 
-## 11. Quality bar
+## 11. Kotlin style
+
+- Import types. **Never** write a fully-qualified name in an expression (`co.ratmo.anreal.feature.chat.domain.stream.ChatRole.User`). `ChatRole.User` after an import is the default.
+- `import foo.Bar as Baz` only when two imported types share a simple name. Do not alias “just in case”.
+- Prefer `when (result)` / `onSuccess` / `onFailure` over `as Result.Success`.
+- Compose-owned chrome (`DrawerState`, `LazyListState`, `ScrollState`) stays in the Screen. Do not mirror it into ViewModel state.
+
+---
+
+## 12. Quality bar
 
 - No compile errors. Warnings are errors (`allWarningsAsErrors` in convention plugins).
 - No unused parameters, no unexplained `!!`, no unused imports.
@@ -183,7 +196,7 @@ A single happy-path preview is not verification. Exercise loading, empty, error,
 
 ---
 
-## 12. GitHub workflow
+## 13. GitHub workflow
 
 - Public repo: `iqbalShafiq/anreal-mobile`.
 - One issue per slice. Do not start Milestone 3 until Chat core (parser, sessions, send/resume) is tested.

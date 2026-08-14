@@ -25,8 +25,9 @@ class FakeChatRepository : ChatRepository {
     override fun observeSessions(): Flow<List<ChatSession>> = sessions
 
     override suspend fun refreshSessions(): Result<SessionPage, ChatError> {
-        if (refreshResult is Result.Success) {
-            sessions.value = (refreshResult as Result.Success).data.items
+        when (val result = refreshResult) {
+            is Result.Success -> sessions.value = result.data.items
+            is Result.Error -> Unit
         }
         return refreshResult
     }

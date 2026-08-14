@@ -1,5 +1,6 @@
 package co.ratmo.anreal.feature.chat.presentation
 
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,6 +8,7 @@ import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.domain.util.onFailure
 import co.ratmo.anreal.core.domain.util.onSuccess
+import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
@@ -31,6 +33,7 @@ data class ChatSessionUi(
     val unread: Boolean,
 )
 
+@Stable
 data class ChatState(
     val sessions: List<ChatSessionUi> = emptyList(),
     val sessionsLoading: Boolean = true,
@@ -42,7 +45,6 @@ data class ChatState(
     val draft: String = "",
     val isSending: Boolean = false,
     val runActiveConflict: Boolean = false,
-    val drawerOpen: Boolean = false,
 )
 
 sealed interface ChatAction {
@@ -57,8 +59,6 @@ sealed interface ChatAction {
     data object OnResumeConflict : ChatAction
     data object OnDismissConflict : ChatAction
     data object OnRetryHistory : ChatAction
-    data object OnOpenDrawer : ChatAction
-    data object OnCloseDrawer : ChatAction
 }
 
 sealed interface ChatEvent {
@@ -118,8 +118,6 @@ class ChatViewModel(
             ChatAction.OnRetryHistory -> viewModelScope.launch {
                 _state.value.selectedSessionId?.let { loadHistory(it) }
             }
-            ChatAction.OnOpenDrawer -> _state.update { it.copy(drawerOpen = true) }
-            ChatAction.OnCloseDrawer -> _state.update { it.copy(drawerOpen = false) }
         }
     }
 
@@ -164,7 +162,6 @@ class ChatViewModel(
         _state.update {
             it.copy(
                 selectedSessionId = sessionId,
-                drawerOpen = false,
                 runActiveConflict = false,
                 thread = ChatThreadState(),
             )
@@ -277,6 +274,6 @@ class ChatViewModel(
 
 private fun ChatSession.toUi(): ChatSessionUi = ChatSessionUi(
     id = id,
-    title = title.ifBlank { "New chat" },
+    title = title.ifBlank { AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT) },
     unread = unread,
 )

@@ -30,6 +30,7 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,7 @@ import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Menu
 import com.composables.icons.materialsymbols.rounded.Send
 import com.composables.icons.materialsymbols.rounded.Stop
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -71,18 +73,10 @@ fun ChatScreen(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
 ) {
-    val drawerState = rememberDrawerState(
-        initialValue = if (state.drawerOpen) DrawerValue.Open else DrawerValue.Closed,
-    )
-    LaunchedEffect(state.drawerOpen) {
-        if (state.drawerOpen) drawerState.open() else drawerState.close()
-    }
-    LaunchedEffect(drawerState.currentValue) {
-        if (drawerState.currentValue == DrawerValue.Open) {
-            onAction(ChatAction.OnOpenDrawer)
-        } else {
-            onAction(ChatAction.OnCloseDrawer)
-        }
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(state.selectedSessionId) {
+        drawerState.close()
     }
 
     ModalNavigationDrawer(
@@ -100,13 +94,16 @@ fun ChatScreen(
             topBar = {
                 TopAppBar(
                     title = {
-                        Text(state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title ?: "Anreal")
+                        Text(
+                            state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title
+                                ?: AnrealCopy.get(AnrealCopy.LABEL_CHATS),
+                        )
                     },
                     navigationIcon = {
-                        IconButton(onClick = { onAction(ChatAction.OnOpenDrawer) }) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
                             Icon(
                                 imageVector = MaterialSymbols.Rounded.Menu,
-                                contentDescription = "Open chats",
+                                contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_CHATS),
                             )
                         }
                     },
@@ -139,7 +136,7 @@ fun ChatScreen(
     if (state.runActiveConflict) {
         AlertDialog(
             onDismissRequest = { onAction(ChatAction.OnDismissConflict) },
-            title = { Text("Chat already running") },
+            title = { Text(AnrealCopy.get(AnrealCopy.DIALOG_RUN_ACTIVE_TITLE)) },
             text = { Text(AnrealCopy.get(AnrealCopy.ERROR_RUN_ACTIVE)) },
             confirmButton = {
                 TextButton(onClick = { onAction(ChatAction.OnResumeConflict) }) {
@@ -148,7 +145,7 @@ fun ChatScreen(
             },
             dismissButton = {
                 TextButton(onClick = { onAction(ChatAction.OnDismissConflict) }) {
-                    Text("Wait")
+                    Text(AnrealCopy.get(AnrealCopy.ACTION_WAIT))
                 }
             },
         )
@@ -162,7 +159,7 @@ private fun SessionDrawer(
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(AnrealSpacing.md)) {
         Text(
-            text = "Chats",
+            text = AnrealCopy.get(AnrealCopy.LABEL_CHATS),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(bottom = AnrealSpacing.sm),
         )
@@ -190,7 +187,7 @@ private fun SessionDrawer(
                         ListItem(
                             headlineContent = { Text(session.title) },
                             supportingContent = if (session.unread) {
-                                { Text("Unread") }
+                                { Text(AnrealCopy.get(AnrealCopy.LABEL_UNREAD)) }
                             } else {
                                 null
                             },
@@ -293,7 +290,6 @@ private fun ComposerBar(
             onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
             modifier = Modifier.weight(1f),
             placeholder = { Text(AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER)) },
-            enabled = !state.isSending,
             singleLine = false,
             maxLines = 4,
         )
