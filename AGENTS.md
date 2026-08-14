@@ -93,6 +93,12 @@ Every screen:
 - Do not inject `CoroutineDispatcher` unless the class is unit-tested *and* hops off Main.
 - `@Stable` only when state contains `List`/`Map`/interfaces. Prefer immutable collections.
 
+### Screen files stay thin
+
+A `*Screen.kt` file holds only Root, Screen, and that screen’s previews. Feature-owned pieces (drawer, thread, composer, dialogs) live in `presentation/component/`. Group by visual unit — a row that only the drawer uses stays with the drawer; do not force one composable per file. Shared preview fixtures live in `presentation/preview/`.
+
+Each extracted composable previews every state it can show (`@AnrealPreviews` + `AnrealPreview`). Screen previews still cover the assembled states (loading, empty, error, populated, plus in-flight / conflict where they exist).
+
 ### UX states are mandatory
 
 A screen that only handles the happy path is incomplete. `State` must be able to represent **loading, empty, error, populated**, plus action-in-flight and success where the screen mutates. See `DESIGN.md` §8.
@@ -116,7 +122,7 @@ Chat streaming:
 - Extend the reducer for tools/images/queue. Do not fork a second stream pipeline.
 - The composer **stays editable while a run is streaming** (queue later). Never lock the field the way stock `@anvia/react-ui` does — the web repo patches that SDK; we own the composer so we do not port the lock.
 
-Do **not** add a `:core:chat-ui` / Anvia-style headless module until a second feature needs the same unstyled thread/composer/tool primitives. Until then, slot composables stay in `feature:chat:presentation` (`ThreadPane`, `ComposerBar`, later tool cards). Do not clone `@anvia/react-ui`.
+Do **not** add a `:core:chat-ui` / Anvia-style headless module until a second feature needs the same unstyled thread/composer/tool primitives. Until then, slot composables stay in `feature:chat:presentation/component/` (`ThreadPane`, `ComposerBar`, later tool cards). Do not clone `@anvia/react-ui`.
 
 ---
 
