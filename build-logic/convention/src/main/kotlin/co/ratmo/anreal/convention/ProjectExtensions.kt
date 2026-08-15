@@ -16,11 +16,25 @@ internal fun Project.intVersion(alias: String): Int =
     libs.findVersion(alias).get().requiredVersion.toInt()
 
 internal fun Project.resolveBaseUrl(): String {
+    return resolveAnrealProperty("anreal.baseUrl") ?: "http://127.0.0.1:3001"
+}
+
+internal fun Project.resolveEnvironment(): String {
+    val raw = resolveAnrealProperty("anreal.environment") ?: "development"
+    return when (raw.lowercase()) {
+        "development", "dev" -> "development"
+        "staging", "stage" -> "staging"
+        "production", "prod" -> "production"
+        else -> error("Unknown anreal.environment=$raw. Use development, staging, or production.")
+    }
+}
+
+private fun Project.resolveAnrealProperty(key: String): String? {
     val localFile = rootProject.file("local.properties")
     if (localFile.exists()) {
         val properties = Properties()
         localFile.inputStream().use(properties::load)
-        properties.getProperty("anreal.baseUrl")?.takeIf { it.isNotBlank() }?.let { return it }
+        properties.getProperty(key)?.takeIf { it.isNotBlank() }?.let { return it }
     }
-    return findProperty("anreal.baseUrl") as String? ?: "http://127.0.0.1:3001"
+    return (findProperty(key) as String?)?.takeIf { it.isNotBlank() }
 }

@@ -1,23 +1,25 @@
 package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.em
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -39,6 +41,13 @@ fun AnrealTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+        color = if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        },
+    )
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
@@ -55,27 +64,46 @@ fun AnrealTextField(
             emphasized = focused && error == null,
             error = error != null,
         ) {
-            OutlinedTextField(
-                value = value,
-                onValueChange = onValueChange,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onFocusChanged { focused = it.isFocused },
-                enabled = enabled,
-                isError = error != null,
-                placeholder = if (placeholder.isNotEmpty()) {
-                    { Text(placeholder) }
-                } else {
-                    null
-                },
-                trailingIcon = trailingIcon,
-                visualTransformation = visualTransformation,
-                keyboardOptions = keyboardOptions,
-                keyboardActions = keyboardActions,
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge,
-                colors = anrealFieldColors(),
-            )
+                    .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                BasicTextField(
+                    value = value,
+                    onValueChange = onValueChange,
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged { focused = it.isFocused },
+                    enabled = enabled,
+                    textStyle = textStyle,
+                    cursorBrush = SolidColor(
+                        if (error != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    ),
+                    visualTransformation = visualTransformation,
+                    keyboardOptions = keyboardOptions,
+                    keyboardActions = keyboardActions,
+                    singleLine = true,
+                    decorationBox = { inner ->
+                        Box {
+                            if (value.isEmpty()) {
+                                Text(
+                                    text = placeholder,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            inner()
+                        }
+                    },
+                )
+                trailingIcon?.invoke()
+            }
         }
         if (error != null) {
             Text(
@@ -86,26 +114,6 @@ fun AnrealTextField(
         }
     }
 }
-
-@Composable
-internal fun anrealFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedContainerColor = Color.Transparent,
-    unfocusedContainerColor = Color.Transparent,
-    errorContainerColor = Color.Transparent,
-    disabledContainerColor = Color.Transparent,
-    focusedBorderColor = Color.Transparent,
-    unfocusedBorderColor = Color.Transparent,
-    errorBorderColor = Color.Transparent,
-    disabledBorderColor = Color.Transparent,
-    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-    disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-    errorTextColor = MaterialTheme.colorScheme.onSurface,
-    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-    cursorColor = MaterialTheme.colorScheme.primary,
-    errorCursorColor = MaterialTheme.colorScheme.error,
-)
 
 @AnrealPreviews
 @Composable

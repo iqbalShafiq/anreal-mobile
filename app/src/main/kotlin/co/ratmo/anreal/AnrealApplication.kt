@@ -2,6 +2,7 @@ package co.ratmo.anreal
 
 import android.app.Application
 import co.ratmo.anreal.core.data.AppConfig
+import co.ratmo.anreal.core.data.AppEnvironment
 import co.ratmo.anreal.core.data.di.coreDataModule
 import co.ratmo.anreal.core.database.databaseModule
 import co.ratmo.anreal.feature.auth.data.authDataModule
@@ -18,7 +19,14 @@ class AnrealApplication : Application() {
         startKoin {
             androidContext(this@AnrealApplication)
             modules(
-                module { single { AppConfig(BuildConfig.BASE_URL) } },
+                module {
+                    single {
+                        AppConfig(
+                            environment = AppEnvironment.parse(BuildConfig.ENVIRONMENT),
+                            baseUrl = BuildConfig.BASE_URL,
+                        )
+                    }
+                },
                 coreDataModule,
                 databaseModule,
                 authDataModule,

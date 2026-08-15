@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
@@ -103,6 +104,7 @@ fun GlassDrawer(
         modifier = modifier
             .fillMaxHeight()
             .width(GlassDrawerWidth)
+            .clip(shape)
             .then(frost)
             .border(width = 1.dp, color = border, shape = shape),
         shape = shape,

@@ -24,6 +24,7 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     versionCode = 1
                     versionName = "1.0"
                     buildConfigField("String", "BASE_URL", "\"${resolveBaseUrl()}\"")
+                    buildConfigField("String", "ENVIRONMENT", "\"${resolveEnvironment()}\"")
                 }
 
                 compileOptions {

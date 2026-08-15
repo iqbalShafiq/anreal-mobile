@@ -2,7 +2,6 @@ package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -49,9 +48,7 @@ fun AnrealEmpty(
             textAlign = TextAlign.Center,
         )
         if (actionLabel != null && onAction != null) {
-            Button(onClick = onAction) {
-                Text(actionLabel)
-            }
+            AnrealPrimaryButton(label = actionLabel, onClick = onAction)
         }
     }
 }
