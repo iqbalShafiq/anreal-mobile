@@ -113,6 +113,7 @@ fun GlassDrawer(
         } else {
             scheme.surfaceContainer.copy(alpha = 0.94f)
         },
+        contentColor = scheme.onSurface,
         content = {
             Column(
                 modifier = Modifier

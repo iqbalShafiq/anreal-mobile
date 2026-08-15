@@ -170,6 +170,7 @@ private fun DrawerHeader(
             text = AnrealCopy.get(AnrealCopy.LABEL_APP_NAME),
             modifier = Modifier.padding(start = AnrealSpacing.sm).weight(1f),
             style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -180,6 +181,7 @@ private fun DrawerHeader(
             Icon(
                 imageVector = MaterialSymbols.Rounded.Edit_square,
                 contentDescription = AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT),
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
@@ -422,6 +424,7 @@ private fun AccountFooter(
             Text(
                 text = account.name.ifBlank { AnrealCopy.get(AnrealCopy.LABEL_APP_NAME) },
                 style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -440,6 +443,7 @@ private fun AccountFooter(
                 Icon(
                     imageVector = MaterialSymbols.Rounded.Expand_less,
                     contentDescription = AnrealCopy.get(AnrealCopy.CD_ACCOUNT_MENU),
+                    tint = MaterialTheme.colorScheme.onSurface,
                 )
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
