@@ -1,7 +1,10 @@
 package co.ratmo.anreal.core.designsystem.component
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -13,9 +16,11 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
@@ -24,7 +29,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -38,9 +45,28 @@ fun AnrealPrimaryButton(
 ) {
     val resolvedLabel = if (loading) loadingLabel else label
     val canClick = enabled && !loading
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val reduceMotion = LocalAnrealReduceMotion.current
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed && canClick && !reduceMotion) {
+            AnrealMotion.pressScale
+        } else {
+            1f
+        },
+        animationSpec = tween(
+            durationMillis = AnrealMotion.durationFast.inWholeMilliseconds.toInt(),
+            easing = AnrealMotion.easeOut,
+        ),
+        label = "pressScale",
+    )
     GlassSurface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .semantics {
                 role = Role.Button
                 if (loading) liveRegion = LiveRegionMode.Polite
@@ -54,7 +80,7 @@ fun AnrealPrimaryButton(
                 .fillMaxWidth()
                 .clickable(
                     enabled = canClick,
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick,
                 )

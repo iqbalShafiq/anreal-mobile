@@ -11,12 +11,14 @@ import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
+import co.ratmo.anreal.feature.auth.presentation.BoardingRoute
 import co.ratmo.anreal.feature.auth.presentation.LoginRoute
 import co.ratmo.anreal.feature.auth.presentation.RegisterRoute
 import co.ratmo.anreal.feature.chat.presentation.AccountRoute
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
 
 enum class AnrealRouteKind {
+    Boarding,
     Login,
     Register,
     Chat,
@@ -33,11 +35,15 @@ enum class AnrealNavMotion {
 }
 
 fun classifyNavMotion(from: AnrealRouteKind, to: AnrealRouteKind): AnrealNavMotion {
-    val fromAuth = from == AnrealRouteKind.Login || from == AnrealRouteKind.Register
-    val toAuth = to == AnrealRouteKind.Login || to == AnrealRouteKind.Register
-    val fromApp = from == AnrealRouteKind.Chat || from == AnrealRouteKind.Account
-    val toApp = to == AnrealRouteKind.Chat || to == AnrealRouteKind.Account
+    val fromAuth = from.isAuth
+    val toAuth = to.isAuth
+    val fromApp = from.isApp
+    val toApp = to.isApp
+    val fromForm = from == AnrealRouteKind.Login || from == AnrealRouteKind.Register
+    val toForm = to == AnrealRouteKind.Login || to == AnrealRouteKind.Register
     return when {
+        from == AnrealRouteKind.Boarding && toForm -> AnrealNavMotion.VerticalUp
+        fromForm && to == AnrealRouteKind.Boarding -> AnrealNavMotion.VerticalDown
         from == AnrealRouteKind.Login && to == AnrealRouteKind.Register -> AnrealNavMotion.VerticalUp
         from == AnrealRouteKind.Register && to == AnrealRouteKind.Login -> AnrealNavMotion.VerticalDown
         fromAuth && toApp -> AnrealNavMotion.HorizontalForward
@@ -48,8 +54,17 @@ fun classifyNavMotion(from: AnrealRouteKind, to: AnrealRouteKind): AnrealNavMoti
     }
 }
 
+private val AnrealRouteKind.isAuth: Boolean
+    get() = this == AnrealRouteKind.Boarding ||
+        this == AnrealRouteKind.Login ||
+        this == AnrealRouteKind.Register
+
+private val AnrealRouteKind.isApp: Boolean
+    get() = this == AnrealRouteKind.Chat || this == AnrealRouteKind.Account
+
 fun NavDestination.toRouteKind(): AnrealRouteKind {
     return when {
+        hasRoute<BoardingRoute>() -> AnrealRouteKind.Boarding
         hasRoute<LoginRoute>() -> AnrealRouteKind.Login
         hasRoute<RegisterRoute>() -> AnrealRouteKind.Register
         hasRoute<ChatRoute>() -> AnrealRouteKind.Chat

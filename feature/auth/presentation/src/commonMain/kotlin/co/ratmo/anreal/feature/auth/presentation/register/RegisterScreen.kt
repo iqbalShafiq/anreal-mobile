@@ -1,8 +1,6 @@
 package co.ratmo.anreal.feature.auth.presentation.register
 
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.input.KeyboardType
@@ -18,19 +16,22 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
+import co.ratmo.anreal.feature.auth.presentation.component.AuthSwitchRow
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun RegisterRoot(
     onNavigateHome: () -> Unit,
-    onNavigateLogin: () -> Unit,
+    onNavigateLogin: (String) -> Unit,
+    onNavigateBack: () -> Unit,
     viewModel: RegisterViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             RegisterEvent.NavigateHome -> onNavigateHome()
-            RegisterEvent.NavigateLogin -> onNavigateLogin()
+            is RegisterEvent.NavigateLogin -> onNavigateLogin(event.email)
+            RegisterEvent.NavigateBack -> onNavigateBack()
         }
     }
     RegisterScreen(state = state, onAction = viewModel::onAction)
@@ -42,22 +43,26 @@ fun RegisterScreen(
     onAction: (RegisterAction) -> Unit,
 ) {
     AnrealFormScreen(
-        title = "Create an account",
-        subtitle = "Start a workspace with your name, email, and a password.",
+        title = AnrealCopy.get(AnrealCopy.REGISTER_TITLE),
+        subtitle = AnrealCopy.get(AnrealCopy.REGISTER_SUBTITLE),
+        wordmark = AnrealCopy.get(AnrealCopy.LABEL_APP_NAME),
+        markDescription = AnrealCopy.get(AnrealCopy.CD_APP_MARK),
+        onBack = { onAction(RegisterAction.OnBackClick) },
+        backDescription = AnrealCopy.get(AnrealCopy.CD_BACK),
         footer = {
-            TextButton(
+            AuthSwitchRow(
+                prompt = AnrealCopy.get(AnrealCopy.AUTH_HAVE_ACCOUNT),
+                actionLabel = AnrealCopy.get(AnrealCopy.ACTION_SIGN_IN),
                 onClick = { onAction(RegisterAction.OnLoginClick) },
                 enabled = !state.isSubmitting,
-            ) {
-                Text("Already have an account? Sign in")
-            }
+            )
         },
     ) {
         AnrealTextField(
             value = state.name,
             onValueChange = { onAction(RegisterAction.OnNameChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_NAME),
-            placeholder = "Ada Lovelace",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_NAME),
             error = state.nameError?.asString(),
             enabled = !state.isSubmitting,
         )
@@ -65,7 +70,7 @@ fun RegisterScreen(
             value = state.email,
             onValueChange = { onAction(RegisterAction.OnEmailChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_EMAIL),
-            placeholder = "you@company.com",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_EMAIL),
             error = state.emailError?.asString(),
             enabled = !state.isSubmitting,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -74,7 +79,7 @@ fun RegisterScreen(
             value = state.password,
             onValueChange = { onAction(RegisterAction.OnPasswordChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_PASSWORD),
-            placeholder = "At least 8 characters",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_PASSWORD_NEW),
             error = state.passwordError?.asString(),
             enabled = !state.isSubmitting,
             showPasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_SHOW_PASSWORD),
@@ -84,7 +89,7 @@ fun RegisterScreen(
             value = state.confirmPassword,
             onValueChange = { onAction(RegisterAction.OnConfirmPasswordChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_CONFIRM_PASSWORD),
-            placeholder = "Repeat your password",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_PASSWORD_REPEAT),
             error = state.confirmError?.asString(),
             enabled = !state.isSubmitting,
             showPasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_SHOW_PASSWORD),

@@ -24,6 +24,7 @@ kotlin {
         implementation(project(":feature:auth:domain"))
         implementation(libs.androidx.navigation.compose)
         implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.icons.material.symbols.rounded)
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)

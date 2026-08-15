@@ -90,4 +90,25 @@ class LoginViewModelTest {
 
         assertThat(viewModel.state.value.email).isEqualTo("saved@company.com")
     }
+
+    @Test
+    fun register_click_sends_email() = runTest {
+        val viewModel = LoginViewModel(SavedStateHandle(), FakeAuthRemoteDataSource())
+
+        viewModel.events.test {
+            viewModel.onAction(LoginAction.OnEmailChange("ada@company.com"))
+            viewModel.onAction(LoginAction.OnRegisterClick)
+            assertThat(awaitItem()).isEqualTo(LoginEvent.NavigateRegister("ada@company.com"))
+        }
+    }
+
+    @Test
+    fun back_click_navigates_back() = runTest {
+        val viewModel = LoginViewModel(SavedStateHandle(), FakeAuthRemoteDataSource())
+
+        viewModel.events.test {
+            viewModel.onAction(LoginAction.OnBackClick)
+            assertThat(awaitItem()).isEqualTo(LoginEvent.NavigateBack)
+        }
+    }
 }

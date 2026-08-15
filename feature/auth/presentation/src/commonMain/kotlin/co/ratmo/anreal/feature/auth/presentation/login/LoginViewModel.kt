@@ -33,11 +33,13 @@ sealed interface LoginAction {
     data class OnPasswordChange(val password: String) : LoginAction
     data object OnSubmit : LoginAction
     data object OnRegisterClick : LoginAction
+    data object OnBackClick : LoginAction
 }
 
 sealed interface LoginEvent {
     data object NavigateHome : LoginEvent
-    data object NavigateRegister : LoginEvent
+    data class NavigateRegister(val email: String) : LoginEvent
+    data object NavigateBack : LoginEvent
 }
 
 class LoginViewModel(
@@ -64,7 +66,12 @@ class LoginViewModel(
             }
             LoginAction.OnSubmit -> submit()
             LoginAction.OnRegisterClick -> {
-                viewModelScope.launch { _events.send(LoginEvent.NavigateRegister) }
+                viewModelScope.launch {
+                    _events.send(LoginEvent.NavigateRegister(_state.value.email.trim()))
+                }
+            }
+            LoginAction.OnBackClick -> {
+                viewModelScope.launch { _events.send(LoginEvent.NavigateBack) }
             }
         }
     }

@@ -18,6 +18,8 @@ object AnrealMotion {
     val durationMed: Duration = 220.milliseconds
     val durationDrawer: Duration = 280.milliseconds
     val durationPage: Duration = 420.milliseconds
+    val durationSplash: Duration = 1100.milliseconds
+    val durationBoardingHold: Duration = 4500.milliseconds
     val durationAuroraMin: Duration = 16.seconds
     val durationAurora: Duration = 22.seconds
     val durationAuroraMax: Duration = 32.seconds

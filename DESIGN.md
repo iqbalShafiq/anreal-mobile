@@ -199,8 +199,10 @@ Named after the web, implemented as Compose specs. Do not invent a second system
 | `durationFast` | 160ms | Press, color, chips |
 | `durationMed` | 220ms | Popovers, dialogs, snackbars |
 | `durationDrawer` | 280–320ms | Navigation drawer, sheets |
-| `durationPage` | 420ms | Full-screen vertical pager only (login ↔ register). Occasional; allowed above the 300ms daily-chrome cap. |
-| `pageSpec` | 420ms `easeDrawer` | Login ↔ Register: both pages start immediately and settle. Do not use the punchy `easeInOut` here — it hesitates then rushes. |
+| `durationPage` | 420ms | Full-screen vertical pager only (boarding ↔ login/register, login ↔ register). Occasional; allowed above the 300ms daily-chrome cap. |
+| `durationSplash` | 1100ms | First-run compose splash hold after session resolve. Reduced motion uses `durationFast`. |
+| `durationBoardingHold` | 4500ms | Auto-advance on the signed-out boarding carousel. Pause while the email field is focused. |
+| `pageSpec` | 420ms `easeDrawer` | Boarding ↔ Login/Register and Login ↔ Register: both pages start immediately and settle. Do not use the punchy `easeInOut` here — it hesitates then rushes. |
 | `drawerSpec` | 280ms `easeDrawer` | Horizontal push (auth ↔ chat, chat ↔ account), drawers |
 
 M3 components use `MotionScheme.standard()` as the **app default**. Expressive bounce is reserved for rare hero moments (empty-state mark, first-run). Daily chrome must not overshoot.
@@ -225,8 +227,11 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 |---|---|---|
 | Button / icon / send | Press scale 0.97, 120ms easeOut | Keep scale *or* color flash only |
 | Drawer | Slide from start + fade 280ms easeDrawer | Fade 160ms, no slide |
-| Login ↔ Register | **Vertical pager.** Both screens translate the full container height in the same direction — like a TikTok strip, not a sheet over a still page. Login → Register: both move **up**. Register → Login: both move **down**. 420ms `easeDrawer` (no fade). Aurora stays put behind `NavHost`. Hide IME before the navigate. | Fade 160ms, no slide |
-| Auth ↔ Chat / Chat ↔ Account | Horizontal push, full width, no fade. Logout is the reverse. | Fade 160ms |
+| Splash → boarding / chat | System splash hands off to compose splash (aurora + mark + version). Compose splash is **not** a nav destination. After session resolve, hold `durationSplash` then fade 160ms onto the start route. Aurora is already mounted. | Fade 160ms; hold `durationFast` |
+| Boarding carousel | Horizontal pager. Auto-advance after `durationBoardingHold` (`easeInOut` 220ms). User swipe is the same pager. Pause on email focus and reduced motion. Indicator pill uses `offset {}`, not width animation. | Instant page change, no auto-advance |
+| Boarding ↔ Login / Register | **Vertical pager.** Boarding is the floor. Boarding → Login or Register: both move **up**. Back / pop to boarding: both move **down**. 420ms `easeDrawer` (no fade). Hide IME before the navigate. | Fade 160ms, no slide |
+| Login ↔ Register | Same vertical pager. Login → Register: both move **up**. Register → Login: both move **down**. | Fade 160ms, no slide |
+| Auth ↔ Chat / Chat ↔ Account | Horizontal push, full width, no fade. Logout returns to **boarding** (the reverse). | Fade 160ms |
 | Sheet | Slide from bottom, interruptible, velocity handoff | Fade 160ms |
 | Dialog | Scale 0.96 + fade 220ms, centered | Fade only |
 | Snackbar | Slide from bottom 220ms | Fade |
@@ -284,6 +289,8 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 
 | Surface | Empty | Loading | Error | Success |
 |---|---|---|---|---|
+| Splash | — | Aurora + mark + version | — | Fade to boarding / chat |
+| Boarding | First slide | Auto-advance / swipe | Inline email on submit | Navigate to register |
 | Login / register | — | Busy on submit | Inline field + form alert | Navigate |
 | Session list | “No chats yet” + New chat | Skeleton rows | Retry banner | Rename/delete in place |
 | Thread | Product empty state | History skeleton | Inline + retry load | Stream completes in place |

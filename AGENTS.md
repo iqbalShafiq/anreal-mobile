@@ -152,8 +152,10 @@ Read `DESIGN.md` before writing UI.
 - Intra-feature: `NavController`. Inter-feature: callbacks.
 - Pass IDs, not whole objects.
 - Transitions live on the root `NavHost` in `shared` (`anrealEnter` / `anrealExit`). Classify with `classifyNavMotion`. Do not leave NavHost on the default crossfade.
-- **Login ↔ Register** is a vertical **pager**: both destinations move the full container height in the same direction (TikTok / vertical strip). Login → Register slides **up**; Register → Login slides **down**. No fade. Hide the IME before this navigate.
-- **Auth → Chat** slides forward (right → left). Logout / pop to login is the reverse.
+- Compose splash (aurora + mark + `Anreal v<versionName>` + “Presented by Ratmo.co”) is not a route. It holds until session resolve + `durationSplash`, then fades to boarding or chat. Android 12+ uses `Theme.Anreal.Splash`.
+- Signed-out start is **boarding** (feature carousel + email + Create account). Login and Register sit above it.
+- **Boarding ↔ Login / Register** is a vertical **pager**: boarding → form slides **up**; back to boarding slides **down**. **Login ↔ Register** is the same strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
+- **Auth → Chat** slides forward (right → left). Logout / pop to **boarding** is the reverse.
 - **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). Logout lives on the Account section, not in a drawer menu.
 - One `AnrealAtmosphere` wraps the `NavHost`. Nested `AnrealAtmosphere` calls are passthrough so aurora does not remount mid-transition.
 

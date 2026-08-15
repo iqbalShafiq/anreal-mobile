@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,10 +15,10 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -31,13 +30,19 @@ import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Arrow_back
+
+enum class AnrealAuthLayout {
+    CenteredForm,
+    Docked,
+}
 
 @Composable
-fun AnrealFormScreen(
-    title: String,
-    subtitle: String,
+fun AnrealAuthScaffold(
     modifier: Modifier = Modifier,
-    footer: @Composable (() -> Unit)? = null,
+    layout: AnrealAuthLayout = AnrealAuthLayout.CenteredForm,
+    navigationIcon: @Composable (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AnrealAtmosphere(modifier = modifier) {
@@ -47,11 +52,15 @@ fun AnrealFormScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .windowInsetsPadding(
+                        WindowInsets.safeDrawing.only(
+                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
+                        ),
+                    )
                     .clipToBounds(),
             ) {
-                Column(
-                    modifier = Modifier
+                val columnModifier = when (layout) {
+                    AnrealAuthLayout.CenteredForm -> Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth()
                         .then(
@@ -61,26 +70,34 @@ fun AnrealFormScreen(
                                 Modifier.verticalScroll(rememberScrollState())
                             },
                         )
+                    AnrealAuthLayout.Docked -> Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
+                        )
+                }
+                val contentPadding = when (layout) {
+                    AnrealAuthLayout.CenteredForm -> Modifier.padding(
+                        horizontal = AnrealSpacing.screenCompact,
+                        vertical = AnrealSpacing.xl,
+                    )
+                    AnrealAuthLayout.Docked -> Modifier.padding(vertical = AnrealSpacing.xl)
+                }
+                Column(
+                    modifier = columnModifier
                         .imeFocusShiftOffset(shiftPx)
-                        .padding(
-                            horizontal = AnrealSpacing.screenCompact,
-                            vertical = AnrealSpacing.xl,
-                        ),
+                        .then(contentPadding),
                     verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
-                ) {
-                    AuthBrandMark()
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    content()
-                    footer?.invoke()
+                    content = content,
+                )
+                if (navigationIcon != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(AnrealSpacing.xxs),
+                    ) {
+                        navigationIcon()
+                    }
                 }
             }
         }
@@ -88,29 +105,90 @@ fun AnrealFormScreen(
 }
 
 @Composable
-private fun AuthBrandMark() {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
-    ) {
-        Surface(
-            modifier = Modifier.size(32.dp),
-            shape = RoundedCornerShape(10.dp),
-            color = glassHighlightColor(),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "A",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
+fun AnrealFormScreen(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    wordmark: String = "Anreal",
+    markDescription: String? = wordmark,
+    onBack: (() -> Unit)? = null,
+    backDescription: String? = null,
+    footer: @Composable (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AnrealAuthScaffold(
+        modifier = modifier,
+        navigationIcon = if (onBack != null && backDescription != null) {
+            {
+                AnrealBackButton(
+                    description = backDescription,
+                    onClick = onBack,
                 )
             }
-        }
+        } else {
+            null
+        },
+    ) {
+        AnrealMark(
+            wordmark = wordmark,
+            contentDescription = markDescription,
+        )
         Text(
-            text = "Anreal",
-            style = MaterialTheme.typography.titleSmall,
+            text = title,
+            style = MaterialTheme.typography.titleLargeEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        content()
+        footer?.invoke()
+    }
+}
+
+@Composable
+fun AnrealBackButton(
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.size(AnrealSpacing.touch),
+    ) {
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Arrow_back,
+            contentDescription = description,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AnrealFormScreenWithBackPreview() {
+    AnrealPreview {
+        AnrealFormScreen(
+            title = "Welcome back",
+            subtitle = "Sign in with the email and password for your Anreal workspace.",
+            onBack = {},
+            backDescription = "Back",
+            footer = {
+                TextButton(onClick = {}) {
+                    Text("New here? Create an account")
+                }
+            },
+        ) {
+            AnrealTextField(
+                value = "you@company.com",
+                onValueChange = {},
+                label = "Email",
+            )
+            AnrealPrimaryButton(label = "Continue", onClick = {})
+        }
     }
 }
 

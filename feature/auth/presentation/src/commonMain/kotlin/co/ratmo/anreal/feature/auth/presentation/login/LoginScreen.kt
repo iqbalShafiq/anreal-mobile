@@ -1,8 +1,6 @@
 package co.ratmo.anreal.feature.auth.presentation.login
 
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.input.KeyboardType
@@ -18,19 +16,22 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
+import co.ratmo.anreal.feature.auth.presentation.component.AuthSwitchRow
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun LoginRoot(
     onNavigateHome: () -> Unit,
-    onNavigateRegister: () -> Unit,
+    onNavigateRegister: (String) -> Unit,
+    onNavigateBack: () -> Unit,
     viewModel: LoginViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             LoginEvent.NavigateHome -> onNavigateHome()
-            LoginEvent.NavigateRegister -> onNavigateRegister()
+            is LoginEvent.NavigateRegister -> onNavigateRegister(event.email)
+            LoginEvent.NavigateBack -> onNavigateBack()
         }
     }
     LoginScreen(state = state, onAction = viewModel::onAction)
@@ -42,22 +43,26 @@ fun LoginScreen(
     onAction: (LoginAction) -> Unit,
 ) {
     AnrealFormScreen(
-        title = "Sign in",
-        subtitle = "Use the email and password for your Anreal workspace.",
+        title = AnrealCopy.get(AnrealCopy.LOGIN_TITLE),
+        subtitle = AnrealCopy.get(AnrealCopy.LOGIN_SUBTITLE),
+        wordmark = AnrealCopy.get(AnrealCopy.LABEL_APP_NAME),
+        markDescription = AnrealCopy.get(AnrealCopy.CD_APP_MARK),
+        onBack = { onAction(LoginAction.OnBackClick) },
+        backDescription = AnrealCopy.get(AnrealCopy.CD_BACK),
         footer = {
-            TextButton(
+            AuthSwitchRow(
+                prompt = AnrealCopy.get(AnrealCopy.AUTH_NEW_HERE),
+                actionLabel = AnrealCopy.get(AnrealCopy.ACTION_CREATE_ACCOUNT),
                 onClick = { onAction(LoginAction.OnRegisterClick) },
                 enabled = !state.isSubmitting,
-            ) {
-                Text("New here? Create an account")
-            }
+            )
         },
     ) {
         AnrealTextField(
             value = state.email,
             onValueChange = { onAction(LoginAction.OnEmailChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_EMAIL),
-            placeholder = "you@company.com",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_EMAIL),
             error = state.emailError?.asString(),
             enabled = !state.isSubmitting,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -66,7 +71,7 @@ fun LoginScreen(
             value = state.password,
             onValueChange = { onAction(LoginAction.OnPasswordChange(it)) },
             label = AnrealCopy.get(AnrealCopy.LABEL_PASSWORD),
-            placeholder = "Your password",
+            placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_PASSWORD),
             error = state.passwordError?.asString(),
             enabled = !state.isSubmitting,
             showPasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_SHOW_PASSWORD),

@@ -42,6 +42,7 @@ fun AnrealTextField(
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     trailingIcon: @Composable (() -> Unit)? = null,
+    onFocusChange: (Boolean) -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     val reportFocusedBottom = LocalFocusedImeAnchor.current
@@ -85,6 +86,7 @@ fun AnrealTextField(
                         .weight(1f)
                         .onFocusChanged { focusState ->
                             focused = focusState.isFocused
+                            onFocusChange(focusState.isFocused)
                             if (!focusState.isFocused) {
                                 reportFocusedBottom?.invoke(null)
                             }

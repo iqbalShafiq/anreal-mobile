@@ -15,6 +15,8 @@ class AnrealMotionTest {
         assertThat(AnrealMotion.durationMed.inWholeMilliseconds).isEqualTo(220)
         assertThat(AnrealMotion.durationDrawer.inWholeMilliseconds).isEqualTo(280)
         assertThat(AnrealMotion.durationPage.inWholeMilliseconds).isEqualTo(420)
+        assertThat(AnrealMotion.durationSplash.inWholeMilliseconds).isEqualTo(1100)
+        assertThat(AnrealMotion.durationBoardingHold.inWholeMilliseconds).isEqualTo(4500)
         assertThat(AnrealMotion.durationAuroraMin.inWholeSeconds).isEqualTo(16)
         assertThat(AnrealMotion.durationAurora.inWholeSeconds).isEqualTo(22)
         assertThat(AnrealMotion.durationAuroraMax.inWholeSeconds).isEqualTo(32)
