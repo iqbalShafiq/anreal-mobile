@@ -5,7 +5,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,6 +20,7 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AnrealPrimaryButton(
     label: String,
@@ -43,9 +45,8 @@ fun AnrealPrimaryButton(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (loading) {
-                CircularProgressIndicator(
+                LoadingIndicator(
                     modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             }

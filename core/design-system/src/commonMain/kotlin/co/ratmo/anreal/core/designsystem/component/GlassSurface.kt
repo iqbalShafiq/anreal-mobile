@@ -54,6 +54,7 @@ fun GlassSurface(
     shape: Shape = MaterialTheme.shapes.extraLarge,
     tone: GlassTone = GlassTone.Thin,
     emphasized: Boolean = false,
+    error: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -69,10 +70,10 @@ fun GlassSurface(
             GlassTone.Pane -> 0.70f
         },
     )
-    val border = if (emphasized) {
-        scheme.primary.copy(alpha = 0.38f)
-    } else {
-        scheme.outlineVariant.copy(alpha = 0.45f)
+    val border = when {
+        error -> scheme.error
+        emphasized -> scheme.primary.copy(alpha = 0.38f)
+        else -> scheme.outlineVariant.copy(alpha = 0.45f)
     }
     val frost = if (hazeState != null) {
         Modifier.hazeEffect(state = hazeState, style = style)
@@ -85,6 +86,7 @@ fun GlassSurface(
             .border(width = 1.dp, color = border, shape = shape),
         shape = shape,
         color = if (hazeState != null) tint else scheme.surfaceContainer,
+        contentColor = scheme.onSurface,
         content = content,
     )
 }

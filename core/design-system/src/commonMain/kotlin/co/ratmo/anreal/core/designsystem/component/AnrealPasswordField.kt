@@ -63,6 +63,7 @@ fun AnrealPasswordField(
 @Composable
 private fun AnrealPasswordFieldHiddenPreview() {
     AnrealPreview {
+        AnrealAtmosphere {
         AnrealPasswordField(
             value = "password1",
             onValueChange = {},
@@ -70,6 +71,7 @@ private fun AnrealPasswordFieldHiddenPreview() {
             placeholder = "Your password",
             modifier = Modifier.padding(AnrealSpacing.md),
         )
+        }
     }
 }
 
@@ -77,6 +79,7 @@ private fun AnrealPasswordFieldHiddenPreview() {
 @Composable
 private fun AnrealPasswordFieldVisiblePreview() {
     AnrealPreview {
+        AnrealAtmosphere {
         AnrealPasswordField(
             value = "password1",
             onValueChange = {},
@@ -84,6 +87,7 @@ private fun AnrealPasswordFieldVisiblePreview() {
             initiallyVisible = true,
             modifier = Modifier.padding(AnrealSpacing.md),
         )
+        }
     }
 }
 
@@ -91,13 +95,15 @@ private fun AnrealPasswordFieldVisiblePreview() {
 @Composable
 private fun AnrealPasswordFieldErrorPreview() {
     AnrealPreview {
-        AnrealPasswordField(
-            value = "123",
-            onValueChange = {},
-            label = "Password",
-            error = "Password must be at least 8 characters.",
-            modifier = Modifier.padding(AnrealSpacing.md),
-        )
+        AnrealAtmosphere {
+            AnrealPasswordField(
+                value = "123",
+                onValueChange = {},
+                label = "Password",
+                error = "Password must be at least 8 characters.",
+                modifier = Modifier.padding(AnrealSpacing.md),
+            )
+        }
     }
 }
 
@@ -105,12 +111,14 @@ private fun AnrealPasswordFieldErrorPreview() {
 @Composable
 private fun AnrealPasswordFieldDisabledPreview() {
     AnrealPreview {
-        AnrealPasswordField(
-            value = "password1",
-            onValueChange = {},
-            label = "Password",
-            enabled = false,
-            modifier = Modifier.padding(AnrealSpacing.md),
-        )
+        AnrealAtmosphere {
+            AnrealPasswordField(
+                value = "password1",
+                onValueChange = {},
+                label = "Password",
+                enabled = false,
+                modifier = Modifier.padding(AnrealSpacing.md),
+            )
+        }
     }
 }

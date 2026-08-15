@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
+import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.theme.AnrealTheme
 import co.ratmo.anreal.feature.auth.domain.SessionStatus
 import co.ratmo.anreal.feature.auth.presentation.AppViewModel
@@ -30,7 +31,7 @@ fun App(
     val status by viewModel.status.collectAsStateWithLifecycle()
     AnrealTheme {
         when (status) {
-            SessionStatus.Checking -> Box(modifier = Modifier.fillMaxSize())
+            SessionStatus.Checking -> AnrealAtmosphere { Box(modifier = Modifier.fillMaxSize()) }
             SessionStatus.SignedIn,
             SessionStatus.SignedOut,
             -> AuthenticatedHost(status = status, viewModel = viewModel)
