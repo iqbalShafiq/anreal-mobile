@@ -21,4 +21,6 @@ data class ThemeSettings(
 
 object AnrealBrand {
     const val seedArgb: Int = 0xFFE8A317.toInt()
+    /** Near-black canvas the web glass chrome samples. */
+    const val canvasArgb: Int = 0xFF050505.toInt()
 }

@@ -18,18 +18,30 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.AnrealBrand
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import dev.chrisbanes.haze.hazeEffect
 
 private val DrawerCorner: Dp = 28.dp
 internal val GlassDrawerWidth: Dp = 300.dp
+
+@Composable
+fun glassHighlightColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.surface.luminance() < 0.5f) {
+        Color.White.copy(alpha = 0.055f)
+    } else {
+        scheme.onSurface.copy(alpha = 0.06f)
+    }
+}
 
 fun glassDrawerShape(fromEnd: Boolean): Shape {
     val radius = DrawerCorner
@@ -51,10 +63,14 @@ fun GlassDrawer(
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.surface.luminance() < 0.5f
     val shape = glassDrawerShape(fromEnd)
-    val tint = scheme.surface.copy(alpha = if (dark) 0.46f else 0.64f)
-    val border = scheme.outlineVariant.copy(alpha = if (dark) 0.28f else 0.36f)
+    val tint = if (dark) {
+        Color(AnrealBrand.canvasArgb).copy(alpha = 0.50f)
+    } else {
+        scheme.surface.copy(alpha = 0.56f)
+    }
+    val border = scheme.outlineVariant.copy(alpha = if (dark) 0.18f else 0.28f)
     val frost = if (hazeState != null) {
-        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.regular())
+        Modifier.hazeEffect(state = hazeState, style = HazeMaterials.thin())
     } else {
         Modifier
     }
@@ -70,7 +86,13 @@ fun GlassDrawer(
             .then(frost)
             .border(width = 1.dp, color = border, shape = shape),
         shape = shape,
-        color = if (hazeState != null) tint else scheme.surfaceContainer.copy(alpha = if (dark) 0.88f else 0.96f),
+        color = if (hazeState != null) {
+            tint
+        } else if (dark) {
+            Color(AnrealBrand.canvasArgb).copy(alpha = 0.82f)
+        } else {
+            scheme.surfaceContainer.copy(alpha = 0.94f)
+        },
         content = {
             Column(
                 modifier = Modifier

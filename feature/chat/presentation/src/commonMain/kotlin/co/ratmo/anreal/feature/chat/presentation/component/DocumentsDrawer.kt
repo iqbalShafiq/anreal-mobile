@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
+import co.ratmo.anreal.core.designsystem.component.glassHighlightColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -186,7 +187,7 @@ private fun ActiveDocumentCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        color = glassHighlightColor(),
     ) {
         Column(modifier = Modifier.padding(AnrealSpacing.sm)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -234,7 +235,7 @@ private fun CitedDocumentCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        color = glassHighlightColor(),
     ) {
         Row(
             modifier = Modifier.padding(AnrealSpacing.sm),

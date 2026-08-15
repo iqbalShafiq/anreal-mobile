@@ -33,8 +33,7 @@ import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
 import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
-import co.ratmo.anreal.core.designsystem.component.GlassSurface
-import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.glassHighlightColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -155,13 +154,13 @@ private fun DrawerHeader(
         Surface(
             modifier = Modifier.size(32.dp),
             shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
+            color = glassHighlightColor(),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "A",
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }
@@ -228,11 +227,7 @@ private fun WorkspaceItem(
             .padding(vertical = 2.dp)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
-        color = if (selected) {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-        },
+        color = if (selected) glassHighlightColor() else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = AnrealSpacing.sm, vertical = AnrealSpacing.xs),
@@ -314,11 +309,7 @@ internal fun SessionRow(
     Surface(
         modifier = rowModifier,
         shape = shape,
-        color = if (selected) {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0f)
-        },
+        color = if (selected) glassHighlightColor() else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
     ) {
         SessionRowContent(
             session = session,
@@ -412,10 +403,10 @@ private fun AccountFooter(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
     ) {
-        GlassSurface(
+        Surface(
             modifier = Modifier.size(36.dp),
             shape = RoundedCornerShape(10.dp),
-            tone = GlassTone.Pane,
+            color = glassHighlightColor(),
         ) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
