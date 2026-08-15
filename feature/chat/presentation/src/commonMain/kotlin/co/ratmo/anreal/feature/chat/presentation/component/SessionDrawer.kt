@@ -229,7 +229,7 @@ private fun WorkspaceItem(
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         color = if (selected) {
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
         } else {
             MaterialTheme.colorScheme.surface.copy(alpha = 0f)
         },
@@ -311,38 +311,24 @@ internal fun SessionRow(
         .fillMaxWidth()
         .padding(horizontal = AnrealSpacing.xs, vertical = 1.dp)
         .clickable(onClick = onClick)
-    if (selected) {
-        GlassSurface(
-            modifier = rowModifier,
-            shape = shape,
-            tone = GlassTone.Pane,
-        ) {
-            SessionRowContent(
-                session = session,
-                selected = true,
-                menuOpen = menuOpen,
-                onToggleMenu = { if (menuExpanded == null) expanded = true },
-                onDismissMenu = { if (menuExpanded == null) expanded = false },
-                onRename = onRename,
-                onDelete = onDelete,
-            )
-        }
-    } else {
-        Surface(
-            modifier = rowModifier,
-            shape = shape,
-            color = MaterialTheme.colorScheme.surface.copy(alpha = 0f),
-        ) {
-            SessionRowContent(
-                session = session,
-                selected = false,
-                menuOpen = menuOpen,
-                onToggleMenu = { if (menuExpanded == null) expanded = true },
-                onDismissMenu = { if (menuExpanded == null) expanded = false },
-                onRename = onRename,
-                onDelete = onDelete,
-            )
-        }
+    Surface(
+        modifier = rowModifier,
+        shape = shape,
+        color = if (selected) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0f)
+        },
+    ) {
+        SessionRowContent(
+            session = session,
+            selected = selected,
+            menuOpen = menuOpen,
+            onToggleMenu = { if (menuExpanded == null) expanded = true },
+            onDismissMenu = { if (menuExpanded == null) expanded = false },
+            onRename = onRename,
+            onDelete = onDelete,
+        )
     }
 }
 

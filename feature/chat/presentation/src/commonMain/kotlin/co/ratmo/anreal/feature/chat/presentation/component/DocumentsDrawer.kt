@@ -11,20 +11,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DrawerDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,8 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import co.ratmo.anreal.core.designsystem.component.GlassSurface
-import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.GlassDrawer
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -55,7 +51,6 @@ import com.composables.icons.materialsymbols.rounded.Expand_less
 import com.composables.icons.materialsymbols.rounded.Expand_more
 import com.composables.icons.materialsymbols.rounded.Format_quote
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DocumentsEndDrawer(
     open: Boolean,
@@ -82,12 +77,7 @@ internal fun DocumentsEndDrawer(
             enter = slideInHorizontally { it },
             exit = slideOutHorizontally { it },
         ) {
-            ModalDrawerSheet(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(300.dp),
-                drawerContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            ) {
+            GlassDrawer(fromEnd = true) {
                 DocumentsDrawer(state = state, onAction = onAction)
             }
         }
@@ -193,10 +183,10 @@ private fun ActiveDocumentCard(
     document: SessionDocumentUi,
     onRemove: () -> Unit,
 ) {
-    GlassSurface(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        tone = GlassTone.Pane,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
         Column(modifier = Modifier.padding(AnrealSpacing.sm)) {
             Row(verticalAlignment = Alignment.Top) {
@@ -241,10 +231,10 @@ private fun ActiveDocumentCard(
 private fun CitedDocumentCard(
     document: CitedDocumentUi,
 ) {
-    GlassSurface(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
-        tone = GlassTone.Pane,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
     ) {
         Row(
             modifier = Modifier.padding(AnrealSpacing.sm),
