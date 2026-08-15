@@ -69,6 +69,8 @@ fun LoginScreen(
             placeholder = "Your password",
             error = state.passwordError?.asString(),
             enabled = !state.isSubmitting,
+            showPasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_SHOW_PASSWORD),
+            hidePasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_HIDE_PASSWORD),
         )
         state.formError?.let { error ->
             AnrealError(message = error.asString())

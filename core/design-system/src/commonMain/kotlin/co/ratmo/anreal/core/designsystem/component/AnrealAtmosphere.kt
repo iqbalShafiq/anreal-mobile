@@ -26,6 +26,10 @@ fun AnrealAtmosphere(
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
+    if (LocalAnrealHazeState.current != null) {
+        Box(modifier = modifier.fillMaxSize(), content = content)
+        return
+    }
     val hazeState = remember { HazeState() }
     CompositionLocalProvider(LocalAnrealHazeState provides hazeState) {
         Box(modifier = modifier.fillMaxSize()) {

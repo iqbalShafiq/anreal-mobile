@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -20,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.em
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -41,6 +44,7 @@ fun AnrealTextField(
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val reportFocusedBottom = LocalFocusedImeAnchor.current
     val textStyle = MaterialTheme.typography.bodyLarge.copy(
         color = if (enabled) {
             MaterialTheme.colorScheme.onSurface
@@ -67,7 +71,11 @@ fun AnrealTextField(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+                    .heightIn(min = AnrealSpacing.field)
+                    .padding(
+                        start = AnrealSpacing.md,
+                        end = if (trailingIcon != null) AnrealSpacing.xxs else AnrealSpacing.md,
+                    ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 BasicTextField(
@@ -75,7 +83,19 @@ fun AnrealTextField(
                     onValueChange = onValueChange,
                     modifier = Modifier
                         .weight(1f)
-                        .onFocusChanged { focused = it.isFocused },
+                        .onFocusChanged { focusState ->
+                            focused = focusState.isFocused
+                            if (!focusState.isFocused) {
+                                reportFocusedBottom?.invoke(null)
+                            }
+                        }
+                        .onGloballyPositioned { coordinates ->
+                            if (focused) {
+                                reportFocusedBottom?.invoke(
+                                    coordinates.positionInWindow().y + coordinates.size.height,
+                                )
+                            }
+                        },
                     enabled = enabled,
                     textStyle = textStyle,
                     cursorBrush = SolidColor(

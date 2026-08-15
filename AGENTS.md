@@ -31,7 +31,8 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 :feature:<name>:presentation
 ```
 
-Features today: `auth`, `chat`, `documents`, `projects`, `settings`.
+Shipped feature modules: `auth`, `chat`.  
+Account / Settings is a **screen inside** `feature:chat:presentation` (`AccountRoute`), not `:feature:settings` yet. Documents, projects, and images destinations are still toasts until those modules exist.
 
 ### Dependency rules
 
@@ -57,6 +58,7 @@ A concern becomes its own `:core:*` module only when it has a non-trivial API. O
 | DI | Koin (`singleOf` / `viewModelOf`) |
 | HTTP | Ktor Client + KotlinX Serialization |
 | Prefs | DataStore Preferences 1.2.1; `DataStoreSessionTokenStore` + Tink AEAD / Android Keystore for the session cookie. Not `security-crypto`. iOS Keychain is a TODO stub. |
+| Env | `anreal.environment` in `gradle.properties` / `local.properties` → `BuildConfig.ENVIRONMENT` → `AppEnvironment`. **Development** uses in-process stub auth + chat. Staging / production hit `BASE_URL`. |
 | Nav | Type-safe Navigation Compose (`@Serializable` routes) |
 | Images | Coil 3 |
 | Logging | Kermit |
@@ -122,6 +124,8 @@ Chat streaming:
 - Extend the reducer for tools/images/queue. Do not fork a second stream pipeline.
 - The composer **stays editable while a run is streaming**. A filled composer queues (`POST /api/chat/steer`); an empty one Stops. Queue mutations live in `feature:chat:domain/queue` and persist in Room. Hold is in-memory. Never lock the field the way stock `@anvia/react-ui` does.
 
+Model + reasoning are **one** composer trigger and **one** sheet. The label concatenates the model with the effort when effort ≠ None (e.g. `GPT Luna 5.6 Xhigh`).
+
 Do **not** add a `:core:chat-ui` / Anvia-style headless module until a second feature needs the same unstyled thread/composer/tool primitives. Until then, slot composables stay in `feature:chat:presentation/component/` (`ThreadPane`, `ComposerBar`, later tool cards). Do not clone `@anvia/react-ui`.
 
 ---
@@ -147,6 +151,11 @@ Read `DESIGN.md` before writing UI.
 - One `NavGraphBuilder.<feature>Graph(...)` per feature.
 - Intra-feature: `NavController`. Inter-feature: callbacks.
 - Pass IDs, not whole objects.
+- Transitions live on the root `NavHost` in `shared` (`anrealEnter` / `anrealExit`). Classify with `classifyNavMotion`. Do not leave NavHost on the default crossfade.
+- **Login ↔ Register** is a vertical **pager**: both destinations move the full container height in the same direction (TikTok / vertical strip). Login → Register slides **up**; Register → Login slides **down**. No fade. Hide the IME before this navigate.
+- **Auth → Chat** slides forward (right → left). Logout / pop to login is the reverse.
+- **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). Logout lives on the Account section, not in a drawer menu.
+- One `AnrealAtmosphere` wraps the `NavHost`. Nested `AnrealAtmosphere` calls are passthrough so aurora does not remount mid-transition.
 
 ---
 
@@ -191,6 +200,7 @@ Read `DESIGN.md` before writing UI.
 - No unused parameters, no unexplained `!!`, no unused imports.
 - User-facing strings are resources.
 - `BASE_URL` from BuildKonfig / `local.properties`. Debug default is the machine LAN IP (not `10.0.2.2` — there is no emulator on the primary machine).
+- Auth forms: `windowSoftInputMode=adjustNothing`. Do **not** `imePadding()` a centered form (that recenters and leaves a hole). Shift the form block with `rememberImeFocusShift` so the focused field sits just above the keyboard.
 
 ### Visual QA (no emulator)
 

@@ -87,6 +87,7 @@ Always `sp`. Layout must survive font scale 1.3 and 2.0. Body reading width ~40�
 - Compact horizontal inset: 16.dp
 - Medium+: 24.dp
 - Minimum touch target: **48.dp** (icon-only controls get a 48.dp hit box even if the glyph is 24.dp)
+- Single-line text fields: **56.dp** (`AnrealSpacing.field`). Password uses a 48.dp trailing `IconButton` (visibility), not a TextButton — the field height must match Name / Email.
 - Icon glyph: 24.dp, tint `LocalContentColor`
 
 **Shape:** M3 scale (`extraSmall` 4 → `extraLarge` 28). Composer and fields use `large` / `extraLarge`. Sheets use the platform sheet shape. Pills/chips use full rounding.
@@ -99,10 +100,11 @@ Do not rebuild buttons, fields, dialogs, lists, or navigation. Theme them.
 
 | Job | Component |
 |---|---|
-| Primary action | `Button` |
+| Primary action | `AnrealPrimaryButton` (glass) — not a filled M3 `Button` |
 | Secondary | `FilledTonalButton` |
 | Tertiary / cancel | `TextButton` |
 | Icon-only | `IconButton` / `FilledTonalIconButton` |
+| Auth fields | `AnrealTextField` / `AnrealPasswordField` (`BasicTextField` in `GlassSurface`, never `OutlinedTextField`) |
 | Send + extras | `SplitButtonLayout` |
 | Model / reasoning / feature cluster | `ButtonGroup` |
 | Loading (indeterminate wait) | `LoadingIndicator` — not a circular spinner |
@@ -125,7 +127,8 @@ We do **not** port `@anvia/react-ui`. On web that package is headless (structure
 
 - Thread, composer, and later tool/approval cards are **slot composables** in `feature:chat:presentation` (typed params, M3 + Anreal tokens).
 - Do not add a separate unstyled chat-ui module until a second feature needs the same primitives.
-- Composer field stays enabled during a run. Stop replaces Send. Queue (later) uses the same field.
+- Composer field stays enabled during a run. Stop replaces Send. Queue uses the same field.
+- Model + reasoning is **one** composer trigger and **one** sheet. Concatenate the effort onto the model label when it is not None.
 
 ---
 
@@ -142,11 +145,13 @@ Compose has no CSS `backdrop-filter`. These are **wrong**:
 
 **Correct:** [Haze](https://chrisbanes.github.io/haze/) — `hazeSource` on aurora + thread, `hazeBlur` on chrome. Feature modules never import Haze. They use:
 
-- `GlassSurface` — chips, panes, user bubbles
+- `GlassSurface` — chips, panes, user bubbles, auth fields, primary buttons
 - `GlassTopBar`
 - `GlassBottomBar` / composer shell
 - `GlassSheet` / `GlassDialog`
-- `GlassDrawer`
+- `GlassDrawer` — left workspace (start radii), right documents (end radii, `fromEnd = true`)
+
+`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
 
 Recipes:
 
@@ -194,6 +199,9 @@ Named after the web, implemented as Compose specs. Do not invent a second system
 | `durationFast` | 160ms | Press, color, chips |
 | `durationMed` | 220ms | Popovers, dialogs, snackbars |
 | `durationDrawer` | 280–320ms | Navigation drawer, sheets |
+| `durationPage` | 420ms | Full-screen vertical pager only (login ↔ register). Occasional; allowed above the 300ms daily-chrome cap. |
+| `pageSpec` | 420ms `easeDrawer` | Login ↔ Register: both pages start immediately and settle. Do not use the punchy `easeInOut` here — it hesitates then rushes. |
+| `drawerSpec` | 280ms `easeDrawer` | Horizontal push (auth ↔ chat, chat ↔ account), drawers |
 
 M3 components use `MotionScheme.standard()` as the **app default**. Expressive bounce is reserved for rare hero moments (empty-state mark, first-run). Daily chrome must not overshoot.
 
@@ -217,6 +225,8 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 |---|---|---|
 | Button / icon / send | Press scale 0.97, 120ms easeOut | Keep scale *or* color flash only |
 | Drawer | Slide from start + fade 280ms easeDrawer | Fade 160ms, no slide |
+| Login ↔ Register | **Vertical pager.** Both screens translate the full container height in the same direction — like a TikTok strip, not a sheet over a still page. Login → Register: both move **up**. Register → Login: both move **down**. 420ms `easeDrawer` (no fade). Aurora stays put behind `NavHost`. Hide IME before the navigate. | Fade 160ms, no slide |
+| Auth ↔ Chat / Chat ↔ Account | Horizontal push, full width, no fade. Logout is the reverse. | Fade 160ms |
 | Sheet | Slide from bottom, interruptible, velocity handoff | Fade 160ms |
 | Dialog | Scale 0.96 + fade 220ms, centered | Fade only |
 | Snackbar | Slide from bottom 220ms | Fade |
@@ -234,9 +244,10 @@ Sheets and drawers that the user can drag use **springs** (critically damped). H
 ### 7.5 Compose implementation rules
 
 - Prefer M3 component motion (it already reads `MotionScheme`).
-- Custom motion lives in `:core:design-system` (`AnrealMotion`, `Modifier.pressable`, `AnrealAnimatedVisibility`).
+- Custom motion lives in `:core:design-system` (`AnrealMotion`) and root nav helpers (`anrealEnter` / `anrealExit` in `shared`).
 - Features do not pick random `tween(400)`.
-- `LocalReduceMotion` (from `AccessibilityManager` / compose `LocalAccessibilityManager`) must be read by every wrapper.
+- `LocalAnrealReduceMotion` (Android: animator duration scale = 0) is provided by `AnrealTheme`. Reduced motion replaces slides with a 160ms fade.
+- Full-screen page swipes use `slideIntoContainer` / `slideOutOfContainer` so the distance is the **container**, not wrap-content form height. `sizeTransform` is a clip-only snap — never a size fade.
 
 ---
 
@@ -280,7 +291,9 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 | Documents | “Upload a PDF or image” | Library skeletons + upload progress | Quota / failed ingest | Status → ready |
 | Projects | “Create a project” | Skeletons | Retry | Open project |
 | Gallery | “No images yet” | Grid skeletons | Retry | New image at start |
-| Settings / usage | Zero-state usage | Section shimmer | Retry section | Reset profile confirm |
+| Settings / account | Name + email + Log out | — | — | Sign out → login |
+| Settings / usage | Zero-state usage (API not wired) | Section shimmer | Retry section | — |
+| Settings / personalization | “No profile yet…” | Section shimmer | Retry section | Reset profile confirm |
 | Approval / clarification | — | Card while pending | Late response is idempotent | Card dismisses |
 
 ### 8.3 Copy for states
@@ -322,6 +335,7 @@ Accessibility ships with the component, not as a follow-up. Target **WCAG 2.2 AA
 - Tab / D-pad / keyboard order is reading order. Drawer, then bar, then thread, then composer.
 - Dialogs and sheets trap focus and return it to the trigger on dismiss (`restoreFocus`).
 - IME: composer is a single-line or multi-line field with Send as IME action; errors announced after submit.
+- Auth IME: activity uses `adjustNothing`. Do not `imePadding()` a vertically centered form — that shrinks the viewport and recenters, leaving a hole above the fields. Measure the focused field vs the keyboard top and **translate the form block** (`rememberImeFocusShift`) by only the overlap. Fields stay packed. Password visibility is an icon with `Show password` / `Hide password` descriptions.
 
 ### 9.3 Touch and motor
 
@@ -373,7 +387,8 @@ Every Screen preview file includes at minimum:
 
 ## 11. Layout
 
-- Compact: drawer + `TopAppBar` + thread + floating glass composer above IME + nav bar insets.
+- Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets.
+- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Opened from the left-drawer account row. Log out is on Account.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).
@@ -406,7 +421,8 @@ Every Screen preview file includes at minimum:
 | Token | Code |
 |---|---|
 | Theme | `AnrealTheme` → `MaterialExpressiveTheme` + dynamic/brand scheme |
-| Motion | `AnrealMotion` + `MotionScheme.standard()` |
+| Motion | `AnrealMotion` + `MotionScheme.standard()` + `anrealEnter` / `anrealExit` |
+| Auth IME | `adjustNothing` + `rememberImeFocusShift` — never centered `imePadding()` |
 | Glass | Haze wrappers in `:core:design-system` |
 | Space | `AnrealSpacing` |
 | States | `AnrealEmpty`, `AnrealError`, `AnrealSkeleton`, `AnrealBanner` |

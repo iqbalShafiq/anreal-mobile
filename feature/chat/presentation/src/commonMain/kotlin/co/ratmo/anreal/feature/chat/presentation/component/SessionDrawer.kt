@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
@@ -55,14 +59,12 @@ import co.ratmo.anreal.feature.chat.presentation.preview.previewReadSession
 import co.ratmo.anreal.feature.chat.presentation.preview.previewUnreadSession
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Chat_bubble
+import com.composables.icons.materialsymbols.rounded.Chevron_right
 import com.composables.icons.materialsymbols.rounded.Description
 import com.composables.icons.materialsymbols.rounded.Edit_square
-import com.composables.icons.materialsymbols.rounded.Expand_less
 import com.composables.icons.materialsymbols.rounded.Folder
 import com.composables.icons.materialsymbols.rounded.Image
-import com.composables.icons.materialsymbols.rounded.Logout
 import com.composables.icons.materialsymbols.rounded.More_vert
-import com.composables.icons.materialsymbols.rounded.Settings
 
 @Composable
 internal fun SessionDrawer(
@@ -397,12 +399,14 @@ private fun AccountFooter(
     account: AccountUi,
     onAction: (ChatAction) -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     val initials = accountInitials(account.name, account.email)
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = AnrealSpacing.touch)
+            .semantics { role = Role.Button }
+            .clickable(onClick = { onAction(ChatAction.OnOpenSettings) })
             .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
@@ -438,37 +442,11 @@ private fun AccountFooter(
                 )
             }
         }
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(
-                    imageVector = MaterialSymbols.Rounded.Expand_less,
-                    contentDescription = AnrealCopy.get(AnrealCopy.CD_ACCOUNT_MENU),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(
-                    text = { Text(AnrealCopy.get(AnrealCopy.ACTION_SETTINGS)) },
-                    leadingIcon = {
-                        Icon(imageVector = MaterialSymbols.Rounded.Settings, contentDescription = null)
-                    },
-                    onClick = {
-                        menuOpen = false
-                        onAction(ChatAction.OnOpenSettings)
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(AnrealCopy.get(AnrealCopy.ACTION_LOG_OUT)) },
-                    leadingIcon = {
-                        Icon(imageVector = MaterialSymbols.Rounded.Logout, contentDescription = null)
-                    },
-                    onClick = {
-                        menuOpen = false
-                        onAction(ChatAction.OnSignOut)
-                    },
-                )
-            }
-        }
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Chevron_right,
+            contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_ACCOUNT),
+            tint = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

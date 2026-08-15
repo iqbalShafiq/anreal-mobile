@@ -1,5 +1,6 @@
 package co.ratmo.anreal.core.designsystem.theme
 
+import androidx.compose.animation.core.CubicBezierEasing
 import assertk.assertThat
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
@@ -13,6 +14,7 @@ class AnrealMotionTest {
         assertThat(AnrealMotion.durationFast.inWholeMilliseconds).isEqualTo(160)
         assertThat(AnrealMotion.durationMed.inWholeMilliseconds).isEqualTo(220)
         assertThat(AnrealMotion.durationDrawer.inWholeMilliseconds).isEqualTo(280)
+        assertThat(AnrealMotion.durationPage.inWholeMilliseconds).isEqualTo(420)
     }
 
     @Test
@@ -31,5 +33,12 @@ class AnrealMotionTest {
     fun press_scale_is_subtle() {
         assertThat(AnrealMotion.pressScale).isEqualTo(0.97f)
         assertThat(AnrealMotion.enterScale).isEqualTo(0.96f)
+    }
+
+    @Test
+    fun easing_matches_design_tokens() {
+        assertThat(AnrealMotion.easeOut).isEqualTo(CubicBezierEasing(0.23f, 1f, 0.32f, 1f))
+        assertThat(AnrealMotion.easeInOut).isEqualTo(CubicBezierEasing(0.77f, 0f, 0.175f, 1f))
+        assertThat(AnrealMotion.easeDrawer).isEqualTo(CubicBezierEasing(0.32f, 0.72f, 0f, 1f))
     }
 }

@@ -317,6 +317,17 @@ class ChatViewModelTest {
         assertThat(fake.sentOptions?.webSearchEnabled).isEqualTo(true)
     }
 
+    @Test
+    fun opening_settings_navigates_to_account() = runTest {
+        val viewModel = ChatViewModel(SavedStateHandle(), populatedRepo())
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnOpenSettings)
+            assertThat(awaitItem()).isEqualTo(ChatEvent.OpenAccount)
+        }
+    }
+
     private fun populatedRepo(): FakeChatRepository = FakeChatRepository().apply {
         refreshResult = Result.Success(
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),

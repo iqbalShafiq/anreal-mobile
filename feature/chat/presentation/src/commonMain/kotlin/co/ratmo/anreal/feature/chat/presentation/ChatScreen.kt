@@ -70,7 +70,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Suppress("DEPRECATION")
 fun ChatRoot(
     account: AccountUi = AccountUi(),
-    onSignOut: () -> Unit = {},
+    onNavigateAccount: () -> Unit = {},
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -90,7 +90,7 @@ fun ChatRoot(
             is ChatEvent.PickFiles -> snackbarScope.launch {
                 snackbarHostState.showSnackbar(AnrealCopy.get(AnrealCopy.TOAST_PICKER_SOON))
             }
-            ChatEvent.SignOut -> onSignOut()
+            ChatEvent.OpenAccount -> onNavigateAccount()
         }
     }
     Box(modifier = Modifier.fillMaxSize()) {

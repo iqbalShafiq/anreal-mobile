@@ -13,6 +13,7 @@ object AnrealSpacing {
     val xxl: Dp = 40.dp
     val xxxl: Dp = 48.dp
     val touch: Dp = 48.dp
+    val field: Dp = 56.dp
     val screenCompact: Dp = 16.dp
     val screenMedium: Dp = 24.dp
 }

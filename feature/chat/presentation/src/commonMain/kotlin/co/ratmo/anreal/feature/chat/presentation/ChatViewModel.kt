@@ -156,7 +156,6 @@ sealed interface ChatAction {
     data object OnOpenDocumentsLibrary : ChatAction
     data object OnOpenImages : ChatAction
     data object OnOpenSettings : ChatAction
-    data object OnSignOut : ChatAction
     data class OnOpenRecentProject(val projectId: String) : ChatAction
     data class OnRemoveActiveDocument(val documentId: String) : ChatAction
 }
@@ -165,7 +164,7 @@ sealed interface ChatEvent {
     data class ShowMessage(val message: UiText) : ChatEvent
     data class CopyText(val text: String) : ChatEvent
     data class PickFiles(val imagesOnly: Boolean) : ChatEvent
-    data object SignOut : ChatEvent
+    data object OpenAccount : ChatEvent
 }
 
 class ChatViewModel(
@@ -270,9 +269,8 @@ class ChatViewModel(
                 _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_IMAGES_SOON)))
             }
             ChatAction.OnOpenSettings -> viewModelScope.launch {
-                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_SETTINGS_SOON)))
+                _events.send(ChatEvent.OpenAccount)
             }
-            ChatAction.OnSignOut -> viewModelScope.launch { _events.send(ChatEvent.SignOut) }
             is ChatAction.OnOpenRecentProject -> viewModelScope.launch {
                 _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_PROJECTS_SOON)))
             }

@@ -1,10 +1,11 @@
 package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,6 +18,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Visibility
+import com.composables.icons.materialsymbols.rounded.Visibility_off
 
 @Composable
 fun AnrealPasswordField(
@@ -28,6 +32,8 @@ fun AnrealPasswordField(
     error: String? = null,
     enabled: Boolean = true,
     initiallyVisible: Boolean = false,
+    showPasswordDescription: String = "Show password",
+    hidePasswordDescription: String = "Hide password",
 ) {
     var visible by rememberSaveable { mutableStateOf(initiallyVisible) }
     AnrealTextField(
@@ -45,14 +51,27 @@ fun AnrealPasswordField(
             PasswordVisualTransformation()
         },
         trailingIcon = {
-            TextButton(
+            IconButton(
                 onClick = { visible = !visible },
                 enabled = enabled,
+                modifier = Modifier.size(AnrealSpacing.touch),
             ) {
-                Text(
-                    text = if (visible) "Hide" else "Show",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    imageVector = if (visible) {
+                        MaterialSymbols.Rounded.Visibility_off
+                    } else {
+                        MaterialSymbols.Rounded.Visibility
+                    },
+                    contentDescription = if (visible) {
+                        hidePasswordDescription
+                    } else {
+                        showPasswordDescription
+                    },
+                    tint = if (enabled) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    },
                 )
             }
         },
@@ -64,13 +83,13 @@ fun AnrealPasswordField(
 private fun AnrealPasswordFieldHiddenPreview() {
     AnrealPreview {
         AnrealAtmosphere {
-        AnrealPasswordField(
-            value = "password1",
-            onValueChange = {},
-            label = "Password",
-            placeholder = "Your password",
-            modifier = Modifier.padding(AnrealSpacing.md),
-        )
+            AnrealPasswordField(
+                value = "password1",
+                onValueChange = {},
+                label = "Password",
+                placeholder = "Your password",
+                modifier = Modifier.padding(AnrealSpacing.md),
+            )
         }
     }
 }
@@ -80,13 +99,13 @@ private fun AnrealPasswordFieldHiddenPreview() {
 private fun AnrealPasswordFieldVisiblePreview() {
     AnrealPreview {
         AnrealAtmosphere {
-        AnrealPasswordField(
-            value = "password1",
-            onValueChange = {},
-            label = "Password",
-            initiallyVisible = true,
-            modifier = Modifier.padding(AnrealSpacing.md),
-        )
+            AnrealPasswordField(
+                value = "password1",
+                onValueChange = {},
+                label = "Password",
+                initiallyVisible = true,
+                modifier = Modifier.padding(AnrealSpacing.md),
+            )
         }
     }
 }

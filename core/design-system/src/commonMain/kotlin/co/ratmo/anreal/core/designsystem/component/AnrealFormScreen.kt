@@ -5,10 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -19,6 +25,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -33,30 +41,48 @@ fun AnrealFormScreen(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     AnrealAtmosphere(modifier = modifier) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = AnrealSpacing.screenCompact, vertical = AnrealSpacing.xl),
-            verticalArrangement = Arrangement.spacedBy(
-                AnrealSpacing.md,
-                Alignment.CenterVertically,
-            ),
-        ) {
-            AuthBrandMark()
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLargeEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            content()
-            footer?.invoke()
+        val imeOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+        val (imeShift, shiftPx) = rememberImeFocusShift()
+        ProvideImeFocusAnchor(imeShift) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .clipToBounds(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .then(
+                            if (imeOpen) {
+                                Modifier
+                            } else {
+                                Modifier.verticalScroll(rememberScrollState())
+                            },
+                        )
+                        .imeFocusShiftOffset(shiftPx)
+                        .padding(
+                            horizontal = AnrealSpacing.screenCompact,
+                            vertical = AnrealSpacing.xl,
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
+                ) {
+                    AuthBrandMark()
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    content()
+                    footer?.invoke()
+                }
+            }
         }
     }
 }
