@@ -164,7 +164,7 @@ Recipes:
 
 Fallback when Haze disables blur (low-end / reliability gate): opaque-enough `surfaceContainer` scrim, same shape, no fake blur.
 
-Aurora is the haze **source**. Animate aurora only with transform + opacity, very slow (48–72s), and **disable it** under reduced motion and reduced transparency.
+Aurora is the haze **source**. Animate it with independent orb wander (position + opacity) on a 16–32s cycle — slow enough to stay atmospheric, large enough to read through frost. **Disable it** under reduced motion and reduced transparency.
 
 Never stack a light translucent surface on another light translucent surface.
 
@@ -236,7 +236,7 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 | Streaming tokens | **None** | — |
 | Skeleton → content | Crossfade 160ms; optional 2.dp blur seam | Instant swap |
 | Theme switch | Color 200ms | Instant |
-| Aurora | Transform only, 48–72s | Hidden |
+| Aurora | Independent orb wander, 16–32s | Hidden |
 | Success check | 200ms scale 0.96→1 once | Static icon |
 
 Sheets and drawers that the user can drag use **springs** (critically damped). Hand off release velocity. Rubber-band past the edge. Never lock input during the transition.

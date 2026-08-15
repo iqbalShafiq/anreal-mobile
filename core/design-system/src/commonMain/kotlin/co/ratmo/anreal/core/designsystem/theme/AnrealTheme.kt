@@ -29,7 +29,10 @@ fun AnrealTheme(
         style = PaletteStyle.Expressive,
     )
 
-    CompositionLocalProvider(LocalAnrealReduceMotion provides rememberReduceMotion()) {
+    CompositionLocalProvider(
+        LocalAnrealReduceMotion provides rememberReduceMotion(),
+        LocalAnrealReduceTransparency provides rememberReduceTransparency(),
+    ) {
         MaterialExpressiveTheme(
             colorScheme = dynamicScheme ?: brandScheme,
             motionScheme = MotionScheme.standard(),

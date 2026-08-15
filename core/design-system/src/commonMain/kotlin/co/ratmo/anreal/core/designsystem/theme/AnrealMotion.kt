@@ -7,14 +7,20 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.staticCompositionLocalOf
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 val LocalAnrealReduceMotion = staticCompositionLocalOf { false }
+
+val LocalAnrealReduceTransparency = staticCompositionLocalOf { false }
 
 object AnrealMotion {
     val durationFast: Duration = 160.milliseconds
     val durationMed: Duration = 220.milliseconds
     val durationDrawer: Duration = 280.milliseconds
     val durationPage: Duration = 420.milliseconds
+    val durationAuroraMin: Duration = 16.seconds
+    val durationAurora: Duration = 22.seconds
+    val durationAuroraMax: Duration = 32.seconds
 
     val easeOut: Easing = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
     val easeInOut: Easing = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
