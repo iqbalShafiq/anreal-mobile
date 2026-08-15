@@ -33,7 +33,9 @@ import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
 import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
+import co.ratmo.anreal.core.designsystem.component.glassFaintTextColor
 import co.ratmo.anreal.core.designsystem.component.glassHighlightColor
+import co.ratmo.anreal.core.designsystem.component.glassMutedTextColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -241,7 +243,7 @@ private fun WorkspaceItem(
                 tint = if (selected) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    glassMutedTextColor()
                 },
             )
             Text(
@@ -250,7 +252,7 @@ private fun WorkspaceItem(
                 color = if (selected) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+                    glassMutedTextColor()
                 },
             )
         }
@@ -268,7 +270,7 @@ private fun SectionLabel(text: String) {
             bottom = AnrealSpacing.xxs,
         ),
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = glassFaintTextColor(),
     )
 }
 
@@ -284,7 +286,7 @@ private fun RecentProjectRow(
             .clickable(onClick = onClick)
             .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = glassMutedTextColor(),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
@@ -348,7 +350,7 @@ private fun SessionRowContent(
             color = if (selected) {
                 MaterialTheme.colorScheme.onSurface
             } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
+                glassMutedTextColor()
             },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -365,7 +367,7 @@ private fun SessionRowContent(
                 Icon(
                     imageVector = MaterialSymbols.Rounded.More_vert,
                     contentDescription = AnrealCopy.get(AnrealCopy.CD_SESSION_MENU),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = glassMutedTextColor(),
                 )
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = onDismissMenu) {
@@ -427,7 +429,7 @@ private fun AccountFooter(
                 Text(
                     text = account.email,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassMutedTextColor(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

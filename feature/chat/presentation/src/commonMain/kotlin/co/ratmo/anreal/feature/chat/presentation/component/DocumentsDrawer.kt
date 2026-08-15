@@ -33,7 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
+import co.ratmo.anreal.core.designsystem.component.glassFaintTextColor
 import co.ratmo.anreal.core.designsystem.component.glassHighlightColor
+import co.ratmo.anreal.core.designsystem.component.glassMutedTextColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -106,7 +108,7 @@ internal fun DocumentsDrawer(
             Text(
                 text = documentsSummary(active.size, cited.size),
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = glassFaintTextColor(),
             )
         }
         Column(
@@ -138,7 +140,7 @@ internal fun DocumentsDrawer(
                     text = AnrealCopy.get(AnrealCopy.DOCUMENTS_EMPTY_BODY),
                     modifier = Modifier.padding(AnrealSpacing.md),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassMutedTextColor(),
                 )
             }
         }
@@ -163,7 +165,7 @@ private fun DocumentSection(
                 text = title,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = glassFaintTextColor(),
             )
             Icon(
                 imageVector = if (expanded) {
@@ -172,7 +174,7 @@ private fun DocumentSection(
                     MaterialSymbols.Rounded.Expand_more
                 },
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = glassMutedTextColor(),
             )
         }
         if (expanded) content()
@@ -210,7 +212,7 @@ private fun ActiveDocumentCard(
                     Icon(
                         imageVector = MaterialSymbols.Rounded.Close,
                         contentDescription = AnrealCopy.get(AnrealCopy.CD_REMOVE_DOCUMENT),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = glassMutedTextColor(),
                     )
                 }
             }
@@ -220,7 +222,7 @@ private fun ActiveDocumentCard(
                 },
                 modifier = Modifier.padding(top = AnrealSpacing.xs),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = glassMutedTextColor(),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -264,7 +266,7 @@ private fun CitedDocumentCard(
                         listOf(document.citationCount.toString()),
                     ).asString(),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = glassMutedTextColor(),
                 )
             }
         }

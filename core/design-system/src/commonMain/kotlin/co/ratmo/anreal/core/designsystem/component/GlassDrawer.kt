@@ -43,6 +43,26 @@ fun glassHighlightColor(): Color {
     }
 }
 
+@Composable
+fun glassMutedTextColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.surface.luminance() < 0.5f) {
+        scheme.onSurface.copy(alpha = 0.78f)
+    } else {
+        scheme.onSurfaceVariant
+    }
+}
+
+@Composable
+fun glassFaintTextColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.surface.luminance() < 0.5f) {
+        scheme.onSurface.copy(alpha = 0.56f)
+    } else {
+        scheme.onSurfaceVariant
+    }
+}
+
 fun glassDrawerShape(fromEnd: Boolean): Shape {
     val radius = DrawerCorner
     return if (fromEnd) {
