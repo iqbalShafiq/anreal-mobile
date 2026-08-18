@@ -22,6 +22,8 @@ class DataStoreAppPreferencesRepository(
             dynamicColor = values[DYNAMIC_COLOR] ?: true,
             reduceMotion = values[REDUCE_MOTION] ?: false,
             reduceTransparency = values[REDUCE_TRANSPARENCY] ?: false,
+            chatModelId = values[CHAT_MODEL_ID],
+            chatReasoningEffort = values[CHAT_REASONING_EFFORT],
         )
     }
 
@@ -41,10 +43,28 @@ class DataStoreAppPreferencesRepository(
         dataStore.edit { it[REDUCE_TRANSPARENCY] = enabled }
     }
 
+    override suspend fun setChatModel(modelId: String?) {
+        dataStore.edit { values ->
+            if (modelId == null) values.remove(CHAT_MODEL_ID) else values[CHAT_MODEL_ID] = modelId
+        }
+    }
+
+    override suspend fun setChatReasoningEffort(effort: String?) {
+        dataStore.edit { values ->
+            if (effort == null) {
+                values.remove(CHAT_REASONING_EFFORT)
+            } else {
+                values[CHAT_REASONING_EFFORT] = effort
+            }
+        }
+    }
+
     private companion object {
         val THEME = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
         val REDUCE_MOTION = booleanPreferencesKey("reduce_motion")
         val REDUCE_TRANSPARENCY = booleanPreferencesKey("reduce_transparency")
+        val CHAT_MODEL_ID = stringPreferencesKey("chat_model_id")
+        val CHAT_REASONING_EFFORT = stringPreferencesKey("chat_reasoning_effort")
     }
 }

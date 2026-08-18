@@ -12,6 +12,7 @@ import io.ktor.client.plugins.timeout
 import io.ktor.client.request.delete as ktorDelete
 import io.ktor.client.request.accept
 import io.ktor.client.request.get as ktorGet
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.patch as ktorPatch
 import io.ktor.client.request.put as ktorPut
@@ -167,7 +168,14 @@ suspend inline fun <reified Request : Any> HttpClient.postJsonl(
 ): Result<Unit, DataError.Network> {
     return try {
         preparePost(urlString = route) {
+            // defaultRequest advertises JSON for ordinary API calls. A single
+            // explicit streaming Accept value prevents proxies from selecting
+            // a buffered JSON response, while identity encoding avoids delayed
+            // gzip delivery on some Android/proxy combinations.
+            headers.remove(HttpHeaders.Accept)
             accept(ContentType.parse("application/x-ndjson"))
+            header(HttpHeaders.CacheControl, "no-cache")
+            header(HttpHeaders.AcceptEncoding, "identity")
             setBody(body)
             timeout {
                 requestTimeoutMillis = HttpTimeoutConfig.INFINITE_TIMEOUT_MS

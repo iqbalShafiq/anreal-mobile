@@ -96,6 +96,7 @@ interface ChatRepository {
     suspend fun renameSession(sessionId: String, title: String): Result<ChatSession, ChatError>
     suspend fun deleteSession(sessionId: String): EmptyResult<ChatError>
     suspend fun markRead(sessionId: String): EmptyResult<ChatError>
+    suspend fun loadCachedHistory(sessionId: String): List<ChatMessage>
     suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError>
     suspend fun sendMessage(
         sessionId: String,

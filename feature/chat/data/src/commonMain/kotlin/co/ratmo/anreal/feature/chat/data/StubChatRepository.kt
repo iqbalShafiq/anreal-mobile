@@ -102,6 +102,10 @@ class StubChatRepository : ChatRepository {
 
     override suspend fun markRead(sessionId: String): EmptyResult<ChatError> = Result.Success(Unit)
 
+    override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> {
+        return histories[sessionId].orEmpty()
+    }
+
     override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
         return Result.Success(histories[sessionId].orEmpty())
     }

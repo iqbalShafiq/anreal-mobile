@@ -52,6 +52,7 @@ data class ImageUi(
     val prompt: String,
     val detail: String,
     val bytes: ByteArray? = null,
+    val loading: Boolean = false,
 )
 
 data class DocumentPreviewUi(
@@ -376,15 +377,32 @@ class WorkspaceViewModel(
         }
     }
 
-    private suspend fun loadImageBytes(images: List<WorkspaceImage>) {
+    private fun loadImageBytes(images: List<WorkspaceImage>) {
         images.forEach { image ->
-            repository.getImageBytes(image.id).onSuccess { bytes ->
-                _state.update { state ->
-                    state.copy(
-                        images = state.images.map { item ->
-                            if (item.id == image.id) item.copy(bytes = bytes) else item
-                        },
-                    )
+            _state.update { state ->
+                state.copy(
+                    images = state.images.map { item ->
+                        if (item.id == image.id) item.copy(loading = true) else item
+                    },
+                )
+            }
+            viewModelScope.launch {
+                repository.getImageBytes(image.id).onSuccess { bytes ->
+                    _state.update { state ->
+                        state.copy(
+                            images = state.images.map { item ->
+                                if (item.id == image.id) item.copy(bytes = bytes, loading = false) else item
+                            },
+                        )
+                    }
+                }.onFailure {
+                    _state.update { state ->
+                        state.copy(
+                            images = state.images.map { item ->
+                                if (item.id == image.id) item.copy(loading = false) else item
+                            },
+                        )
+                    }
                 }
             }
         }

@@ -1,9 +1,7 @@
 package co.ratmo.anreal.feature.chat.presentation
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Badge
@@ -24,22 +22,30 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
+import co.ratmo.anreal.core.designsystem.component.AnrealHazeSource
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
+import co.ratmo.anreal.core.designsystem.component.GlassTopBar
+import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
+import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageButton
+import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageSheet
 import co.ratmo.anreal.feature.chat.presentation.component.ApprovalDialog
 import co.ratmo.anreal.feature.chat.presentation.component.ClarificationDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
@@ -163,6 +169,9 @@ fun ChatScreen(
 ) {
     val drawerState = rememberDrawerState(initialValue = initialChatsDrawer)
     var documentsOpen by remember { mutableStateOf(initialDocumentsDrawer) }
+    var contextUsageOpen by remember { mutableStateOf(false) }
+    var composerHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val documentCount = documentsBadgeCount(state)
     var skipInitialDrawerClose by remember { mutableStateOf(true) }
@@ -192,59 +201,73 @@ fun ChatScreen(
                 Scaffold(
                     containerColor = Color.Transparent,
                     topBar = {
-                        TopAppBar(
-                            title = {
-                                Text(
-                                    text = state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title
-                                        ?: AnrealCopy.get(AnrealCopy.LABEL_CHATS),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
-                            },
-                            navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(
-                                        imageVector = MaterialSymbols.Rounded.Menu,
-                                        contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_CHATS),
+                        GlassTopBar {
+                            TopAppBar(
+                                title = {
+                                    Text(
+                                        text = state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title
+                                            ?: AnrealCopy.get(AnrealCopy.LABEL_CHATS),
+                                        style = MaterialTheme.typography.titleMedium,
                                     )
-                                }
-                            },
-                            actions = {
-                                IconButton(onClick = { documentsOpen = true }) {
-                                    if (documentCount > 0) {
-                                        BadgedBox(
-                                            badge = { Badge { Text(documentCount.toString()) } },
-                                        ) {
+                                },
+                                navigationIcon = {
+                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                        Icon(
+                                            imageVector = MaterialSymbols.Rounded.Menu,
+                                            contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_CHATS),
+                                        )
+                                    }
+                                },
+                                actions = {
+                                    ContextUsageButton(
+                                        usage = state.contextUsage,
+                                        error = state.contextUsageError,
+                                        onClick = { contextUsageOpen = true },
+                                    )
+                                    IconButton(onClick = { documentsOpen = true }) {
+                                        if (documentCount > 0) {
+                                            BadgedBox(
+                                                badge = { Badge { Text(documentCount.toString()) } },
+                                            ) {
+                                                Icon(
+                                                    imageVector = MaterialSymbols.Rounded.Description,
+                                                    contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
+                                                )
+                                            }
+                                        } else {
                                             Icon(
                                                 imageVector = MaterialSymbols.Rounded.Description,
                                                 contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
                                             )
                                         }
-                                    } else {
-                                        Icon(
-                                            imageVector = MaterialSymbols.Rounded.Description,
-                                            contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
-                                        )
                                     }
-                                }
-                            },
-                            colors = TopAppBarDefaults.topAppBarColors(
-                                containerColor = Color.Transparent,
-                                scrolledContainerColor = Color.Transparent,
-                            ),
-                        )
+                                },
+                                colors = TopAppBarDefaults.topAppBarColors(
+                                    containerColor = Color.Transparent,
+                                    scrolledContainerColor = Color.Transparent,
+                                ),
+                            )
+                        }
                     },
                 ) { padding ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
-                    ) {
-                        ThreadPane(
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AnrealHazeSource(modifier = Modifier.fillMaxSize()) {
+                            ThreadPane(
+                                state = state,
+                                onAction = onAction,
+                                modifier = Modifier.fillMaxSize(),
+                                topContentPadding = padding.calculateTopPadding() + AnrealSpacing.sm,
+                                bottomContentPadding = with(density) { composerHeightPx.toDp() } + AnrealSpacing.sm,
+                                initialScrollReady = composerHeightPx > 0,
+                            )
+                        }
+                        ComposerBar(
                             state = state,
                             onAction = onAction,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .onSizeChanged { composerHeightPx = it.height },
                         )
-                        ComposerBar(state = state, onAction = onAction)
                     }
                 }
             }
@@ -254,6 +277,13 @@ fun ChatScreen(
                 onAction = onAction,
                 onDismiss = { documentsOpen = false },
             )
+            if (contextUsageOpen) {
+                ContextUsageSheet(
+                    usage = state.contextUsage,
+                    error = state.contextUsageError,
+                    onDismiss = { contextUsageOpen = false },
+                )
+            }
         }
     }
 

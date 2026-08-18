@@ -16,6 +16,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,8 +29,10 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
+import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
@@ -46,12 +49,19 @@ internal fun ComposerSheets(
     sheet: ComposerSheet?,
     state: ChatState,
     onAction: (ChatAction) -> Unit,
+    onOpenAttachments: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     if (sheet == null) return
     if (LocalInspectionMode.current) {
         InspectionBottomSheet {
-            ComposerSheetBody(sheet = sheet, state = state, onAction = onAction, onDismiss = onDismiss)
+            ComposerSheetBody(
+                sheet = sheet,
+                state = state,
+                onAction = onAction,
+                onOpenAttachments = onOpenAttachments,
+                onDismiss = onDismiss,
+            )
         }
         return
     }
@@ -61,7 +71,13 @@ internal fun ComposerSheets(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
-        ComposerSheetBody(sheet = sheet, state = state, onAction = onAction, onDismiss = onDismiss)
+        ComposerSheetBody(
+            sheet = sheet,
+            state = state,
+            onAction = onAction,
+            onOpenAttachments = onOpenAttachments,
+            onDismiss = onDismiss,
+        )
     }
 }
 
@@ -91,11 +107,16 @@ private fun ComposerSheetBody(
     sheet: ComposerSheet,
     state: ChatState,
     onAction: (ChatAction) -> Unit,
+    onOpenAttachments: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     when (sheet) {
         ComposerSheet.Model -> ModelAndReasoningSheet(state = state, onAction = onAction)
-        ComposerSheet.Features -> FeaturesSheet(state = state, onAction = onAction)
+        ComposerSheet.Features -> FeaturesSheet(
+            state = state,
+            onAction = onAction,
+            onOpenAttachments = onOpenAttachments,
+        )
         ComposerSheet.Attach -> AttachSheet(onAction = onAction, onDismiss = onDismiss)
     }
 }
@@ -104,7 +125,9 @@ private fun ComposerSheetBody(
 private fun SheetTitle(text: String) {
     Text(
         text = text,
-        modifier = Modifier.padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.onSurface,
     )
@@ -160,34 +183,73 @@ private fun ModelAndReasoningSheet(
     onAction: (ChatAction) -> Unit,
 ) {
     val allowed = state.models.firstOrNull { it.id == state.selectedModelId }?.reasoningEfforts.orEmpty()
-    Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = AnrealSpacing.lg)) {
-        SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
-        state.models.forEach { model ->
-            SheetOption(
-                title = model.label,
-                subtitle = if (model.contextWindowTokens > 0) {
-                    "${model.contextWindowTokens / 1000}k context"
-                } else {
-                    null
-                },
-                selected = model.id == state.selectedModelId,
-                onClick = { onAction(ChatAction.OnSelectModel(model.id)) },
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = AnrealSpacing.lg),
+        horizontalAlignment = Alignment.Start,
+    ) {
+        when {
+            state.catalogLoading && state.models.isEmpty() -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnrealLoadingIndicator()
+                }
+            }
+            state.catalogError != null && state.models.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md),
+                    horizontalAlignment = Alignment.Start,
+                ) {
+                    Text(
+                        text = state.catalogError.asString(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TextButton(onClick = { onAction(ChatAction.OnRetryCatalog) }) {
+                        Text(AnrealCopy.get(AnrealCopy.ACTION_RETRY))
+                    }
+                }
+            }
+            state.models.isEmpty() -> Text(
+                text = AnrealCopy.get(AnrealCopy.MODELS_EMPTY),
+                modifier = Modifier.padding(AnrealSpacing.md),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-        }
-        SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_REASONING))
-        SheetOption(
-            title = AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE),
-            subtitle = null,
-            selected = state.selectedReasoning == null,
-            onClick = { onAction(ChatAction.OnSelectReasoning(null)) },
-        )
-        state.reasoningEfforts.filter { it.key in allowed || allowed.isEmpty() }.forEach { effort ->
-            SheetOption(
-                title = effort.label,
-                subtitle = effort.description,
-                selected = state.selectedReasoning == effort.key,
-                onClick = { onAction(ChatAction.OnSelectReasoning(effort.key)) },
-            )
+            else -> {
+                SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
+                state.models.forEach { model ->
+                    SheetOption(
+                        title = model.label,
+                        subtitle = if (model.contextWindowTokens > 0) {
+                            "${model.contextWindowTokens / 1000}k context"
+                        } else {
+                            null
+                        },
+                        selected = model.id == state.selectedModelId,
+                        onClick = { onAction(ChatAction.OnSelectModel(model.id)) },
+                    )
+                }
+                SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_REASONING))
+                SheetOption(
+                    title = AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE),
+                    subtitle = null,
+                    selected = state.selectedReasoning == null,
+                    onClick = { onAction(ChatAction.OnSelectReasoning(null)) },
+                )
+                state.reasoningEfforts.filter { it.key in allowed }.forEach { effort ->
+                    SheetOption(
+                        title = effort.label,
+                        subtitle = effort.description,
+                        selected = state.selectedReasoning == effort.key,
+                        onClick = { onAction(ChatAction.OnSelectReasoning(effort.key)) },
+                    )
+                }
+            }
         }
     }
 }
@@ -196,9 +258,17 @@ private fun ModelAndReasoningSheet(
 private fun FeaturesSheet(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
+    onOpenAttachments: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
         SheetTitle(AnrealCopy.get(AnrealCopy.CD_FEATURES))
+        SheetOption(
+            title = AnrealCopy.get(AnrealCopy.LABEL_ATTACH),
+            subtitle = AnrealCopy.get(AnrealCopy.ATTACH_LIBRARY_BODY),
+            selected = false,
+            enabled = !state.isUploading,
+            onClick = onOpenAttachments,
+        )
         SheetOption(
             title = AnrealCopy.get(AnrealCopy.LABEL_WEB_SEARCH),
             subtitle = if (state.capabilities.webSearchAvailable) {

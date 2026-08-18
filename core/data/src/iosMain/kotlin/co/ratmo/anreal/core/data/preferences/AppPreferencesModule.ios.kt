@@ -29,4 +29,12 @@ private class InMemoryAppPreferencesRepository : AppPreferencesRepository {
     override suspend fun setReduceTransparency(enabled: Boolean) {
         preferences.value = preferences.value.copy(reduceTransparency = enabled)
     }
+
+    override suspend fun setChatModel(modelId: String?) {
+        preferences.value = preferences.value.copy(chatModelId = modelId)
+    }
+
+    override suspend fun setChatReasoningEffort(effort: String?) {
+        preferences.value = preferences.value.copy(chatReasoningEffort = effort)
+    }
 }

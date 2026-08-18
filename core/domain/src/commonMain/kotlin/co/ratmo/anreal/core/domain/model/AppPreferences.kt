@@ -9,6 +9,8 @@ data class AppPreferences(
     val dynamicColor: Boolean = true,
     val reduceMotion: Boolean = false,
     val reduceTransparency: Boolean = false,
+    val chatModelId: String? = null,
+    val chatReasoningEffort: String? = null,
 )
 
 interface AppPreferencesRepository {
@@ -17,4 +19,6 @@ interface AppPreferencesRepository {
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setReduceMotion(enabled: Boolean)
     suspend fun setReduceTransparency(enabled: Boolean)
+    suspend fun setChatModel(modelId: String?)
+    suspend fun setChatReasoningEffort(effort: String?)
 }

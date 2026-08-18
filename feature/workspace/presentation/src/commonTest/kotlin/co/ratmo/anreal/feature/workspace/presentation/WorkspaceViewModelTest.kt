@@ -105,6 +105,18 @@ class WorkspaceViewModelTest {
             assertThat(awaitItem()).isEqualTo(WorkspaceEvent.OpenProject("p1"))
         }
     }
+
+    @Test
+    fun images_become_visible_when_their_binary_payload_finishes_loading() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Images, repository)
+
+        assertThat(viewModel.state.value.loadedSections).isEqualTo(setOf(WorkspaceSection.Images))
+        assertThat(viewModel.state.value.images.single().bytes?.toList())
+            .isEqualTo(byteArrayOf(1, 2, 3).toList())
+        assertThat(viewModel.state.value.images.single().loading).isFalse()
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {
@@ -180,8 +192,23 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
     ): Result<ByteArray, WorkspaceError> = error("not needed")
 
     override suspend fun listImages(projectId: String?): Result<List<WorkspaceImage>, WorkspaceError> =
-        Result.Success(emptyList())
+        Result.Success(
+            listOf(
+                WorkspaceImage(
+                    id = "i1",
+                    projectId = null,
+                    sessionId = "s1",
+                    mediaType = "image/png",
+                    width = 1024,
+                    height = 768,
+                    modelId = "image-model",
+                    prompt = "A research chart",
+                    nOfTotal = null,
+                    createdAt = "now",
+                ),
+            ),
+        )
 
     override suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError> =
-        Result.Success(byteArrayOf())
+        Result.Success(byteArrayOf(1, 2, 3))
 }

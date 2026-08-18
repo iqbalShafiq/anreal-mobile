@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -44,19 +42,18 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
-import co.ratmo.anreal.core.designsystem.component.AnrealPrimaryButton
+import co.ratmo.anreal.core.designsystem.component.AnrealSegmentedTabs
+import co.ratmo.anreal.core.designsystem.component.GlassExtendedFloatingActionButton
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
 import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.GlassTopBar
 import co.ratmo.anreal.core.designsystem.component.glassFaintTextColor
-import co.ratmo.anreal.core.designsystem.component.glassHighlightColor
 import co.ratmo.anreal.core.designsystem.component.glassMutedTextColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -77,6 +74,7 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Arrow_back
 import com.composables.icons.materialsymbols.rounded.Auto_awesome
 import com.composables.icons.materialsymbols.rounded.Bolt
+import com.composables.icons.materialsymbols.rounded.Logout
 import com.composables.icons.materialsymbols.rounded.Person
 
 private val SettingsContentMaxWidth = 640.dp
@@ -106,90 +104,107 @@ internal fun AccountSettingsLayout(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = AnrealCopy.get(AnrealCopy.ACTION_SETTINGS),
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = onBack,
-                            enabled = !state.isSigningOut,
-                        ) {
-                            Icon(
-                                imageVector = MaterialSymbols.Rounded.Arrow_back,
-                                contentDescription = AnrealCopy.get(AnrealCopy.CD_BACK),
+                GlassTopBar {
+                    TopAppBar(
+                        title = {
+                            Text(
+                                text = AnrealCopy.get(AnrealCopy.ACTION_SETTINGS),
+                                style = MaterialTheme.typography.titleMedium,
                             )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = Color.Transparent,
-                    ),
-                )
+                        },
+                        navigationIcon = {
+                            IconButton(
+                                onClick = onBack,
+                                enabled = !state.isSigningOut,
+                            ) {
+                                Icon(
+                                    imageVector = MaterialSymbols.Rounded.Arrow_back,
+                                    contentDescription = AnrealCopy.get(AnrealCopy.CD_BACK),
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = Color.Transparent,
+                        ),
+                    )
+                }
             },
         ) { scaffoldPadding ->
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(scaffoldPadding),
             ) {
-                LazyColumn(
+                AnrealSegmentedTabs(
+                    items = AccountSection.entries,
+                    selected = state.section,
+                    label = AccountSection::label,
+                    enabled = !state.isSigningOut,
+                    onSelect = onSelectSection,
                     modifier = Modifier
-                        .align(Alignment.TopCenter)
                         .widthIn(max = SettingsContentMaxWidth)
-                        .fillMaxHeight()
-                        .fillMaxWidth(),
-                    contentPadding = PaddingValues(
-                        start = AnrealSpacing.screenCompact,
-                        top = AnrealSpacing.xs,
-                        end = AnrealSpacing.screenCompact,
-                        bottom = LogoutDockClearance,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
-                ) {
-                    item {
-                        AccountSectionSwitcher(
-                            selected = state.section,
-                            enabled = !state.isSigningOut,
-                            onSelect = onSelectSection,
-                        )
-                    }
-                    item {
-                        AnimatedAccountSection(
-                            state = state,
-                            onRetryUsage = onRetryUsage,
-                            onRetryHealth = onRetryHealth,
-                            onRetryPersonalization = onRetryPersonalization,
-                            onRequestResetUserProfile = onRequestResetUserProfile,
-                            onRequestResetProjectProfile = onRequestResetProjectProfile,
-                            onThemeModeChange = onThemeModeChange,
-                            onToggleDynamicColor = onToggleDynamicColor,
-                            onToggleReduceMotion = onToggleReduceMotion,
-                            onToggleReduceTransparency = onToggleReduceTransparency,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-
-                AnrealPrimaryButton(
-                    label = AnrealCopy.get(AnrealCopy.ACTION_LOG_OUT),
-                    onClick = onSignOut,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = LogoutDockMaxWidth)
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .align(Alignment.CenterHorizontally)
                         .padding(
                             horizontal = AnrealSpacing.screenCompact,
-                            vertical = AnrealSpacing.sm,
+                            vertical = AnrealSpacing.xs,
                         ),
-                    loading = state.isSigningOut,
-                    loadingLabel = AnrealCopy.get(AnrealCopy.ACTION_LOGGING_OUT),
-                    destructive = true,
                 )
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    LazyColumn(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .widthIn(max = SettingsContentMaxWidth)
+                            .fillMaxHeight()
+                            .fillMaxWidth(),
+                        contentPadding = PaddingValues(
+                            start = AnrealSpacing.screenCompact,
+                            top = AnrealSpacing.md,
+                            end = AnrealSpacing.screenCompact,
+                            bottom = LogoutDockClearance,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
+                    ) {
+                        item {
+                            AnimatedAccountSection(
+                                state = state,
+                                onRetryUsage = onRetryUsage,
+                                onRetryHealth = onRetryHealth,
+                                onRetryPersonalization = onRetryPersonalization,
+                                onRequestResetUserProfile = onRequestResetUserProfile,
+                                onRequestResetProjectProfile = onRequestResetProjectProfile,
+                                onThemeModeChange = onThemeModeChange,
+                                onToggleDynamicColor = onToggleDynamicColor,
+                                onToggleReduceMotion = onToggleReduceMotion,
+                                onToggleReduceTransparency = onToggleReduceTransparency,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+
+                    GlassExtendedFloatingActionButton(
+                        label = AnrealCopy.get(
+                            if (state.isSigningOut) {
+                                AnrealCopy.ACTION_LOGGING_OUT
+                            } else {
+                                AnrealCopy.ACTION_LOG_OUT
+                            },
+                        ),
+                        icon = MaterialSymbols.Rounded.Logout,
+                        onClick = onSignOut,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = LogoutDockMaxWidth)
+                            .navigationBarsPadding()
+                            .padding(
+                                horizontal = AnrealSpacing.screenCompact,
+                                vertical = AnrealSpacing.sm,
+                            ),
+                        loading = state.isSigningOut,
+                        destructive = true,
+                    )
+                }
             }
         }
     }
@@ -224,64 +239,6 @@ internal fun AccountSettingsLayout(
                 }
             },
         )
-    }
-}
-
-@Composable
-private fun AccountSectionSwitcher(
-    selected: AccountSection,
-    enabled: Boolean,
-    onSelect: (AccountSection) -> Unit,
-) {
-    GlassSurface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        tone = GlassTone.Thin,
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AnrealSpacing.xxs)
-                .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
-        ) {
-            AccountSection.entries.forEach { section ->
-                val isSelected = section == selected
-                val contentColor = if (isSelected) {
-                    MaterialTheme.colorScheme.onSurface
-                } else {
-                    glassMutedTextColor()
-                }
-                Surface(
-                    modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.large,
-                    color = if (isSelected) glassHighlightColor() else Color.Transparent,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = AnrealSpacing.touch)
-                            .selectable(
-                                selected = isSelected,
-                                enabled = enabled,
-                                role = Role.Tab,
-                                onClick = { onSelect(section) },
-                            )
-                            .alpha(if (enabled) 1f else 0.38f)
-                            .padding(horizontal = AnrealSpacing.xs),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = section.label(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = contentColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-        }
     }
 }
 

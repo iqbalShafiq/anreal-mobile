@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import co.ratmo.anreal.core.domain.model.ChatSession
+import co.ratmo.anreal.core.domain.model.AppPreferencesRepository
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.domain.util.onFailure
 import co.ratmo.anreal.core.domain.util.onSuccess
@@ -47,11 +48,13 @@ import co.ratmo.anreal.feature.chat.domain.stream.StreamEnvelope
 import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -105,10 +108,17 @@ data class DocumentIngestUi(
 )
 
 data class ContextUsageUi(
-    val label: String,
+    val modelLabel: String,
+    val estimatedTokens: Int,
+    val contextWindowTokens: Int,
     val ratio: Float,
+    val thresholdRatio: Float,
+    val targetRatio: Float,
+    val reasoningEffort: String?,
     val nearThreshold: Boolean,
-)
+) {
+    val label: String get() = "$estimatedTokens / $contextWindowTokens tokens"
+}
 
 data class CitedDocumentUi(
     val id: String,
@@ -150,6 +160,7 @@ data class ChatState(
     val capabilities: ChatCapabilities = ChatCapabilities(),
     val contextSnippet: String? = null,
     val contextSnippetId: String? = null,
+    val catalogLoading: Boolean = true,
     val catalogError: UiText? = null,
     val recentProjects: List<RecentProjectUi> = emptyList(),
     val activeDocuments: List<SessionDocumentUi> = emptyList(),
@@ -252,6 +263,7 @@ sealed interface ChatEvent {
 class ChatViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository,
+    private val preferencesRepository: AppPreferencesRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -318,8 +330,14 @@ class ChatViewModel(
             }
             is ChatAction.OnSelectModel -> selectModel(action.modelId)
             is ChatAction.OnSelectReasoning -> {
-                _state.update { it.copy(selectedReasoning = action.effort) }
+                val allowed = _state.value.models
+                    .firstOrNull { it.id == _state.value.selectedModelId }
+                    ?.reasoningEfforts
+                    .orEmpty()
+                val effort = action.effort?.takeIf { it in allowed }
+                _state.update { it.copy(selectedReasoning = effort) }
                 viewModelScope.launch {
+                    preferencesRepository.setChatReasoningEffort(effort)
                     _state.value.selectedSessionId?.let { loadContextUsage(it) }
                 }
             }
@@ -618,14 +636,15 @@ class ChatViewModel(
 
     private suspend fun selectSession(sessionId: String) {
         savedStateHandle[SESSION_KEY] = sessionId
-        val queue = restoreQueue(chatRepository.loadQueue(sessionId))
         _state.update {
             it.copy(
                 selectedSessionId = sessionId,
                 runActiveConflict = false,
                 queueConflict = false,
                 thread = ChatThreadState(),
-                queue = queue,
+                historyLoading = true,
+                historyError = null,
+                queue = emptyList(),
                 queueHidden = false,
                 activeDocuments = emptyList(),
                 citedDocuments = emptyList(),
@@ -633,30 +652,54 @@ class ChatViewModel(
                 contextSnippetId = null,
                 editingMessageId = null,
                 sessionImages = emptyList(),
+                imagesLoading = false,
                 uploadingDocuments = emptyList(),
                 contextUsage = null,
             )
         }
-        loadHistory(sessionId)
-        loadSessionDocuments(sessionId)
-        loadSessionImages(sessionId)
-        loadContextSnippet(sessionId)
-        chatRepository.markRead(sessionId)
-        maybeResume(sessionId)
+        val cachedMessages = chatRepository.loadCachedHistory(sessionId)
+        if (cachedMessages.isNotEmpty() && _state.value.selectedSessionId == sessionId) {
+            _state.update { current ->
+                current.copy(thread = current.thread.copy(messages = cachedMessages))
+            }
+        }
+        val queue = restoreQueue(chatRepository.loadQueue(sessionId))
+        if (_state.value.selectedSessionId == sessionId) {
+            _state.update { it.copy(queue = queue) }
+        }
+        coroutineScope {
+            launch {
+                // The history snapshot must settle before a live run resumes. Running
+                // these concurrently lets a late snapshot overwrite streamed parts.
+                loadHistory(sessionId)
+                maybeResume(sessionId)
+            }
+            launch { loadSessionDocuments(sessionId) }
+            launch { loadSessionImages(sessionId) }
+            launch { loadContextSnippet(sessionId) }
+            launch { loadContextUsage(sessionId) }
+            launch { chatRepository.markRead(sessionId) }
+        }
     }
 
     private suspend fun loadHistory(sessionId: String) {
+        if (_state.value.selectedSessionId != sessionId) return
         _state.update { it.copy(historyLoading = true, historyError = null) }
         chatRepository.loadHistory(sessionId)
             .onSuccess { messages ->
-                _state.update {
-                    it.copy(
+                if (_state.value.selectedSessionId != sessionId) return@onSuccess
+                _state.update { current ->
+                    current.copy(
                         historyLoading = false,
-                        thread = it.thread.copy(messages = messages, status = RunStatus.Idle),
+                        thread = current.thread.copy(
+                            messages = messages.ifEmpty { current.thread.messages },
+                            status = RunStatus.Idle,
+                        ),
                     )
                 }
             }
             .onFailure { error ->
+                if (_state.value.selectedSessionId != sessionId) return@onFailure
                 _state.update {
                     it.copy(historyLoading = false, historyError = error.toUiText())
                 }
@@ -666,11 +709,16 @@ class ChatViewModel(
     private suspend fun loadContextSnippet(sessionId: String) {
         chatRepository.loadContextSnippet(sessionId)
             .onSuccess { snippet ->
+                if (_state.value.selectedSessionId != sessionId) return@onSuccess
                 _state.update {
                     it.copy(contextSnippet = snippet?.text, contextSnippetId = snippet?.id)
                 }
             }
-            .onFailure { error -> _events.send(ChatEvent.ShowMessage(error.toUiText())) }
+            .onFailure { error ->
+                if (_state.value.selectedSessionId == sessionId) {
+                    _events.send(ChatEvent.ShowMessage(error.toUiText()))
+                }
+            }
     }
 
     private suspend fun saveContextSnippet(text: String, sourceRole: ChatRole) {
@@ -804,6 +852,7 @@ class ChatViewModel(
         ) { line ->
             applyLine(sessionId, line)
         }
+        if (_state.value.selectedSessionId != sessionId) return
         _state.update { current ->
             val status = if (result is Result.Success && current.thread.status == RunStatus.Streaming) {
                 RunStatus.Completed
@@ -814,6 +863,11 @@ class ChatViewModel(
         }
         result.onFailure { error -> handleSendError(error) }
         if (result is Result.Success) {
+            // The stream reducer owns live updates. Reloading once after the
+            // terminal event also reconciles any event missed during a brief
+            // transport interruption, so the completed answer is never held
+            // until the session is reopened.
+            loadHistory(sessionId)
             loadContextUsage(sessionId)
             loadSessionImages(sessionId)
             maybeAutoFlush()
@@ -948,6 +1002,7 @@ class ChatViewModel(
     private suspend fun maybeResume(sessionId: String) {
         chatRepository.runStatus(sessionId)
             .onSuccess { snapshot ->
+                if (_state.value.selectedSessionId != sessionId) return@onSuccess
                 val streamId = snapshot.streamId
                 if (snapshot.status == "running" && streamId != null) {
                     resume(sessionId, streamId, snapshot.lastEventId ?: 0)
@@ -961,22 +1016,37 @@ class ChatViewModel(
     }
 
     private suspend fun resume(sessionId: String, streamId: String, after: Int) {
+        if (_state.value.selectedSessionId != sessionId) return
         _state.update { it.copy(isSending = true) }
-        chatRepository.resume(sessionId, streamId, after) { line ->
+        val result = chatRepository.resume(sessionId, streamId, after) { line ->
             applyLine(sessionId, line)
-        }.onFailure { error -> handleSendError(error) }
-        _state.update { it.copy(isSending = false) }
+        }
+        if (_state.value.selectedSessionId != sessionId) return
+        result.onFailure { error -> handleSendError(error) }
+        if (result is Result.Success) loadHistory(sessionId)
+        if (_state.value.selectedSessionId == sessionId) {
+            _state.update { it.copy(isSending = false) }
+        }
     }
 
     private suspend fun applyLine(sessionId: String, line: String) {
+        if (_state.value.selectedSessionId != sessionId) return
         val envelope = parseStreamLine(line) ?: return
+        if (_state.value.selectedSessionId != sessionId) return
         if (envelope is StreamEnvelope.Event) {
             val event = envelope.event
             if (event is ChatStreamEvent.QueuedMessageApplied) {
                 ackQueued(event)
             }
         }
-        _state.update { it.copy(thread = it.thread.reduce(envelope)) }
+        _state.update { current ->
+            if (current.selectedSessionId == sessionId) {
+                current.copy(thread = current.thread.reduce(envelope))
+            } else {
+                current
+            }
+        }
+        if (_state.value.selectedSessionId != sessionId) return
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)
         if (envelope is StreamEnvelope.End) {
@@ -986,25 +1056,39 @@ class ChatViewModel(
     }
 
     private suspend fun loadCatalog() {
+        _state.update { it.copy(catalogLoading = true, catalogError = null) }
         chatRepository.loadCatalog()
             .onSuccess { catalog ->
-                val selected = _state.value.selectedModelId
-                    ?: catalog.models.firstOrNull()?.id
-                val allowed = catalog.models.firstOrNull { it.id == selected }?.reasoningEfforts.orEmpty()
-                val reasoning = _state.value.selectedReasoning?.takeIf { it in allowed }
+                val preferences = preferencesRepository.preferences.first()
+                val requestedModel = _state.value.selectedModelId ?: preferences.chatModelId
+                val selectedModel = catalog.models.firstOrNull { it.id == requestedModel }
+                    ?: catalog.models.firstOrNull()
+                val selected = selectedModel?.id
+                val requestedReasoning = _state.value.selectedReasoning
+                    ?: preferences.chatReasoningEffort
+                val reasoning = requestedReasoning?.takeIf {
+                    it in selectedModel?.reasoningEfforts.orEmpty()
+                }
+                if (preferences.chatModelId != null && preferences.chatModelId != selected) {
+                    preferencesRepository.setChatModel(null)
+                }
+                if (preferences.chatReasoningEffort != null && reasoning == null) {
+                    preferencesRepository.setChatReasoningEffort(null)
+                }
                 _state.update {
                     it.copy(
                         models = catalog.models,
                         reasoningEfforts = catalog.efforts,
                         selectedModelId = selected,
                         selectedReasoning = reasoning,
+                        catalogLoading = false,
                         catalogError = null,
                     )
                 }
                 _state.value.selectedSessionId?.let { loadContextUsage(it) }
             }
             .onFailure { error ->
-                _state.update { it.copy(catalogError = error.toUiText()) }
+                _state.update { it.copy(catalogLoading = false, catalogError = error.toUiText()) }
             }
         chatRepository.loadCapabilities()
             .onSuccess { capabilities ->
@@ -1015,9 +1099,16 @@ class ChatViewModel(
     private fun selectModel(modelId: String) {
         val model = _state.value.models.firstOrNull { it.id == modelId } ?: return
         val allowed = model.reasoningEfforts
-        val reasoning = _state.value.selectedReasoning?.takeIf { it in allowed }
+        val previousReasoning = _state.value.selectedReasoning
+        val reasoning = previousReasoning?.takeIf { it in allowed }
         _state.update {
             it.copy(selectedModelId = modelId, selectedReasoning = reasoning)
+        }
+        viewModelScope.launch {
+            preferencesRepository.setChatModel(modelId)
+            if (reasoning != previousReasoning) {
+                preferencesRepository.setChatReasoningEffort(reasoning)
+            }
         }
         _state.value.selectedSessionId?.let { sessionId ->
             viewModelScope.launch { loadContextUsage(sessionId) }
@@ -1034,9 +1125,14 @@ class ChatViewModel(
     private suspend fun regenerateMessage(messageId: String) {
         if (isStreaming(_state.value)) return
         val messages = _state.value.thread.messages
-        val assistantIndex = messages.indexOfFirst { it.id == messageId }
-        if (assistantIndex < 0) return
-        val user = messages.take(assistantIndex).lastOrNull { it.role == ChatRole.User } ?: return
+        val targetIndex = messages.indexOfFirst { it.id == messageId }
+        if (targetIndex < 0) return
+        val target = messages[targetIndex]
+        val user = if (target.role == ChatRole.User) {
+            target
+        } else {
+            messages.take(targetIndex).lastOrNull { it.role == ChatRole.User }
+        } ?: return
         val text = user.parts.filterIsInstance<ChatPart.Text>().joinToString("") { it.text }
         resubmitFromMessage(user.id, text)
     }
@@ -1115,10 +1211,13 @@ class ChatViewModel(
     private suspend fun loadSessionDocuments(sessionId: String) {
         chatRepository.listSessionDocuments(sessionId)
             .onSuccess { documents ->
+                if (_state.value.selectedSessionId != sessionId) return@onSuccess
                 _state.update { it.copy(activeDocuments = documents.map { document -> document.toUi() }) }
             }
             .onFailure {
-                _state.update { it.copy(activeDocuments = emptyList()) }
+                if (_state.value.selectedSessionId == sessionId) {
+                    _state.update { it.copy(activeDocuments = emptyList()) }
+                }
             }
     }
 
@@ -1196,19 +1295,23 @@ class ChatViewModel(
     }
 
     private suspend fun loadSessionImages(sessionId: String) {
-        if (_state.value.imagesLoading) return
+        if (_state.value.selectedSessionId != sessionId) return
         _state.update { it.copy(imagesLoading = true) }
         val images = when (val result = chatRepository.listSessionImages(sessionId)) {
             is Result.Success -> result.data
             is Result.Error -> {
-                _state.update { it.copy(imagesLoading = false) }
+                if (_state.value.selectedSessionId == sessionId) {
+                    _state.update { it.copy(imagesLoading = false) }
+                }
                 return
             }
         }
+        if (_state.value.selectedSessionId != sessionId) return
         val pinnedIds = when (val result = chatRepository.listPinnedImages(sessionId)) {
             is Result.Success -> result.data.mapTo(mutableSetOf()) { it.id }
             is Result.Error -> emptySet()
         }
+        if (_state.value.selectedSessionId != sessionId) return
         val previousBytes = _state.value.sessionImages.associate { it.id to it.bytes }
         _state.update {
             it.copy(
@@ -1220,6 +1323,7 @@ class ChatViewModel(
         }
         images.filter { previousBytes[it.id] == null }.forEach { image ->
             chatRepository.loadImageBytes(image.id).onSuccess { bytes ->
+                if (_state.value.selectedSessionId != sessionId) return@onSuccess
                 _state.update { state ->
                     state.copy(
                         sessionImages = state.sessionImages.map { item ->
@@ -1251,14 +1355,18 @@ class ChatViewModel(
     }
 
     private suspend fun loadContextUsage(sessionId: String) {
+        if (_state.value.selectedSessionId != sessionId) return
         chatRepository.getContextUsage(
             sessionId,
             _state.value.selectedModelId,
             _state.value.selectedReasoning,
         ).onSuccess { usage ->
+            if (_state.value.selectedSessionId != sessionId) return@onSuccess
             _state.update { it.copy(contextUsage = usage.toUi(), contextUsageError = false) }
         }.onFailure {
-            _state.update { it.copy(contextUsageError = true) }
+            if (_state.value.selectedSessionId == sessionId) {
+                _state.update { it.copy(contextUsageError = true) }
+            }
         }
     }
 
@@ -1341,8 +1449,13 @@ private fun DocumentIngest.toUi(): DocumentIngestUi = DocumentIngestUi(
 )
 
 private fun ContextUsage.toUi(): ContextUsageUi = ContextUsageUi(
-    label = "$estimatedTokens / $contextWindowTokens tokens",
+    modelLabel = modelLabel,
+    estimatedTokens = estimatedTokens,
+    contextWindowTokens = contextWindowTokens,
     ratio = ratio.toFloat().coerceIn(0f, 1f),
+    thresholdRatio = thresholdRatio.toFloat().coerceIn(0f, 1f),
+    targetRatio = targetRatio.toFloat().coerceIn(0f, 1f),
+    reasoningEffort = reasoningEffort,
     nearThreshold = ratio >= thresholdRatio,
 )
 

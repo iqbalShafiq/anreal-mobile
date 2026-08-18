@@ -62,6 +62,10 @@ class OfflineFirstChatRepository(
         return remote.markRead(sessionId)
     }
 
+    override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> {
+        return local.loadMessages(sessionId)
+    }
+
     override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
         return when (val remoteResult = remote.loadHistory(sessionId)) {
             is Result.Success -> {

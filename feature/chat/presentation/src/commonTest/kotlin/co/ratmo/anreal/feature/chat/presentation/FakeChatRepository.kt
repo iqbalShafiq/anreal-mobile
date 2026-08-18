@@ -30,11 +30,16 @@ class FakeChatRepository : ChatRepository {
     val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
     var refreshResult: Result<SessionPage, ChatError> = Result.Success(SessionPage(emptyList()))
     var draft: ChatSession = ChatSession(id = "draft", title = "New chat", updatedAt = "now")
+    var cachedHistory: List<ChatMessage> = emptyList()
     var history: Result<List<ChatMessage>, ChatError> = Result.Success(emptyList())
+    var holdHistory: Boolean = false
+    var historyStarted: CompletableDeferred<Unit> = CompletableDeferred()
+    var allowHistoryToFinish: CompletableDeferred<Unit> = CompletableDeferred()
     var sendResult: EmptyResult<ChatError> = Result.Success(Unit)
     var sentText: String? = null
     var sentClientMessageId: String? = null
     var sentOptions: ChatRunOptions? = null
+    var streamLines: List<String> = emptyList()
     var catalogResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
     var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
     var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
@@ -51,6 +56,8 @@ class FakeChatRepository : ChatRepository {
     var runStatus: Result<RunStatusSnapshot, ChatError> = Result.Success(
         RunStatusSnapshot(streamId = null, status = "idle", lastEventId = null),
     )
+    var runStatusCalls: Int = 0
+    var resumeCalls: Int = 0
     var sessionDocuments: Result<List<SessionDocument>, ChatError> = Result.Success(emptyList())
     var recentProjects: Result<List<RecentProject>, ChatError> = Result.Success(emptyList())
     var lastUnlinked: Pair<String, String>? = null
@@ -63,6 +70,7 @@ class FakeChatRepository : ChatRepository {
     )
     var lastUpload: Triple<String, ChatUpload, Boolean>? = null
     var contextSnippet: ContextSnippet? = null
+    var lastTruncatedMessageId: String? = null
     val openedProjectIds = mutableListOf<String?>()
 
     override fun observeSessions(): Flow<List<ChatSession>> = sessions
@@ -104,7 +112,15 @@ class FakeChatRepository : ChatRepository {
 
     override suspend fun markRead(sessionId: String): EmptyResult<ChatError> = Result.Success(Unit)
 
-    override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> = history
+    override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> = cachedHistory
+
+    override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
+        if (holdHistory) {
+            if (!historyStarted.isCompleted) historyStarted.complete(Unit)
+            allowHistoryToFinish.await()
+        }
+        return history
+    }
 
     override suspend fun sendMessage(
         sessionId: String,
@@ -116,6 +132,7 @@ class FakeChatRepository : ChatRepository {
         sentText = text
         sentClientMessageId = clientMessageId
         sentOptions = options
+        streamLines.forEach { line -> onLine(line) }
         if (holdSend) {
             if (!sendStarted.isCompleted) sendStarted.complete(Unit)
             allowSendToFinish.await()
@@ -149,11 +166,17 @@ class FakeChatRepository : ChatRepository {
         streamId: String,
         after: Int,
         onLine: suspend (String) -> Unit,
-    ): EmptyResult<ChatError> = Result.Success(Unit)
+    ): EmptyResult<ChatError> {
+        resumeCalls += 1
+        return Result.Success(Unit)
+    }
 
     override suspend fun stop(streamId: String): EmptyResult<ChatError> = Result.Success(Unit)
 
-    override suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError> = runStatus
+    override suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError> {
+        runStatusCalls += 1
+        return runStatus
+    }
 
     override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = Result.Success(emptyList())
 
@@ -173,7 +196,10 @@ class FakeChatRepository : ChatRepository {
         mode: String,
         clientMessageId: String?,
         memoryPosition: Int?,
-    ): EmptyResult<ChatError> = Result.Success(Unit)
+    ): EmptyResult<ChatError> {
+        lastTruncatedMessageId = clientMessageId
+        return Result.Success(Unit)
+    }
 
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) = Unit
 

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealBrand
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceTransparency
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 import dev.chrisbanes.haze.hazeEffect
@@ -64,6 +65,23 @@ fun glassFaintTextColor(): Color {
     }
 }
 
+@Composable
+fun glassDrawerBorderColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    val dark = scheme.surface.luminance() < 0.5f
+    return scheme.outlineVariant.copy(alpha = if (dark) 0.18f else 0.28f)
+}
+
+@Composable
+fun glassDrawerFallbackColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.surface.luminance() < 0.5f) {
+        Color(AnrealBrand.canvasArgb).copy(alpha = 0.82f)
+    } else {
+        scheme.surfaceContainer.copy(alpha = 0.94f)
+    }
+}
+
 fun glassDrawerShape(fromEnd: Boolean): Shape {
     val radius = DrawerCorner
     return if (fromEnd) {
@@ -81,16 +99,13 @@ fun GlassDrawer(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val hazeState = LocalAnrealHazeState.current
+    val reduceTransparency = LocalAnrealReduceTransparency.current
     val scheme = MaterialTheme.colorScheme
-    val dark = scheme.surface.luminance() < 0.5f
     val shape = glassDrawerShape(fromEnd)
-    val tint = if (dark) {
-        Color(AnrealBrand.canvasArgb).copy(alpha = 0.50f)
-    } else {
-        scheme.surface.copy(alpha = 0.56f)
-    }
-    val border = scheme.outlineVariant.copy(alpha = if (dark) 0.18f else 0.28f)
-    val frost = if (hazeState != null) {
+    val border = glassDrawerBorderColor()
+    val fallback = glassDrawerFallbackColor()
+    val useHaze = hazeState != null && !reduceTransparency
+    val frost = if (useHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.thin())
     } else {
         Modifier
@@ -108,13 +123,7 @@ fun GlassDrawer(
             .then(frost)
             .border(width = 1.dp, color = border, shape = shape),
         shape = shape,
-        color = if (hazeState != null) {
-            tint
-        } else if (dark) {
-            Color(AnrealBrand.canvasArgb).copy(alpha = 0.82f)
-        } else {
-            scheme.surfaceContainer.copy(alpha = 0.94f)
-        },
+        color = if (useHaze) Color.Transparent else fallback,
         contentColor = scheme.onSurface,
         content = {
             Column(

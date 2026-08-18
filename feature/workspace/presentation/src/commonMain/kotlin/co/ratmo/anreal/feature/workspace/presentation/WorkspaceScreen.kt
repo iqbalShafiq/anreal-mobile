@@ -14,22 +14,22 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -37,15 +37,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
 import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
+import co.ratmo.anreal.core.designsystem.component.AnrealSegmentedTabs
 import co.ratmo.anreal.core.designsystem.component.AnrealTextField
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
+import co.ratmo.anreal.core.designsystem.component.GlassExtendedFloatingActionButton
 import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.GlassTopBar
 import co.ratmo.anreal.core.designsystem.component.glassMutedTextColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -65,6 +70,8 @@ import com.composables.icons.materialsymbols.rounded.Edit
 import com.composables.icons.materialsymbols.rounded.Chevron_left
 import com.composables.icons.materialsymbols.rounded.Chevron_right
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.parameter.parametersOf
 
@@ -92,22 +99,24 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                TopAppBar(
-                    title = { Text(AnrealCopy.get(AnrealCopy.LABEL_WORKSPACE)) },
-                    navigationIcon = {
-                        IconButton(onClick = { onAction(WorkspaceAction.Back) }) {
-                            Icon(MaterialSymbols.Rounded.Arrow_back, AnrealCopy.get(AnrealCopy.CD_BACK))
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                )
+                GlassTopBar {
+                    TopAppBar(
+                        title = { Text(AnrealCopy.get(AnrealCopy.LABEL_WORKSPACE)) },
+                        navigationIcon = {
+                            IconButton(onClick = { onAction(WorkspaceAction.Back) }) {
+                                Icon(MaterialSymbols.Rounded.Arrow_back, AnrealCopy.get(AnrealCopy.CD_BACK))
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    )
+                }
             },
             floatingActionButton = {
                 if (state.section == WorkspaceSection.Projects) {
-                    ExtendedFloatingActionButton(
+                    GlassExtendedFloatingActionButton(
                         onClick = { onAction(WorkspaceAction.ShowCreateProject) },
-                        icon = { Icon(MaterialSymbols.Rounded.Add, null) },
-                        text = { Text(AnrealCopy.get(AnrealCopy.ACTION_NEW_PROJECT)) },
+                        icon = MaterialSymbols.Rounded.Add,
+                        label = AnrealCopy.get(AnrealCopy.ACTION_NEW_PROJECT),
                     )
                 }
             },
@@ -116,8 +125,10 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                 modifier = Modifier.fillMaxSize().padding(padding),
                 verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
             ) {
-                WorkspaceSwitcher(
+                AnrealSegmentedTabs(
+                    items = WorkspaceSection.entries,
                     selected = state.section,
+                    label = WorkspaceSection::label,
                     onSelect = { onAction(WorkspaceAction.SelectSection(it)) },
                     modifier = Modifier.padding(horizontal = AnrealSpacing.screenCompact),
                 )
@@ -131,7 +142,9 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     )
                 }
-                WorkspaceContent(state, onAction)
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                    WorkspaceContent(state, onAction)
+                }
             }
         }
     }
@@ -139,25 +152,6 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
     state.deleteTarget?.let { target -> DeleteWorkspaceDialog(state, target, onAction) }
     if (state.preview != null || state.previewLoading || state.previewError != null) {
         DocumentPreviewDialog(state, onAction)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun WorkspaceSwitcher(
-    selected: WorkspaceSection,
-    onSelect: (WorkspaceSection) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
-        WorkspaceSection.entries.forEachIndexed { index, section ->
-            SegmentedButton(
-                selected = selected == section,
-                onClick = { onSelect(section) },
-                shape = SegmentedButtonDefaults.itemShape(index, WorkspaceSection.entries.size),
-                label = { Text(section.label(), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-            )
-        }
     }
 }
 
@@ -243,7 +237,7 @@ private fun WorkspaceList(
             contentPadding = PaddingValues(
                 start = AnrealSpacing.screenCompact,
                 end = AnrealSpacing.screenCompact,
-                bottom = 96.dp,
+                bottom = 120.dp,
             ),
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
             content = content,
@@ -326,25 +320,80 @@ private fun LoadMoreRow(state: WorkspaceState, onAction: (WorkspaceAction) -> Un
 
 @Composable
 private fun WorkspaceImageCard(image: ImageUi) {
+    var loadState by remember(image.id, image.bytes) {
+        mutableStateOf(
+            when {
+                image.loading -> WorkspaceImageLoadState.Loading
+                image.bytes == null -> WorkspaceImageLoadState.Error
+                else -> WorkspaceImageLoadState.Loading
+            },
+        )
+    }
+    val imageRequest = image.bytes?.let { bytes ->
+        val context = LocalPlatformContext.current
+        remember(image.id, bytes, context) {
+            ImageRequest.Builder(context)
+                .data(bytes)
+                .memoryCacheKey("workspace-image-${image.id}")
+                .build()
+        }
+    }
+    val stateDescription = when (loadState) {
+        WorkspaceImageLoadState.Loading -> AnrealCopy.get(AnrealCopy.STATUS_LOADING)
+        WorkspaceImageLoadState.Loaded -> AnrealCopy.get(AnrealCopy.STATUS_IMAGE_LOADED)
+        WorkspaceImageLoadState.Error -> AnrealCopy.get(AnrealCopy.ERROR_IMAGE_LOAD)
+    }
     GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
         Column(verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm)) {
-            if (image.bytes != null) {
-                AsyncImage(
-                    model = image.bytes,
-                    contentDescription = image.prompt.ifBlank { AnrealCopy.get(AnrealCopy.LABEL_IMAGE) },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 280.dp),
-                    contentScale = ContentScale.Crop,
-                )
-            } else {
+            if (imageRequest != null) {
                 Box(
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp, max = 280.dp)
+                        .semantics { this.stateDescription = stateDescription },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        AnrealCopy.get(AnrealCopy.ERROR_IMAGE_LOAD),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
+                    AsyncImage(
+                        model = imageRequest,
+                        contentDescription = image.prompt.ifBlank {
+                            AnrealCopy.get(AnrealCopy.LABEL_IMAGE)
+                        },
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop,
+                        onLoading = { loadState = WorkspaceImageLoadState.Loading },
+                        onSuccess = { loadState = WorkspaceImageLoadState.Loaded },
+                        onError = { loadState = WorkspaceImageLoadState.Error },
                     )
+                    when (loadState) {
+                        WorkspaceImageLoadState.Loading -> CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            strokeWidth = 3.dp,
+                        )
+                        WorkspaceImageLoadState.Error -> Text(
+                            AnrealCopy.get(AnrealCopy.ERROR_IMAGE_LOAD),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        WorkspaceImageLoadState.Loaded -> Unit
+                    }
+                }
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 160.dp)
+                        .semantics { this.stateDescription = stateDescription },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (image.loading) {
+                        CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+                    } else {
+                        Text(
+                            AnrealCopy.get(AnrealCopy.ERROR_IMAGE_LOAD),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
             Column(modifier = Modifier.padding(AnrealSpacing.md)) {
@@ -360,6 +409,12 @@ private fun WorkspaceImageCard(image: ImageUi) {
             }
         }
     }
+}
+
+private enum class WorkspaceImageLoadState {
+    Loading,
+    Loaded,
+    Error,
 }
 
 @Composable

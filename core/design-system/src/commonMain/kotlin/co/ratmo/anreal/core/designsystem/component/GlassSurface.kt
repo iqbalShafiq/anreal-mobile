@@ -18,11 +18,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceTransparency
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
@@ -47,6 +49,26 @@ fun HazeBackdrop(
     )
 }
 
+/**
+ * Marks arbitrary screen content as a backdrop for Anreal glass chrome without
+ * leaking the Haze dependency into feature modules.
+ */
+@Composable
+fun AnrealHazeSource(
+    modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val hazeState = LocalAnrealHazeState.current
+    Box(
+        modifier = if (hazeState != null) {
+            modifier.hazeSource(state = hazeState)
+        } else {
+            modifier
+        },
+        content = content,
+    )
+}
+
 @OptIn(ExperimentalHazeMaterialsApi::class)
 @Composable
 fun GlassSurface(
@@ -54,29 +76,27 @@ fun GlassSurface(
     hazeState: HazeState? = LocalAnrealHazeState.current,
     shape: Shape = MaterialTheme.shapes.extraLarge,
     tone: GlassTone = GlassTone.Thin,
+    borderColor: Color? = null,
+    fallbackColor: Color? = null,
     emphasized: Boolean = false,
     error: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val reduceTransparency = LocalAnrealReduceTransparency.current
     val style = when (tone) {
         GlassTone.Thin -> HazeMaterials.thin()
         GlassTone.Regular -> HazeMaterials.regular()
         GlassTone.Pane -> HazeMaterials.thin()
     }
-    val tint = scheme.surface.copy(
-        alpha = when (tone) {
-            GlassTone.Thin -> 0.58f
-            GlassTone.Regular -> 0.78f
-            GlassTone.Pane -> 0.70f
-        },
-    )
     val border = when {
         error -> scheme.error
         emphasized -> scheme.primary.copy(alpha = 0.38f)
+        borderColor != null -> borderColor
         else -> scheme.outlineVariant.copy(alpha = 0.45f)
     }
-    val frost = if (hazeState != null) {
+    val useHaze = hazeState != null && !reduceTransparency
+    val frost = if (useHaze) {
         Modifier.hazeEffect(state = hazeState, style = style)
     } else {
         Modifier
@@ -87,7 +107,9 @@ fun GlassSurface(
             .then(frost)
             .border(width = 1.dp, color = border, shape = shape),
         shape = shape,
-        color = if (hazeState != null) tint else scheme.surfaceContainer,
+        // HazeMaterials already provides tint and noise. Drawing another
+        // translucent Surface tint here makes the material look opaque.
+        color = if (useHaze) Color.Transparent else fallbackColor ?: scheme.surfaceContainer,
         contentColor = scheme.onSurface,
         content = content,
     )

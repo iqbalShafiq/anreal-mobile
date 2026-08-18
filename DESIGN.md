@@ -129,6 +129,10 @@ We do **not** port `@anvia/react-ui`. On web that package is headless (structure
 - Do not add a separate unstyled chat-ui module until a second feature needs the same primitives.
 - Composer field stays enabled during a run. Stop replaces Send. Queue uses the same field.
 - Model + reasoning is **one** composer trigger and **one** sheet. Concatenate the effort onto the model label when it is not None.
+- Persist the last valid model + reasoning choice in app preferences. Revalidate both against the live catalog and clear a removed model or unsupported effort.
+- The model sheet always exposes catalog loading, empty, and retryable error states; its trigger and option content are left-aligned.
+- Context usage is a compact circular indicator immediately before Documents in the top bar. Its detail (model, tokens, ratio, thresholds, and reasoning) lives in a bottom sheet, never in the composer.
+- Attachments are entered from the composer `+` feature sheet; do not spend a second composer action slot on a standalone attachment icon.
 
 ---
 
@@ -151,7 +155,7 @@ Compose has no CSS `backdrop-filter`. These are **wrong**:
 - `GlassSheet` / `GlassDialog`
 - `GlassDrawer` — left workspace (start radii), right documents (end radii, `fromEnd = true`)
 
-`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
+`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. Top bars use the same thin Haze material, tint composition, hairline, and fallback color as the left drawer so app chrome reads as one glass layer. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
 
 Recipes:
 
@@ -298,7 +302,7 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 | Documents | “Upload a PDF or image” | Library skeletons + upload progress | Quota / failed ingest | Status → ready |
 | Projects | “Create a project” | Skeletons | Retry | Open project |
 | Gallery | “No images yet” | Grid skeletons | Retry | New image at start |
-| Settings / account | Profile summary + name + email + fixed floating Log out dock | Health check | Retry API status | Persist appearance locally; sign out → boarding |
+| Settings / account | Profile summary + name + email + fixed glass extended-FAB Log out dock | Health check | Retry API status | Persist appearance locally; sign out → boarding |
 | Settings / usage | Zero-state usage | Section shimmer | Retry section with server-safe message | Storage and request/token breakdowns |
 | Settings / personalization | “No profile yet…” | Section shimmer | Retry section | Reset profile confirm |
 | Workspace / projects | “Create a project” | Project skeletons | Retry section | Create, edit, open, and delete projects |
@@ -317,7 +321,7 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 
 ### 8.4 Perceived performance
 
-- First paint: show chrome immediately; skeleton the body.
+- First paint: show chrome immediately. For chat history, render Room cache first and refresh the network in the background; only show the compact loading indicator when no cache exists.
 - Optimistic user bubble on send; reconcile with history.
 - Fast `LoadingIndicator` (M3) — a quicker indicator feels like a faster app.
 - Never block the composer while a run is streaming (queue instead).
@@ -397,9 +401,10 @@ Every Screen preview file includes at minimum:
 
 ## 11. Layout
 
-- Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets.
-- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use a compact text-only section switcher, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is fixed in a floating bottom dock across this screen.
-- Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses one segmented section switcher and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
+- Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (context ring, documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets. Thread content draws behind both glass chrome surfaces; list content padding keeps the first/last bubble reachable.
+- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use the same reusable fixed glass segmented tabs as Workspace, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is a glass extended FAB fixed in a floating bottom dock across this screen.
+- Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses the shared fixed glass segmented tabs and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
+- Thread opens at the latest message. It follows appended stream content only while the user is at the bottom; scrolling up suspends follow and reveals a smooth scroll-to-latest control.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).

@@ -126,6 +126,10 @@ private class FakeAppPreferencesRepository : AppPreferencesRepository {
     override suspend fun setReduceTransparency(enabled: Boolean) {
         values.value = values.value.copy(reduceTransparency = enabled)
     }
+    override suspend fun setChatModel(modelId: String?) { values.value = values.value.copy(chatModelId = modelId) }
+    override suspend fun setChatReasoningEffort(effort: String?) {
+        values.value = values.value.copy(chatReasoningEffort = effort)
+    }
 }
 
 private class FakeAccountSettingsDataSource : AccountSettingsDataSource {

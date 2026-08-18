@@ -15,6 +15,7 @@ import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatSessionUi
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.CitedDocumentUi
+import co.ratmo.anreal.feature.chat.presentation.ContextUsageUi
 import co.ratmo.anreal.feature.chat.presentation.RecentProjectUi
 import co.ratmo.anreal.feature.chat.presentation.SessionDocumentUi
 
@@ -117,6 +118,16 @@ internal fun chatPopulatedPreviewState(
     draft = draft,
     isSending = isSending,
     runActiveConflict = runActiveConflict,
+    contextUsage = ContextUsageUi(
+        modelLabel = "GPT Luna 5.6",
+        estimatedTokens = 24_000,
+        contextWindowTokens = 200_000,
+        ratio = 0.12f,
+        thresholdRatio = 0.7f,
+        targetRatio = 0.55f,
+        reasoningEffort = "xhigh",
+        nearThreshold = false,
+    ),
 )
 
 internal fun chatStreamingPreviewState(): ChatState = chatPopulatedPreviewState(

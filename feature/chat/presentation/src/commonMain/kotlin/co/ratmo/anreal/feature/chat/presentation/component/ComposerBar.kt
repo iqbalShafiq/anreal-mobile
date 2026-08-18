@@ -1,9 +1,9 @@
 package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -11,12 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
@@ -45,7 +44,6 @@ import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewSta
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Arrow_upward
-import com.composables.icons.materialsymbols.rounded.Attach_file
 import com.composables.icons.materialsymbols.rounded.Close
 import com.composables.icons.materialsymbols.rounded.Expand_more
 import com.composables.icons.materialsymbols.rounded.South_west
@@ -55,6 +53,7 @@ import com.composables.icons.materialsymbols.rounded.Stop
 internal fun ComposerBar(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
+    modifier: Modifier = Modifier,
     initialSheet: ComposerSheet? = null,
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
@@ -62,140 +61,116 @@ internal fun ComposerBar(
     val canSubmit = state.draft.isNotBlank()
     val modelTriggerLabel = modelAndReasoningLabel(state)
     val modelTriggerDescription = AnrealCopy.get(AnrealCopy.CD_MODEL)
-    GlassSurface(
-        modifier = Modifier
+    Box(
+        modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
-        tone = GlassTone.Thin,
-        emphasized = canSubmit || streaming,
     ) {
-        Column(
-            modifier = Modifier.padding(
-                start = AnrealSpacing.md,
-                end = AnrealSpacing.sm,
-                top = AnrealSpacing.md,
-                bottom = AnrealSpacing.sm,
-            ),
-            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+        GlassSurface(
+            modifier = Modifier.fillMaxWidth(),
+            tone = GlassTone.Thin,
+            emphasized = canSubmit || streaming,
         ) {
-            MessageQueueDock(state = state, onAction = onAction)
-            SessionImageStrip(state = state, onAction = onAction)
-            state.contextUsage?.let { usage ->
-                Column(verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs)) {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                        Text(usage.label, style = MaterialTheme.typography.labelSmall)
-                    }
-                    LinearProgressIndicator(
-                        progress = { usage.ratio },
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (usage.nearThreshold) {
-                            MaterialTheme.colorScheme.error
+            Column(
+                modifier = Modifier.padding(
+                    start = AnrealSpacing.md,
+                    end = AnrealSpacing.sm,
+                    top = AnrealSpacing.md,
+                    bottom = AnrealSpacing.sm,
+                ),
+                verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+            ) {
+                MessageQueueDock(state = state, onAction = onAction)
+                SessionImageStrip(state = state, onAction = onAction)
+                state.uploadingDocuments.filter { it.status != "ready" }.forEach { document ->
+                    Text(
+                        text = "${document.filename} · ${document.status.toUploadStatusLabel()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (document.error == null) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
                         } else {
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.error
                         },
                     )
                 }
-            }
-            state.uploadingDocuments.filter { it.status != "ready" }.forEach { document ->
-                Text(
-                    text = "${document.filename} · ${document.status.toUploadStatusLabel()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (document.error == null) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                state.contextSnippet?.let { snippet ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = snippet,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        IconButton(
+                            onClick = { onAction(ChatAction.OnClearContext) },
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            Icon(
+                                imageVector = MaterialSymbols.Rounded.Close,
+                                contentDescription = AnrealCopy.get(AnrealCopy.ACTION_CANCEL),
+                            )
+                        }
+                    }
+                }
+                AnrealComposerField(
+                    value = state.draft,
+                    onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
+                    placeholder = AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER),
                 )
-            }
-            state.contextSnippet?.let { snippet ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = snippet,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+                ) {
                     IconButton(
-                        onClick = { onAction(ChatAction.OnClearContext) },
-                        modifier = Modifier.size(40.dp),
+                        onClick = { sheet = ComposerSheet.Features },
+                        modifier = Modifier.size(AnrealSpacing.touch),
                     ) {
                         Icon(
-                            imageVector = MaterialSymbols.Rounded.Close,
-                            contentDescription = AnrealCopy.get(AnrealCopy.ACTION_CANCEL),
+                            imageVector = MaterialSymbols.Rounded.Add,
+                            contentDescription = AnrealCopy.get(AnrealCopy.CD_FEATURES),
+                            tint = if (
+                                state.webSearchEnabled || state.imageGenerationEnabled || state.isUploading
+                            ) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
                         )
                     }
-                }
-            }
-            AnrealComposerField(
-                value = state.draft,
-                onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
-                placeholder = AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER),
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
-            ) {
-                IconButton(
-                    onClick = { sheet = ComposerSheet.Features },
-                    modifier = Modifier.size(AnrealSpacing.touch),
-                ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Add,
-                        contentDescription = AnrealCopy.get(AnrealCopy.CD_FEATURES),
-                        tint = if (state.webSearchEnabled || state.imageGenerationEnabled) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                    TextButton(
+                        onClick = {
+                            if (state.models.isEmpty() && !state.catalogLoading) {
+                                onAction(ChatAction.OnRetryCatalog)
+                            }
+                            sheet = ComposerSheet.Model
                         },
-                    )
-                }
-                TextButton(
-                    onClick = { sheet = ComposerSheet.Model },
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .semantics { contentDescription = modelTriggerDescription },
-                ) {
-                    Text(
-                        text = modelTriggerLabel,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Expand_more,
-                        contentDescription = null,
-                    )
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = { sheet = ComposerSheet.Attach },
-                    modifier = Modifier.size(AnrealSpacing.touch),
-                    enabled = !state.isUploading,
-                ) {
-                    if (state.isUploading) {
-                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                    } else {
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = modelTriggerDescription },
+                    ) {
+                        Text(
+                            text = modelTriggerLabel,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Start,
+                        )
                         Icon(
-                            imageVector = MaterialSymbols.Rounded.Attach_file,
-                            contentDescription = AnrealCopy.get(AnrealCopy.CD_ATTACH),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            imageVector = MaterialSymbols.Rounded.Expand_more,
+                            contentDescription = null,
                         )
                     }
+                    ComposerSubmitButton(
+                        streaming = streaming,
+                        canSubmit = canSubmit,
+                        onAction = onAction,
+                    )
                 }
-                ComposerSubmitButton(
-                    streaming = streaming,
-                    canSubmit = canSubmit,
-                    onAction = onAction,
-                )
             }
         }
     }
@@ -203,6 +178,7 @@ internal fun ComposerBar(
         sheet = sheet,
         state = state,
         onAction = onAction,
+        onOpenAttachments = { sheet = ComposerSheet.Attach },
         onDismiss = { sheet = null },
     )
 }
