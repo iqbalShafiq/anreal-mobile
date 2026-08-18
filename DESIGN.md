@@ -199,10 +199,10 @@ Named after the web, implemented as Compose specs. Do not invent a second system
 | `durationFast` | 160ms | Press, color, chips |
 | `durationMed` | 220ms | Popovers, dialogs, snackbars |
 | `durationDrawer` | 280–320ms | Navigation drawer, sheets |
-| `durationPage` | 420ms | Full-screen vertical pager only (boarding ↔ login/register, login ↔ register). Occasional; allowed above the 300ms daily-chrome cap. |
+| `durationPage` | 420ms | Full-screen vertical pager only (boarding → login/register, login ↔ register). Occasional; allowed above the 300ms daily-chrome cap. |
 | `durationSplash` | 1100ms | First-run compose splash hold after session resolve. Reduced motion uses `durationFast`. |
 | `durationBoardingHold` | 4500ms | Auto-advance on the signed-out boarding carousel. Pause while the email field is focused. |
-| `pageSpec` | 420ms `easeDrawer` | Boarding ↔ Login/Register and Login ↔ Register: both pages start immediately and settle. Do not use the punchy `easeInOut` here — it hesitates then rushes. |
+| `pageSpec` | 420ms `easeDrawer` | Boarding → Login/Register and Login ↔ Register: both pages start immediately and settle. Do not use the punchy `easeInOut` here — it hesitates then rushes. |
 | `drawerSpec` | 280ms `easeDrawer` | Horizontal push (auth ↔ chat, chat ↔ account), drawers |
 
 M3 components use `MotionScheme.standard()` as the **app default**. Expressive bounce is reserved for rare hero moments (empty-state mark, first-run). Daily chrome must not overshoot.
@@ -229,8 +229,8 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 | Drawer | Slide from start + fade 280ms easeDrawer | Fade 160ms, no slide |
 | Splash → boarding / chat | System splash hands off to compose splash (aurora + mark + version). Compose splash is **not** a nav destination. After session resolve, hold `durationSplash` then fade 160ms onto the start route. Aurora is already mounted. | Fade 160ms; hold `durationFast` |
 | Boarding carousel | Horizontal pager. Auto-advance after `durationBoardingHold` (`easeInOut` 220ms). User swipe is the same pager. Pause on email focus and reduced motion. Indicator pill uses `offset {}`, not width animation. | Instant page change, no auto-advance |
-| Boarding ↔ Login / Register | **Vertical pager.** Boarding is the floor. Boarding → Login or Register: both move **up**. Back / pop to boarding: both move **down**. 420ms `easeDrawer` (no fade). Hide IME before the navigate. | Fade 160ms, no slide |
-| Login ↔ Register | Same vertical pager. Login → Register: both move **up**. Register → Login: both move **down**. | Fade 160ms, no slide |
+| Boarding → Login / Register | **One-way vertical pager.** Boarding is replaced by the selected form; both move **up**. Forms have no back affordance and system back cannot reveal boarding. 420ms `easeDrawer` (no fade). Hide IME before the navigate. | Fade 160ms, no slide |
+| Login ↔ Register | Same vertical pager with replace-current navigation. Login → Register: both move **up**. Register → Login: both move **down**. Neither form accumulates history. | Fade 160ms, no slide |
 | Auth ↔ Chat / Chat ↔ Account | Horizontal push, full width, no fade. Logout returns to **boarding** (the reverse). | Fade 160ms |
 | Sheet | Slide from bottom, interruptible, velocity handoff | Fade 160ms |
 | Dialog | Scale 0.96 + fade 220ms, centered | Fade only |
@@ -298,7 +298,7 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 | Documents | “Upload a PDF or image” | Library skeletons + upload progress | Quota / failed ingest | Status → ready |
 | Projects | “Create a project” | Skeletons | Retry | Open project |
 | Gallery | “No images yet” | Grid skeletons | Retry | New image at start |
-| Settings / account | Name + email + Log out | — | — | Sign out → login |
+| Settings / account | Profile summary + name + email + fixed floating Log out dock | — | — | Sign out → boarding |
 | Settings / usage | Zero-state usage (API not wired) | Section shimmer | Retry section | — |
 | Settings / personalization | “No profile yet…” | Section shimmer | Retry section | Reset profile confirm |
 | Approval / clarification | — | Card while pending | Late response is idempotent | Card dismisses |
@@ -341,7 +341,7 @@ Accessibility ships with the component, not as a follow-up. Target **WCAG 2.2 AA
 - Visible focus indicator: `accent` ring, 2–3.dp, never removed.
 - Tab / D-pad / keyboard order is reading order. Drawer, then bar, then thread, then composer.
 - Dialogs and sheets trap focus and return it to the trigger on dismiss (`restoreFocus`).
-- IME: composer is a single-line or multi-line field with Send as IME action; errors announced after submit.
+- IME: the composer is multi-line; Enter inserts a newline and the visible Send / Queue button submits. Auth fields are single-line with Next between fields and Done on the final submit field. Single-field mutations such as rename use Done; errors are announced after submit.
 - Auth IME: activity uses `adjustNothing`. Do not `imePadding()` a vertically centered form — that shrinks the viewport and recenters, leaving a hole above the fields. Measure the focused field vs the keyboard top and **translate the form block** (`rememberImeFocusShift`) by only the overlap. Fields stay packed. Password visibility is an icon with `Show password` / `Hide password` descriptions.
 
 ### 9.3 Touch and motor
@@ -395,7 +395,7 @@ Every Screen preview file includes at minimum:
 ## 11. Layout
 
 - Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets.
-- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Opened from the left-drawer account row. Log out is on Account.
+- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use a compact text-only section switcher, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is fixed in a floating bottom dock across this screen.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).

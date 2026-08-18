@@ -5,15 +5,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
@@ -52,16 +52,13 @@ fun AnrealAuthScaffold(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Top + WindowInsetsSides.Horizontal,
-                        ),
-                    )
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
                     .clipToBounds(),
             ) {
                 val columnModifier = when (layout) {
                     AnrealAuthLayout.CenteredForm -> Modifier
                         .align(Alignment.Center)
+                        .widthIn(max = AuthContentMaxWidth)
                         .fillMaxWidth()
                         .then(
                             if (imeOpen) {
@@ -71,22 +68,18 @@ fun AnrealAuthScaffold(
                             },
                         )
                     AnrealAuthLayout.Docked -> Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(
-                            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom),
-                        )
-                }
-                val contentPadding = when (layout) {
-                    AnrealAuthLayout.CenteredForm -> Modifier.padding(
-                        horizontal = AnrealSpacing.screenCompact,
-                        vertical = AnrealSpacing.xl,
-                    )
-                    AnrealAuthLayout.Docked -> Modifier.padding(vertical = AnrealSpacing.xl)
+                        .align(Alignment.TopCenter)
+                        .widthIn(max = AuthContentMaxWidth)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
                 }
                 Column(
                     modifier = columnModifier
                         .imeFocusShiftOffset(shiftPx)
-                        .then(contentPadding),
+                        .padding(
+                            horizontal = AnrealSpacing.screenCompact,
+                            vertical = AnrealSpacing.xl,
+                        ),
                     verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
                     content = content,
                 )
@@ -130,12 +123,13 @@ fun AnrealFormScreen(
         },
     ) {
         AnrealMark(
+            size = 40.dp,
             wordmark = wordmark,
             contentDescription = markDescription,
         )
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLargeEmphasized,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
@@ -147,6 +141,8 @@ fun AnrealFormScreen(
         footer?.invoke()
     }
 }
+
+private val AuthContentMaxWidth = 480.dp
 
 @Composable
 fun AnrealBackButton(

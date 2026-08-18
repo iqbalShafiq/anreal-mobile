@@ -116,13 +116,4 @@ class RegisterViewModelTest {
         }
     }
 
-    @Test
-    fun back_click_navigates_back() = runTest {
-        val viewModel = RegisterViewModel(SavedStateHandle(), FakeAuthRemoteDataSource())
-
-        viewModel.events.test {
-            viewModel.onAction(RegisterAction.OnBackClick)
-            assertThat(awaitItem()).isEqualTo(RegisterEvent.NavigateBack)
-        }
-    }
 }

@@ -24,6 +24,8 @@ material3 = "1.11.0-alpha07"
 navigation = "2.9.2"
 ksp = "2.3.11"
 room3 = "3.0.1"
+roborazzi = "1.72.0"
+robolectric = "4.14.1"
 sqlite = "2.7.0"
 datastore = "1.2.1"
 tink = "1.23.0"
@@ -62,6 +64,8 @@ compose-material3 = { module = "org.jetbrains.compose.material3:material3", vers
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMultiplatform" }
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
+androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version = "1.11.0" }
+androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version = "1.11.0" }
 
 koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
@@ -88,6 +92,9 @@ androidx-datastore-preferences-core = { module = "androidx.datastore:datastore-p
 tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink" }
 markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdownRenderer" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
+roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -106,3 +113,4 @@ anrealKtor = { id = "anreal.ktor" }
 anrealSerialization = { id = "anreal.serialization" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidxRoom3 = { id = "androidx.room3", version.ref = "room3" }
+roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }

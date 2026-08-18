@@ -8,8 +8,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -17,18 +15,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAuthLayout
 import co.ratmo.anreal.core.designsystem.component.AnrealAuthScaffold
-import co.ratmo.anreal.core.designsystem.component.AnrealMark
 import co.ratmo.anreal.core.designsystem.component.AnrealPrimaryButton
 import co.ratmo.anreal.core.designsystem.component.AnrealTextField
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.preview.PreviewNightUiMode
-import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.auth.presentation.component.AuthSwitchRow
+import co.ratmo.anreal.feature.auth.presentation.component.BoardingBrandHeader
 import co.ratmo.anreal.feature.auth.presentation.component.BoardingCarousel
 import co.ratmo.anreal.feature.auth.presentation.component.boardingSlides
 import org.koin.compose.viewmodel.koinViewModel
@@ -57,17 +54,10 @@ fun BoardingScreen(
     val slides = remember { boardingSlides() }
     val pagerState = rememberPagerState(pageCount = { slides.size })
     var emailFocused by remember { mutableStateOf(false) }
-    val formInset = Modifier.padding(horizontal = AnrealSpacing.screenCompact)
     AnrealAuthScaffold(layout = AnrealAuthLayout.Docked) {
-        AnrealMark(
-            modifier = formInset,
-            wordmark = AnrealCopy.get(AnrealCopy.LABEL_APP_NAME),
-            contentDescription = AnrealCopy.get(AnrealCopy.CD_APP_MARK),
-        )
+        BoardingBrandHeader()
         BoardingCarousel(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
+            modifier = Modifier.weight(1f),
             paused = emailFocused,
             slides = slides,
             pagerState = pagerState,
@@ -80,24 +70,21 @@ fun BoardingScreen(
             error = state.emailError?.asString(),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
-                imeAction = ImeAction.Go,
+                imeAction = ImeAction.Next,
             ),
             keyboardActions = KeyboardActions(
-                onGo = { onAction(BoardingAction.OnRegisterClick) },
+                onNext = { onAction(BoardingAction.OnRegisterClick) },
             ),
             onFocusChange = { emailFocused = it },
-            modifier = formInset,
         )
         AnrealPrimaryButton(
             label = AnrealCopy.get(AnrealCopy.ACTION_CREATE_ACCOUNT),
             onClick = { onAction(BoardingAction.OnRegisterClick) },
-            modifier = formInset,
         )
         AuthSwitchRow(
             prompt = AnrealCopy.get(AnrealCopy.AUTH_HAVE_ACCOUNT),
             actionLabel = AnrealCopy.get(AnrealCopy.ACTION_SIGN_IN),
             onClick = { onAction(BoardingAction.OnLoginClick) },
-            modifier = formInset,
         )
     }
 }

@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.anrealAndroidFeature)
     alias(libs.plugins.anrealSerialization)
+    alias(libs.plugins.roborazzi)
 }
 
 kotlin {
@@ -31,5 +32,13 @@ kotlin {
         implementation(libs.turbine)
         implementation(libs.androidx.lifecycle.viewmodel)
         implementation(libs.androidx.lifecycle.viewmodel.savedstate)
+    }
+    sourceSets.getByName("androidHostTest").dependencies {
+        implementation(libs.androidx.compose.ui.test.junit4)
+        implementation(libs.androidx.compose.ui.test.manifest)
+        implementation(libs.junit)
+        implementation(libs.robolectric)
+        implementation(libs.roborazzi)
+        implementation(libs.roborazzi.compose)
     }
 }

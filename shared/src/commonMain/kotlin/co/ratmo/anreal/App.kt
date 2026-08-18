@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.rememberNavController
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
@@ -133,30 +134,17 @@ private fun AuthenticatedHost(
                 onNavigateHome = {
                     keyboard?.hide()
                     focusManager.clearFocus()
-                    navController.navigate(ChatRoute()) {
-                        popUpTo(BoardingRoute) { inclusive = true }
-                    }
+                    navController.replaceCurrentWith(ChatRoute())
                 },
                 onNavigateRegister = { email ->
                     keyboard?.hide()
                     focusManager.clearFocus()
-                    navController.navigate(RegisterRoute(email)) {
-                        launchSingleTop = true
-                        popUpTo(BoardingRoute) { inclusive = false }
-                    }
+                    navController.replaceCurrentWith(RegisterRoute(email))
                 },
                 onNavigateLogin = { email ->
                     keyboard?.hide()
                     focusManager.clearFocus()
-                    navController.navigate(LoginRoute(email)) {
-                        launchSingleTop = true
-                        popUpTo(BoardingRoute) { inclusive = false }
-                    }
-                },
-                onNavigateBack = {
-                    keyboard?.hide()
-                    focusManager.clearFocus()
-                    navController.popBackStack()
+                    navController.replaceCurrentWith(LoginRoute(email))
                 },
             )
             chatGraph(
@@ -164,6 +152,16 @@ private fun AuthenticatedHost(
                 account = AccountUi(name = user?.name.orEmpty(), email = user?.email.orEmpty()),
                 onSignOut = viewModel::signOut,
             )
+        }
+    }
+}
+
+internal fun NavController.replaceCurrentWith(route: Any) {
+    val currentDestinationId = currentDestination?.id
+    navigate(route) {
+        launchSingleTop = true
+        if (currentDestinationId != null) {
+            popUpTo(currentDestinationId) { inclusive = true }
         }
     }
 }

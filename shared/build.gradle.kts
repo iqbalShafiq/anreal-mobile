@@ -48,6 +48,13 @@ kotlin {
         implementation(libs.koin.compose)
         implementation(libs.koin.compose.viewmodel)
     }
+
+    sourceSets.getByName("androidHostTest").dependencies {
+        implementation(libs.androidx.compose.ui.test.junit4)
+        implementation(libs.androidx.compose.ui.test.manifest)
+        implementation(libs.junit)
+        implementation(libs.robolectric)
+    }
 }
 
 dependencies {
