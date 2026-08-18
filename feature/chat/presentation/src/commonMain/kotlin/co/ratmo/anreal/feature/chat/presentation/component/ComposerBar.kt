@@ -104,7 +104,6 @@ internal fun ComposerBar(
                 value = state.draft,
                 onValueChange = { onAction(ChatAction.OnDraftChange(it)) },
                 placeholder = AnrealCopy.get(AnrealCopy.COMPOSER_PLACEHOLDER),
-                onSubmit = { onAction(ChatAction.OnSend) },
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),

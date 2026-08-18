@@ -27,14 +27,6 @@ class AnrealNavTransitionsTest {
     }
 
     @Test
-    fun forms_to_boarding_slides_down() {
-        assertThat(classifyNavMotion(AnrealRouteKind.Register, AnrealRouteKind.Boarding))
-            .isEqualTo(AnrealNavMotion.VerticalDown)
-        assertThat(classifyNavMotion(AnrealRouteKind.Login, AnrealRouteKind.Boarding))
-            .isEqualTo(AnrealNavMotion.VerticalDown)
-    }
-
-    @Test
     fun auth_to_chat_slides_forward() {
         assertThat(classifyNavMotion(AnrealRouteKind.Login, AnrealRouteKind.Chat))
             .isEqualTo(AnrealNavMotion.HorizontalForward)

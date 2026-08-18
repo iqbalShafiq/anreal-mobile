@@ -1,8 +1,12 @@
 package co.ratmo.anreal.feature.auth.presentation.login
 
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealError
@@ -17,13 +21,14 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.auth.presentation.component.AuthSwitchRow
+import co.ratmo.anreal.feature.auth.presentation.component.AuthWorkspaceNote
+import co.ratmo.anreal.feature.auth.presentation.component.AuthWorkspaceNoteKind
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun LoginRoot(
     onNavigateHome: () -> Unit,
     onNavigateRegister: (String) -> Unit,
-    onNavigateBack: () -> Unit,
     viewModel: LoginViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -31,7 +36,6 @@ fun LoginRoot(
         when (event) {
             LoginEvent.NavigateHome -> onNavigateHome()
             is LoginEvent.NavigateRegister -> onNavigateRegister(event.email)
-            LoginEvent.NavigateBack -> onNavigateBack()
         }
     }
     LoginScreen(state = state, onAction = viewModel::onAction)
@@ -42,13 +46,12 @@ fun LoginScreen(
     state: LoginState,
     onAction: (LoginAction) -> Unit,
 ) {
+    val focusManager = LocalFocusManager.current
     AnrealFormScreen(
         title = AnrealCopy.get(AnrealCopy.LOGIN_TITLE),
         subtitle = AnrealCopy.get(AnrealCopy.LOGIN_SUBTITLE),
         wordmark = AnrealCopy.get(AnrealCopy.LABEL_APP_NAME),
         markDescription = AnrealCopy.get(AnrealCopy.CD_APP_MARK),
-        onBack = { onAction(LoginAction.OnBackClick) },
-        backDescription = AnrealCopy.get(AnrealCopy.CD_BACK),
         footer = {
             AuthSwitchRow(
                 prompt = AnrealCopy.get(AnrealCopy.AUTH_NEW_HERE),
@@ -58,6 +61,7 @@ fun LoginScreen(
             )
         },
     ) {
+        AuthWorkspaceNote(kind = AuthWorkspaceNoteKind.Returning)
         AnrealTextField(
             value = state.email,
             onValueChange = { onAction(LoginAction.OnEmailChange(it)) },
@@ -65,7 +69,13 @@ fun LoginScreen(
             placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_EMAIL),
             error = state.emailError?.asString(),
             enabled = !state.isSubmitting,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next,
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) },
+            ),
         )
         AnrealPasswordField(
             value = state.password,
@@ -76,6 +86,13 @@ fun LoginScreen(
             enabled = !state.isSubmitting,
             showPasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_SHOW_PASSWORD),
             hidePasswordDescription = AnrealCopy.get(AnrealCopy.ACTION_HIDE_PASSWORD),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done,
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { onAction(LoginAction.OnSubmit) },
+            ),
         )
         state.formError?.let { error ->
             AnrealError(message = error.asString())

@@ -41,13 +41,11 @@ sealed interface RegisterAction {
     data class OnConfirmPasswordChange(val confirmPassword: String) : RegisterAction
     data object OnSubmit : RegisterAction
     data object OnLoginClick : RegisterAction
-    data object OnBackClick : RegisterAction
 }
 
 sealed interface RegisterEvent {
     data object NavigateHome : RegisterEvent
     data class NavigateLogin(val email: String) : RegisterEvent
-    data object NavigateBack : RegisterEvent
 }
 
 class RegisterViewModel(
@@ -89,9 +87,6 @@ class RegisterViewModel(
                 viewModelScope.launch {
                     _events.send(RegisterEvent.NavigateLogin(_state.value.email.trim()))
                 }
-            }
-            RegisterAction.OnBackClick -> {
-                viewModelScope.launch { _events.send(RegisterEvent.NavigateBack) }
             }
         }
     }

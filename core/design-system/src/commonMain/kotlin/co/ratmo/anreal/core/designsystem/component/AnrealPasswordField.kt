@@ -2,6 +2,7 @@ package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +35,8 @@ fun AnrealPasswordField(
     initiallyVisible: Boolean = false,
     showPasswordDescription: String = "Show password",
     hidePasswordDescription: String = "Hide password",
+    keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
 ) {
     var visible by rememberSaveable { mutableStateOf(initiallyVisible) }
     AnrealTextField(
@@ -44,7 +47,8 @@ fun AnrealPasswordField(
         placeholder = placeholder,
         error = error,
         enabled = enabled,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
         visualTransformation = if (visible) {
             VisualTransformation.None
         } else {

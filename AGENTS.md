@@ -154,9 +154,9 @@ Read `DESIGN.md` before writing UI.
 - Transitions live on the root `NavHost` in `shared` (`anrealEnter` / `anrealExit`). Classify with `classifyNavMotion`. Do not leave NavHost on the default crossfade.
 - Compose splash (aurora + mark + `Anreal v<versionName>` + “Presented by Ratmo.co”) is not a route. It holds until session resolve + `durationSplash`, then fades to boarding or chat. Android 12+ uses `Theme.Anreal.Splash`.
 - Signed-out start is **boarding** (feature carousel + email + Create account). Login and Register sit above it.
-- **Boarding ↔ Login / Register** is a vertical **pager**: boarding → form slides **up**; back to boarding slides **down**. **Login ↔ Register** is the same strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
+- **Boarding → Login / Register** is a one-way vertical **pager**: boarding is replaced by the form and both move **up**. Login and Register have no back affordance and system back must not reveal boarding. **Login ↔ Register** is the same replace-current strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
 - **Auth → Chat** slides forward (right → left). Logout / pop to **boarding** is the reverse.
-- **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). Logout lives on the Account section, not in a drawer menu.
+- **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). The Account screen uses a compact section switcher with 160ms directional content motion; Logout is fixed in a floating bottom dock on that screen, never in the drawer menu.
 - One `AnrealAtmosphere` wraps the `NavHost`. Nested `AnrealAtmosphere` calls are passthrough so aurora does not remount mid-transition.
 
 ---
@@ -203,6 +203,7 @@ Read `DESIGN.md` before writing UI.
 - User-facing strings are resources.
 - `BASE_URL` from BuildKonfig / `local.properties`. Debug default is the machine LAN IP (not `10.0.2.2` — there is no emulator on the primary machine).
 - Auth forms: `windowSoftInputMode=adjustNothing`. Do **not** `imePadding()` a centered form (that recenters and leaves a hole). Shift the form block with `rememberImeFocusShift` so the focused field sits just above the keyboard.
+- Auth fields are single-line: use `Next` between steps and `Done` to submit the final field; never offer a newline. The chat composer is multi-line: Enter inserts a newline and the visible Send / Queue button submits. Single-field mutations such as rename use `Done` to confirm.
 
 ### Visual QA (no emulator)
 

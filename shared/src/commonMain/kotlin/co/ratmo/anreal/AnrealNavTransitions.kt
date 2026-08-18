@@ -39,11 +39,9 @@ fun classifyNavMotion(from: AnrealRouteKind, to: AnrealRouteKind): AnrealNavMoti
     val toAuth = to.isAuth
     val fromApp = from.isApp
     val toApp = to.isApp
-    val fromForm = from == AnrealRouteKind.Login || from == AnrealRouteKind.Register
     val toForm = to == AnrealRouteKind.Login || to == AnrealRouteKind.Register
     return when {
         from == AnrealRouteKind.Boarding && toForm -> AnrealNavMotion.VerticalUp
-        fromForm && to == AnrealRouteKind.Boarding -> AnrealNavMotion.VerticalDown
         from == AnrealRouteKind.Login && to == AnrealRouteKind.Register -> AnrealNavMotion.VerticalUp
         from == AnrealRouteKind.Register && to == AnrealRouteKind.Login -> AnrealNavMotion.VerticalDown
         fromAuth && toApp -> AnrealNavMotion.HorizontalForward

@@ -42,6 +42,7 @@ fun AnrealPrimaryButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     loadingLabel: String = label,
+    destructive: Boolean = false,
 ) {
     val resolvedLabel = if (loading) loadingLabel else label
     val canClick = enabled && !loading
@@ -73,7 +74,8 @@ fun AnrealPrimaryButton(
             },
         shape = MaterialTheme.shapes.extraLarge,
         tone = GlassTone.Thin,
-        emphasized = canClick,
+        emphasized = canClick && !destructive,
+        error = destructive,
     ) {
         Box(
             modifier = Modifier
@@ -94,14 +96,22 @@ fun AnrealPrimaryButton(
                 if (loading) {
                     LoadingIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = if (destructive) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     )
                 }
                 Text(
                     text = resolvedLabel,
                     style = MaterialTheme.typography.labelLarge,
                     color = if (canClick || loading) {
-                        MaterialTheme.colorScheme.onSurface
+                        if (destructive) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
                     } else {
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     },
@@ -150,6 +160,21 @@ private fun AnrealPrimaryButtonDisabledPreview() {
                 label = "Continue",
                 onClick = {},
                 enabled = false,
+                modifier = Modifier.padding(AnrealSpacing.md),
+            )
+        }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AnrealPrimaryButtonDestructivePreview() {
+    AnrealPreview {
+        AnrealAtmosphere {
+            AnrealPrimaryButton(
+                label = "Log out",
+                onClick = {},
+                destructive = true,
                 modifier = Modifier.padding(AnrealSpacing.md),
             )
         }

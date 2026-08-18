@@ -9,4 +9,5 @@ plugins {
     alias(libs.plugins.kotlinSerialization) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.androidxRoom3) apply false
+    alias(libs.plugins.roborazzi) apply false
 }

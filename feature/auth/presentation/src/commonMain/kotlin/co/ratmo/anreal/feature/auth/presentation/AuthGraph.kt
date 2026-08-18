@@ -20,7 +20,6 @@ fun NavGraphBuilder.authGraph(
     onNavigateHome: () -> Unit,
     onNavigateRegister: (String) -> Unit,
     onNavigateLogin: (String) -> Unit,
-    onNavigateBack: () -> Unit,
 ) {
     composable<BoardingRoute> {
         BoardingRoot(
@@ -32,14 +31,12 @@ fun NavGraphBuilder.authGraph(
         LoginRoot(
             onNavigateHome = onNavigateHome,
             onNavigateRegister = onNavigateRegister,
-            onNavigateBack = onNavigateBack,
         )
     }
     composable<RegisterRoute> {
         RegisterRoot(
             onNavigateHome = onNavigateHome,
             onNavigateLogin = onNavigateLogin,
-            onNavigateBack = onNavigateBack,
         )
     }
 }
