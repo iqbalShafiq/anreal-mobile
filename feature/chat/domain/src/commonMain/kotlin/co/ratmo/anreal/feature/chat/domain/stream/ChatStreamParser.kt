@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -94,6 +95,7 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
                         toolName = toolName,
                         toolCallId = toolCallId,
                         state = state,
+                        output = part["output"]?.toString(),
                     ),
                 )
             }
@@ -120,9 +122,65 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             } ?: event.string("message")
             ChatStreamEvent.Error(message = message ?: "Something went wrong. Try again.")
         }
+        "tool_approval_request" -> parseApprovalRequest(event, type)
+        "tool_approval_result" -> parseResolvedId(event, "approval")?.let {
+            ChatStreamEvent.ApprovalResolved(it)
+        } ?: ChatStreamEvent.Unknown(type)
+        "clarification_request" -> parseClarificationRequest(event, type)
+        "clarification_response" -> parseResolvedId(event, "clarification")?.let {
+            ChatStreamEvent.ClarificationResolved(it)
+        } ?: ChatStreamEvent.Unknown(type)
+        "compaction" -> ChatStreamEvent.Compaction(event.string("phase") ?: "unknown")
         else -> ChatStreamEvent.Unknown(type = type ?: "unknown")
     }
 }
+
+private fun parseApprovalRequest(event: JsonObject, type: String): ChatStreamEvent {
+    val approval = event["approval"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+    val id = approval.string("id") ?: return ChatStreamEvent.Unknown(type)
+    val toolName = approval.string("toolName") ?: return ChatStreamEvent.Unknown(type)
+    return ChatStreamEvent.ApprovalRequested(
+        ToolApproval(
+            id = id,
+            toolName = toolName,
+            reason = approval.string("reason"),
+            arguments = approval["args"]?.toString().orEmpty(),
+        ),
+    )
+}
+
+private fun parseClarificationRequest(event: JsonObject, type: String): ChatStreamEvent {
+    val clarification = event["clarification"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+    val id = clarification.string("id") ?: return ChatStreamEvent.Unknown(type)
+    val questions = (clarification["questions"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val question = element as? JsonObject ?: return@mapNotNull null
+        val questionId = question.string("id") ?: return@mapNotNull null
+        val text = question.string("question") ?: return@mapNotNull null
+        val questionType = question.string("type") ?: return@mapNotNull null
+        ClarificationQuestion(
+            id = questionId,
+            question = text,
+            type = questionType,
+            options = (question["options"] as? JsonArray).orEmpty().mapNotNull { optionElement ->
+                val option = optionElement as? JsonObject ?: return@mapNotNull null
+                ClarificationOption(
+                    id = option.string("id") ?: return@mapNotNull null,
+                    label = option.string("label") ?: return@mapNotNull null,
+                    recommended = option["recommended"]?.jsonPrimitive?.booleanOrNull ?: false,
+                )
+            },
+            optional = question["optional"]?.jsonPrimitive?.booleanOrNull ?: false,
+            placeholder = question.string("placeholder"),
+        )
+    }
+    if (questions.isEmpty()) return ChatStreamEvent.Unknown(type)
+    return ChatStreamEvent.ClarificationRequested(
+        Clarification(id = id, title = clarification.string("title"), questions = questions),
+    )
+}
+
+private fun parseResolvedId(event: JsonObject, key: String): String? =
+    (event[key] as? JsonObject)?.string("id")
 
 private fun parseParts(message: JsonObject): List<ChatPart> {
     val parts = message["parts"] as? JsonArray ?: return emptyList()
@@ -137,6 +195,7 @@ private fun parseParts(message: JsonObject): List<ChatPart> {
                 toolName = part.string("toolName").orEmpty(),
                 toolCallId = part.string("toolCallId").orEmpty(),
                 state = part.string("state") ?: "input-streaming",
+                output = part["output"]?.toString(),
             )
             else -> null
         }

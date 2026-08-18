@@ -7,5 +7,5 @@ import org.koin.dsl.module
 
 val chatPresentationModule = module {
     viewModelOf(::ChatViewModel)
-    viewModel { (account: AccountUi) -> AccountViewModel(account) }
+    viewModel { (account: AccountUi) -> AccountViewModel(account, get(), get()) }
 }

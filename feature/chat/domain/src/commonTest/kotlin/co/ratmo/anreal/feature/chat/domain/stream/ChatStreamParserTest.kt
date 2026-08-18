@@ -79,7 +79,7 @@ class ChatStreamParserTest {
     }
 
     @Test
-    fun unknown_inner_event_is_kept_so_resume_cursor_still_advances() {
+    fun compaction_event_is_typed_so_resume_cursor_still_advances() {
         val envelope = parseStreamLine(
             """{"type":"stream_event","streamId":"s1","eventId":9,"event":{"type":"compaction","phase":"start"}}""",
         )
@@ -88,7 +88,41 @@ class ChatStreamParserTest {
             StreamEnvelope.Event(
                 streamId = "s1",
                 eventId = 9,
-                event = ChatStreamEvent.Unknown(type = "compaction"),
+                event = ChatStreamEvent.Compaction(phase = "start"),
+            ),
+        )
+    }
+
+    @Test
+    fun parses_approval_and_clarification_requests() {
+        val lines = """
+            {"type":"stream_event","streamId":"s1","eventId":10,"event":{"type":"tool_approval_request","approval":{"id":"a1","toolName":"generate_image","args":{"prompt":"cat"},"reason":"Creates an image"}}}
+            {"type":"stream_event","streamId":"s1","eventId":11,"event":{"type":"clarification_request","clarification":{"id":"c1","questions":[{"id":"q1","question":"Which style?","type":"single_choice","options":[{"id":"clean","label":"Clean","recommended":true}]}]}}}
+        """.trimIndent()
+
+        val events = parseStreamLines(lines).map { (it as StreamEnvelope.Event).event }
+
+        assertThat(events[0]).isEqualTo(
+            ChatStreamEvent.ApprovalRequested(
+                ToolApproval("a1", "generate_image", "Creates an image", "{\"prompt\":\"cat\"}"),
+            ),
+        )
+        assertThat(events[1]).isEqualTo(
+            ChatStreamEvent.ClarificationRequested(
+                Clarification(
+                    id = "c1",
+                    title = null,
+                    questions = listOf(
+                        ClarificationQuestion(
+                            id = "q1",
+                            question = "Which style?",
+                            type = "single_choice",
+                            options = listOf(ClarificationOption("clean", "Clean", true)),
+                            optional = false,
+                            placeholder = null,
+                        ),
+                    ),
+                ),
             ),
         )
     }

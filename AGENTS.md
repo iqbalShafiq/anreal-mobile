@@ -10,7 +10,7 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 
 - This repo is a **client**. No agent runtime, no Prisma, no Anvia React.
 - Talk to the existing Hono API. Do not invent endpoints.
-- Auth is Better Auth email/password. Persist `better-auth.session_token` and send it as `Cookie`. Do not require an API change for v1.
+- Auth is Better Auth email/password with the Bearer plugin. Read `set-auth-token` after sign-in/sign-up, persist the token through the encrypted `SessionTokenStore`, and send `Authorization: Bearer <token>`. A legacy `Set-Cookie` parser may remain only as a migration fallback; authenticated mobile requests do not send browser cookies.
 - Display name: **Anreal**. Visual language: DocChat (aurora, frost, amber *seed*).
 
 ---
@@ -31,8 +31,8 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 :feature:<name>:presentation
 ```
 
-Shipped feature modules: `auth`, `chat`.  
-Account / Settings is a **screen inside** `feature:chat:presentation` (`AccountRoute`), not `:feature:settings` yet. Documents, projects, and images destinations are still toasts until those modules exist.
+Shipped feature modules: `auth`, `chat`, `workspace`.
+Account / Settings is a **screen inside** `feature:chat:presentation` (`AccountRoute`), not `:feature:settings` yet. Projects, documents, and images share the cohesive `:feature:workspace:{domain,data,presentation}` browser; session-scoped attachment and context actions remain owned by chat.
 
 ### Dependency rules
 
@@ -114,6 +114,7 @@ Each `Screen` needs previews for light/dark and at least populated + one of load
 - One source → `*LocalDataSource` / `*RemoteDataSource`. Multiple sources → `*Repository`.
 - Implementations are named for what they wrap: `KtorChatDataSource`, `DataStoreSessionStore`. Never `*Impl`.
 - DTO ≠ domain ≠ UI model. Mappers are extension functions next to the DTO.
+- Decode non-2xx bodies before mapping errors. Preserve the server `error`/`message`, `code`, HTTP status, and primitive detail fields in `DataError.Network`; do not reduce every response to its status code. User-safe 4xx messages may be shown, while 5xx messages stay generic.
 - `HttpClientFactory.create(engine)` so tests inject `MockEngine`.
 - Expected failures return `Result.Error`. Catch at the layer that owns the exception. Rethrow `CancellationException`.
 

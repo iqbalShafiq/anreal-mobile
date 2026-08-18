@@ -24,6 +24,9 @@ import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.component.AnrealSplash
 import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealTheme
+import co.ratmo.anreal.core.designsystem.theme.ThemeMode
+import co.ratmo.anreal.core.designsystem.theme.ThemeSettings
+import co.ratmo.anreal.core.domain.model.AppThemeMode
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
@@ -37,6 +40,9 @@ import co.ratmo.anreal.feature.auth.presentation.authGraph
 import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
 import co.ratmo.anreal.feature.chat.presentation.chatGraph
+import co.ratmo.anreal.feature.workspace.presentation.WorkspaceRoute
+import co.ratmo.anreal.feature.workspace.presentation.WorkspaceSection
+import co.ratmo.anreal.feature.workspace.presentation.workspaceGraph
 import kotlinx.coroutines.delay
 import org.koin.compose.viewmodel.koinViewModel
 import kotlin.time.TimeSource
@@ -47,7 +53,19 @@ fun App(
     viewModel: AppViewModel = koinViewModel(),
 ) {
     val status by viewModel.status.collectAsStateWithLifecycle()
-    AnrealTheme {
+    val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+    AnrealTheme(
+        settings = ThemeSettings(
+            mode = when (preferences.themeMode) {
+                AppThemeMode.System -> ThemeMode.System
+                AppThemeMode.Light -> ThemeMode.Light
+                AppThemeMode.Dark -> ThemeMode.Dark
+            },
+            dynamicColor = preferences.dynamicColor,
+        ),
+        reduceMotion = preferences.reduceMotion,
+        reduceTransparency = preferences.reduceTransparency,
+    ) {
         AnrealAtmosphere {
             val showSplash = rememberSplashVisible(status)
             AnimatedContent(
@@ -151,6 +169,17 @@ private fun AuthenticatedHost(
                 navController = navController,
                 account = AccountUi(name = user?.name.orEmpty(), email = user?.email.orEmpty()),
                 onSignOut = viewModel::signOut,
+                onNavigateProjects = { navController.navigate(WorkspaceRoute(WorkspaceSection.Projects)) },
+                onNavigateDocuments = { navController.navigate(WorkspaceRoute(WorkspaceSection.Documents)) },
+                onNavigateImages = { navController.navigate(WorkspaceRoute(WorkspaceSection.Images)) },
+            )
+            workspaceGraph(
+                navController = navController,
+                onOpenProject = { projectId ->
+                    navController.navigate(ChatRoute(projectId = projectId)) {
+                        popUpTo<WorkspaceRoute> { inclusive = true }
+                    }
+                },
             )
         }
     }

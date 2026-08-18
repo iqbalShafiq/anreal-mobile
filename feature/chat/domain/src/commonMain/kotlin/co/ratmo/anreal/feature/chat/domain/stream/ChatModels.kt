@@ -35,6 +35,7 @@ sealed interface ChatPart {
         val toolName: String,
         val toolCallId: String,
         val state: String,
+        val output: String? = null,
     ) : ChatPart
 }
 
@@ -43,6 +44,8 @@ data class ChatMessage(
     val role: ChatRole,
     val parts: List<ChatPart> = emptyList(),
     val isComplete: Boolean = false,
+    val clientMessageId: String? = null,
+    val memoryPosition: Int? = null,
 )
 
 enum class RunStatus {
@@ -65,6 +68,36 @@ data class ChatThreadState(
     val status: RunStatus = RunStatus.Idle,
     val messages: List<ChatMessage> = emptyList(),
     val error: String? = null,
+    val pendingApprovals: List<ToolApproval> = emptyList(),
+    val pendingClarifications: List<Clarification> = emptyList(),
+)
+
+data class ToolApproval(
+    val id: String,
+    val toolName: String,
+    val reason: String?,
+    val arguments: String,
+)
+
+data class ClarificationOption(
+    val id: String,
+    val label: String,
+    val recommended: Boolean,
+)
+
+data class ClarificationQuestion(
+    val id: String,
+    val question: String,
+    val type: String,
+    val options: List<ClarificationOption>,
+    val optional: Boolean,
+    val placeholder: String?,
+)
+
+data class Clarification(
+    val id: String,
+    val title: String?,
+    val questions: List<ClarificationQuestion>,
 )
 
 sealed interface StreamEnvelope {
@@ -119,6 +152,12 @@ sealed interface ChatStreamEvent {
         val clientMessageId: String,
         val text: String,
     ) : ChatStreamEvent
+
+    data class ApprovalRequested(val approval: ToolApproval) : ChatStreamEvent
+    data class ApprovalResolved(val id: String) : ChatStreamEvent
+    data class ClarificationRequested(val clarification: Clarification) : ChatStreamEvent
+    data class ClarificationResolved(val id: String) : ChatStreamEvent
+    data class Compaction(val phase: String) : ChatStreamEvent
 
     data class Unknown(
         val type: String,

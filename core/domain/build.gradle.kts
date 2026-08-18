@@ -5,6 +5,9 @@ plugins {
 }
 
 kotlin {
+    sourceSets.commonMain.dependencies {
+        implementation(libs.kotlinx.coroutines.core)
+    }
     android {
         namespace = "co.ratmo.anreal.core.domain"
         compileSdk = libs.versions.android.compileSdk.get().toInt()

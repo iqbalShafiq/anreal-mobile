@@ -40,7 +40,10 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
+import co.ratmo.anreal.feature.chat.presentation.component.ApprovalDialog
+import co.ratmo.anreal.feature.chat.presentation.component.ClarificationDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
+import co.ratmo.anreal.feature.chat.presentation.component.DocumentLibraryDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DocumentsEndDrawer
 import co.ratmo.anreal.feature.chat.presentation.component.QueueConflictDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RenameSessionDialog
@@ -64,6 +67,12 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Description
 import com.composables.icons.materialsymbols.rounded.Menu
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import io.github.vinceglb.filekit.FileKit
+import io.github.vinceglb.filekit.dialogs.FileKitType
+import io.github.vinceglb.filekit.dialogs.openFilePicker
+import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.name
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -71,6 +80,9 @@ import org.koin.compose.viewmodel.koinViewModel
 fun ChatRoot(
     account: AccountUi = AccountUi(),
     onNavigateAccount: () -> Unit = {},
+    onNavigateProjects: () -> Unit = {},
+    onNavigateDocuments: () -> Unit = {},
+    onNavigateImages: () -> Unit = {},
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -88,9 +100,40 @@ fun ChatRoot(
                 snackbarHostState.showSnackbar(AnrealCopy.get(AnrealCopy.TOAST_COPIED))
             }
             is ChatEvent.PickFiles -> snackbarScope.launch {
-                snackbarHostState.showSnackbar(AnrealCopy.get(AnrealCopy.TOAST_PICKER_SOON))
+                try {
+                    val type = if (event.imagesOnly) {
+                        FileKitType.Image
+                    } else {
+                        FileKitType.File(listOf("pdf", "png", "jpg", "jpeg", "webp"))
+                    }
+                    FileKit.openFilePicker(type = type)?.let { file ->
+                        viewModel.onAction(
+                            ChatAction.OnFilesPicked(
+                                files = listOf(
+                                    PickedUploadUi(
+                                        filename = file.name,
+                                        mediaType = file.name.toMediaType(),
+                                        bytes = file.readBytes(),
+                                    ),
+                                ),
+                                imagesOnly = event.imagesOnly,
+                            ),
+                        )
+                    }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Exception) {
+                    viewModel.onAction(
+                        ChatAction.OnFilePickerFailed(
+                            exception.message ?: AnrealCopy.get(AnrealCopy.ERROR_FILE_READ),
+                        ),
+                    )
+                }
             }
             ChatEvent.OpenAccount -> onNavigateAccount()
+            ChatEvent.OpenProjects -> onNavigateProjects()
+            ChatEvent.OpenDocuments -> onNavigateDocuments()
+            ChatEvent.OpenImages -> onNavigateImages()
         }
     }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -100,6 +143,13 @@ fun ChatRoot(
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
+}
+
+private fun String.toMediaType(): String = when (substringAfterLast('.', "").lowercase()) {
+    "pdf" -> "application/pdf"
+    "jpg", "jpeg" -> "image/jpeg"
+    "webp" -> "image/webp"
+    else -> "image/png"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -218,6 +268,15 @@ fun ChatScreen(
     }
     if (state.queueConflict) {
         QueueConflictDialog(onAction = onAction)
+    }
+    state.thread.pendingApprovals.firstOrNull()?.let { approval ->
+        ApprovalDialog(approval, state.humanInputBusy, onAction)
+    }
+    state.thread.pendingClarifications.firstOrNull()?.let { clarification ->
+        ClarificationDialog(clarification, state.humanInputBusy, onAction)
+    }
+    if (state.libraryOpen) {
+        DocumentLibraryDialog(state, onAction)
     }
 }
 

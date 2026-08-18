@@ -3,6 +3,9 @@ package co.ratmo.anreal.feature.auth.presentation
 import app.cash.turbine.test
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import co.ratmo.anreal.core.domain.model.AppPreferences
+import co.ratmo.anreal.core.domain.model.AppPreferencesRepository
+import co.ratmo.anreal.core.domain.model.AppThemeMode
 import co.ratmo.anreal.core.domain.model.User
 import co.ratmo.anreal.feature.auth.domain.AuthSession
 import co.ratmo.anreal.feature.auth.domain.SessionStatus
@@ -36,12 +39,23 @@ class AppViewModelTest {
     @Test
     fun starts_checking_then_follows_session() = runTest {
         val session = FakeAuthSession(SessionStatus.SignedIn)
-        val viewModel = AppViewModel(session)
+        val viewModel = AppViewModel(session, FakeAppPreferencesRepository())
         viewModel.status.test {
             assertThat(awaitItem()).isEqualTo(SessionStatus.SignedIn)
             session.emit(SessionStatus.SignedOut)
             assertThat(awaitItem()).isEqualTo(SessionStatus.SignedOut)
         }
+    }
+}
+
+private class FakeAppPreferencesRepository : AppPreferencesRepository {
+    private val values = MutableStateFlow(AppPreferences())
+    override val preferences: Flow<AppPreferences> = values
+    override suspend fun setThemeMode(mode: AppThemeMode) { values.value = values.value.copy(themeMode = mode) }
+    override suspend fun setDynamicColor(enabled: Boolean) { values.value = values.value.copy(dynamicColor = enabled) }
+    override suspend fun setReduceMotion(enabled: Boolean) { values.value = values.value.copy(reduceMotion = enabled) }
+    override suspend fun setReduceTransparency(enabled: Boolean) {
+        values.value = values.value.copy(reduceTransparency = enabled)
     }
 }
 

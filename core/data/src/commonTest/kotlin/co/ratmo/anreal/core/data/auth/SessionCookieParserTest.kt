@@ -22,4 +22,14 @@ class SessionCookieParserTest {
         assertThat(parseSessionToken(listOf("foo=bar; Path=/"))).isNull()
         assertThat(parseSessionToken(emptyList())).isNull()
     }
+
+    @Test
+    fun bearer_response_header_wins_over_legacy_cookie() {
+        val token = responseSessionToken(
+            bearerHeader = " native-token ",
+            setCookieHeaders = listOf("better-auth.session_token=legacy-token; Path=/"),
+        )
+
+        assertThat(token).isEqualTo("native-token")
+    }
 }

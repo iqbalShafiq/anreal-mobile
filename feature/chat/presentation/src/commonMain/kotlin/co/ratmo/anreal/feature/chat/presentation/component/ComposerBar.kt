@@ -11,10 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -79,6 +81,39 @@ internal fun ComposerBar(
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
         ) {
             MessageQueueDock(state = state, onAction = onAction)
+            SessionImageStrip(state = state, onAction = onAction)
+            state.contextUsage?.let { usage ->
+                Column(verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs)) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(usage.label, style = MaterialTheme.typography.labelSmall)
+                    }
+                    LinearProgressIndicator(
+                        progress = { usage.ratio },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = if (usage.nearThreshold) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
+                    )
+                }
+            }
+            state.uploadingDocuments.filter { it.status != "ready" }.forEach { document ->
+                Text(
+                    text = "${document.filename} · ${document.status.toUploadStatusLabel()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (document.error == null) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                )
+            }
             state.contextSnippet?.let { snippet ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -144,12 +179,17 @@ internal fun ComposerBar(
                 IconButton(
                     onClick = { sheet = ComposerSheet.Attach },
                     modifier = Modifier.size(AnrealSpacing.touch),
+                    enabled = !state.isUploading,
                 ) {
-                    Icon(
-                        imageVector = MaterialSymbols.Rounded.Attach_file,
-                        contentDescription = AnrealCopy.get(AnrealCopy.CD_ATTACH),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (state.isUploading) {
+                        CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                    } else {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Attach_file,
+                            contentDescription = AnrealCopy.get(AnrealCopy.CD_ATTACH),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 ComposerSubmitButton(
                     streaming = streaming,
@@ -166,6 +206,16 @@ internal fun ComposerBar(
         onDismiss = { sheet = null },
     )
 }
+
+private fun String.toUploadStatusLabel(): String = AnrealCopy.get(
+    when (lowercase()) {
+        "queued" -> AnrealCopy.STATUS_UPLOAD_QUEUED
+        "processing" -> AnrealCopy.STATUS_UPLOAD_PROCESSING
+        "uploading" -> AnrealCopy.STATUS_UPLOAD_UPLOADING
+        "error", "failed" -> AnrealCopy.STATUS_UPLOAD_FAILED
+        else -> AnrealCopy.STATUS_UPLOAD_PROCESSING
+    },
+)
 
 @Composable
 private fun ComposerSubmitButton(

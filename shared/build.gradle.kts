@@ -44,6 +44,7 @@ kotlin {
         implementation(project(":feature:auth:domain"))
         implementation(project(":feature:auth:presentation"))
         implementation(project(":feature:chat:presentation"))
+        implementation(project(":feature:workspace:presentation"))
         implementation(libs.androidx.navigation.compose)
         implementation(libs.koin.compose)
         implementation(libs.koin.compose.viewmodel)

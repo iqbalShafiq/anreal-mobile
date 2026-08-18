@@ -64,11 +64,25 @@ class AccountScreensScreenshotTest {
     }
 
     @Test
-    fun usageEmptyDark() {
+    fun usagePopulatedDark() {
         composeTestRule.setContent {
             AnrealPreview(dark = true) {
                 AccountScreen(
-                    state = AccountState(section = AccountSection.Usage),
+                    state = AccountState(
+                        section = AccountSection.Usage,
+                        usage = AccountUsageUi(
+                            storageUsed = "12 MB",
+                            storageMax = "200 MB",
+                            storageFraction = 0.06f,
+                            requestCount = "42",
+                            totalTokens = "240,000",
+                            inputTokens = "180,000",
+                            outputTokens = "60,000",
+                            cachedTokens = "20,000",
+                            models = listOf(UsageBreakdownUi("GPT Luna 5.6", "40", "230,000")),
+                            reasoning = listOf(UsageBreakdownUi("High", "10", "80,000")),
+                        ),
+                    ),
                     onAction = {},
                 )
             }
@@ -77,11 +91,21 @@ class AccountScreensScreenshotTest {
     }
 
     @Test
-    fun personalizationEmptyLight() {
+    fun personalizationPopulatedLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {
                 AccountScreen(
-                    state = AccountState(section = AccountSection.Personalization),
+                    state = AccountState(
+                        section = AccountSection.Personalization,
+                        userProfile = ProfileUi(
+                            sections = listOf(
+                                ProfileSectionUi("facts", "Facts", listOf("Builds Kotlin apps")),
+                                ProfileSectionUi("preferences", "Preferences", listOf("Concise answers")),
+                            ),
+                            explicitFacts = emptyList(),
+                            updatedAt = "now",
+                        ),
+                    ),
                     onAction = {},
                 )
             }

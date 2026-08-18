@@ -9,6 +9,8 @@ import co.ratmo.anreal.feature.auth.data.authDataModule
 import co.ratmo.anreal.feature.auth.presentation.authPresentationModule
 import co.ratmo.anreal.feature.chat.data.chatDataModule
 import co.ratmo.anreal.feature.chat.presentation.chatPresentationModule
+import co.ratmo.anreal.feature.workspace.data.workspaceDataModule
+import co.ratmo.anreal.feature.workspace.presentation.workspacePresentationModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 import org.koin.dsl.module
@@ -24,6 +26,7 @@ class AnrealApplication : Application() {
                         AppConfig(
                             environment = AppEnvironment.parse(BuildConfig.ENVIRONMENT),
                             baseUrl = BuildConfig.BASE_URL,
+                            isDebug = BuildConfig.DEBUG,
                         )
                     }
                 },
@@ -33,6 +36,8 @@ class AnrealApplication : Application() {
                 authPresentationModule,
                 chatDataModule,
                 chatPresentationModule,
+                workspaceDataModule,
+                workspacePresentationModule,
             )
         }
     }

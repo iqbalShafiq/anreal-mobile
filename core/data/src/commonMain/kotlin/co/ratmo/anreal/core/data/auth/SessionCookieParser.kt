@@ -1,6 +1,7 @@
 package co.ratmo.anreal.core.data.auth
 
 const val SESSION_COOKIE_NAME = "better-auth.session_token"
+const val SESSION_TOKEN_HEADER = "set-auth-token"
 
 fun parseSessionToken(setCookieHeaders: List<String>): String? {
     return setCookieHeaders.firstNotNullOfOrNull { header ->
@@ -13,3 +14,9 @@ fun parseSessionToken(setCookieHeaders: List<String>): String? {
 }
 
 fun sessionCookieHeader(token: String): String = "$SESSION_COOKIE_NAME=$token"
+
+fun responseSessionToken(
+    bearerHeader: String?,
+    setCookieHeaders: List<String>,
+): String? = bearerHeader?.trim()?.takeIf { it.isNotEmpty() }
+    ?: parseSessionToken(setCookieHeaders)

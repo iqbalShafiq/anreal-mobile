@@ -15,6 +15,7 @@ junit = "4.13.2"
 junit5 = "5.14.4"
 haze = "1.7.2"
 koin = "4.2.2"
+kermit = "2.1.0"
 materialKolor = "5.0.0"
 kotlin = "2.4.10"
 kotlinx-coroutines = "1.11.0"
@@ -30,6 +31,8 @@ sqlite = "2.7.0"
 datastore = "1.2.1"
 tink = "1.23.0"
 markdownRenderer = "0.43.0"
+filekit = "0.14.1"
+coil = "3.5.0"
 
 [libraries]
 android-gradlePlugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
@@ -71,6 +74,7 @@ koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
 koin-android = { module = "io.insert-koin:koin-android", version.ref = "koin" }
 koin-compose = { module = "io.insert-koin:koin-compose", version.ref = "koin" }
 koin-compose-viewmodel = { module = "io.insert-koin:koin-compose-viewmodel", version.ref = "koin" }
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
@@ -92,6 +96,8 @@ androidx-datastore-preferences-core = { module = "androidx.datastore:datastore-p
 tink-android = { module = "com.google.crypto.tink:tink-android", version.ref = "tink" }
 markdown-renderer = { module = "com.mikepenz:multiplatform-markdown-renderer", version.ref = "markdownRenderer" }
 markdown-renderer-m3 = { module = "com.mikepenz:multiplatform-markdown-renderer-m3", version.ref = "markdownRenderer" }
+filekit-dialogs-compose = { module = "io.github.vinceglb:filekit-dialogs-compose", version.ref = "filekit" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 roborazzi = { module = "io.github.takahirom.roborazzi:roborazzi", version.ref = "roborazzi" }
 roborazzi-compose = { module = "io.github.takahirom.roborazzi:roborazzi-compose", version.ref = "roborazzi" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }

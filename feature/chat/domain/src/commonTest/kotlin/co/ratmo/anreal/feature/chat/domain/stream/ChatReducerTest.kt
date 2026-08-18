@@ -175,4 +175,18 @@ class ChatReducerTest {
         assertThat(state.lastEventId).isEqualTo(9)
         assertThat(state.messages).isEqualTo(emptyList())
     }
+
+    @Test
+    fun approval_request_and_result_update_pending_input() {
+        val approval = ToolApproval("a1", "web_search", null, "{}")
+        val pending = ChatThreadState().reduce(
+            StreamEnvelope.Event("s1", 1, ChatStreamEvent.ApprovalRequested(approval)),
+        )
+        val resolved = pending.reduce(
+            StreamEnvelope.Event("s1", 2, ChatStreamEvent.ApprovalResolved("a1")),
+        )
+
+        assertThat(pending.pendingApprovals).isEqualTo(listOf(approval))
+        assertThat(resolved.pendingApprovals).isEqualTo(emptyList())
+    }
 }

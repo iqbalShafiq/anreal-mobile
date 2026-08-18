@@ -19,14 +19,14 @@ import kotlin.test.Test
 class KtorAuthDataSourceTest {
 
     @Test
-    fun signIn_reads_user_and_stores_cookie() = runTest {
+    fun signIn_reads_user_and_stores_bearer_token() = runTest {
         val store = InMemorySessionTokenStore()
         val source = source(
             store = store,
             path = "/api/auth/sign-in/email",
             status = HttpStatusCode.OK,
             body = """{"user":{"id":"u1","email":"a@b.com","name":"Ada"}}""",
-            setCookie = "better-auth.session_token=tok-1; Path=/",
+            authToken = "tok-1",
         )
 
         val result = source.signIn("a@b.com", "password1")
@@ -50,6 +50,18 @@ class KtorAuthDataSourceTest {
     }
 
     @Test
+    fun signUp_maps_better_auth_existing_user_body_to_email_taken() = runTest {
+        val source = source(
+            path = "/api/auth/sign-up/email",
+            status = HttpStatusCode.BadRequest,
+            body = """{"code":"USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL","message":"User already exists"}""",
+        )
+
+        assertThat(source.signUp("Ada", "a@b.com", "password1"))
+            .isEqualTo(Result.Error(AuthError.EmailTaken))
+    }
+
+    @Test
     fun currentUser_treats_401_as_signed_out() = runTest {
         val source = source(
             path = "/api/auth/get-session",
@@ -66,15 +78,15 @@ private fun source(
     path: String,
     status: HttpStatusCode,
     body: String,
-    setCookie: String? = null,
+    authToken: String? = null,
 ): KtorAuthDataSource {
     val engine = MockEngine {
-        val headers = if (setCookie == null) {
+        val headers = if (authToken == null) {
             headersOf(HttpHeaders.ContentType, "application/json")
         } else {
             headersOf(
                 HttpHeaders.ContentType to listOf("application/json"),
-                HttpHeaders.SetCookie to listOf(setCookie),
+                "set-auth-token" to listOf(authToken),
             )
         }
         respond(content = body, status = status, headers = headers)

@@ -7,7 +7,7 @@ import co.ratmo.anreal.feature.chat.presentation.account.AccountRoot
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class ChatRoute(val sessionId: String? = null)
+data class ChatRoute(val sessionId: String? = null, val projectId: String? = null)
 
 @Serializable
 data object AccountRoute
@@ -16,11 +16,17 @@ fun NavGraphBuilder.chatGraph(
     navController: NavController,
     account: AccountUi = AccountUi(),
     onSignOut: () -> Unit = {},
+    onNavigateProjects: () -> Unit = {},
+    onNavigateDocuments: () -> Unit = {},
+    onNavigateImages: () -> Unit = {},
 ) {
     composable<ChatRoute> {
         ChatRoot(
             account = account,
             onNavigateAccount = { navController.navigate(AccountRoute) },
+            onNavigateProjects = onNavigateProjects,
+            onNavigateDocuments = onNavigateDocuments,
+            onNavigateImages = onNavigateImages,
         )
     }
     composable<AccountRoute> {

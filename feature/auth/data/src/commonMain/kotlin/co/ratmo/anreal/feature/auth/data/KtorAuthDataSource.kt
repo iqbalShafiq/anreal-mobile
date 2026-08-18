@@ -34,7 +34,7 @@ class KtorAuthDataSource(
         return httpClient.post<AuthCredentialsDto, AuthSessionResponseDto>(
             route = "/api/auth/sign-up/email",
             body = AuthCredentialsDto(email = email, password = password, name = name),
-        ).toAuthUserResult(emailTakenOnConflict = true)
+        ).toAuthUserResult(detectEmailTaken = true)
     }
 
     override suspend fun signOut(): EmptyResult<AuthError> {
@@ -47,7 +47,7 @@ class KtorAuthDataSource(
     override suspend fun currentUser(): Result<User?, AuthError> {
         return when (val result = httpClient.get<AuthSessionResponseDto>(route = "/api/auth/get-session")) {
             is Result.Success -> Result.Success(result.data.user?.toUser())
-            is Result.Error -> if (result.error == DataError.Network.UNAUTHORIZED) {
+            is Result.Error -> if (result.error.kind == DataError.Network.Kind.UNAUTHORIZED) {
                 Result.Success(null)
             } else {
                 Result.Error(AuthError.Network(result.error))
@@ -57,9 +57,9 @@ class KtorAuthDataSource(
 }
 
 private fun Result<AuthSessionResponseDto, DataError.Network>.toAuthUserResult(
-    emailTakenOnConflict: Boolean = false,
+    detectEmailTaken: Boolean = false,
 ): Result<User, AuthError> {
-    return when (val mapped = mapError { it.toAuthError(emailTakenOnConflict) }) {
+    return when (val mapped = mapError { it.toAuthError(detectEmailTaken) }) {
         is Result.Success -> {
             val user = mapped.data.user?.toUser()
             if (user == null) Result.Error(AuthError.Network(DataError.Network.SERIALIZATION))
@@ -73,14 +73,20 @@ private fun Result<Unit, DataError.Network>.toAuthResult(): Result<Unit, AuthErr
     return mapError { it.toAuthError() }
 }
 
-private fun DataError.Network.toAuthError(emailTakenOnConflict: Boolean = false): AuthError {
-    return when (this) {
-        DataError.Network.UNAUTHORIZED -> AuthError.InvalidCredentials
-        DataError.Network.CONFLICT -> if (emailTakenOnConflict) {
-            AuthError.EmailTaken
-        } else {
-            AuthError.Network(this)
-        }
+private fun DataError.Network.toAuthError(detectEmailTaken: Boolean = false): AuthError {
+    return when {
+        kind == DataError.Network.Kind.UNAUTHORIZED -> AuthError.InvalidCredentials
+        detectEmailTaken && isEmailTaken() -> AuthError.EmailTaken
         else -> AuthError.Network(this)
     }
+}
+
+private fun DataError.Network.isEmailTaken(): Boolean {
+    val normalizedCode = code.orEmpty().uppercase()
+    val normalizedMessage = serverMessage.orEmpty().lowercase()
+    return normalizedCode.contains("USER_ALREADY_EXISTS") ||
+        normalizedCode.contains("EMAIL_ALREADY") ||
+        normalizedMessage.contains("already exists") ||
+        normalizedMessage.contains("email is already") ||
+        normalizedMessage.contains("email already")
 }

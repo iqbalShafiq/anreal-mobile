@@ -23,6 +23,10 @@ enum class AppEnvironment {
 data class AppConfig(
     val environment: AppEnvironment,
     val baseUrl: String,
+    val isDebug: Boolean = false,
 ) {
-    constructor(baseUrl: String) : this(AppEnvironment.Development, baseUrl)
+    constructor(baseUrl: String) : this(
+        environment = AppEnvironment.Development,
+        baseUrl = baseUrl,
+    )
 }

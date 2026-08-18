@@ -46,7 +46,7 @@ internal fun MessageActionsBar(
             contentDescription = AnrealCopy.get(AnrealCopy.CD_COPY_MESSAGE),
         )
         MessageActionButton(
-            onClick = { onAction(ChatAction.OnAddContext(text)) },
+            onClick = { onAction(ChatAction.OnAddContext(text, message.role)) },
             imageVector = MaterialSymbols.Rounded.Reply,
             contentDescription = AnrealCopy.get(AnrealCopy.CD_ADD_CONTEXT),
         )

@@ -10,6 +10,8 @@ dependencies {
     implementation(project(":feature:auth:presentation"))
     implementation(project(":feature:chat:data"))
     implementation(project(":feature:chat:presentation"))
+    implementation(project(":feature:workspace:data"))
+    implementation(project(":feature:workspace:presentation"))
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.splashscreen)

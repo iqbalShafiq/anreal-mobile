@@ -14,6 +14,8 @@ import com.materialkolor.rememberDynamicColorScheme
 @Composable
 fun AnrealTheme(
     settings: ThemeSettings = ThemeSettings(),
+    reduceMotion: Boolean = false,
+    reduceTransparency: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = settings.resolveDark(isSystemInDarkTheme())
@@ -30,8 +32,8 @@ fun AnrealTheme(
     )
 
     CompositionLocalProvider(
-        LocalAnrealReduceMotion provides rememberReduceMotion(),
-        LocalAnrealReduceTransparency provides rememberReduceTransparency(),
+        LocalAnrealReduceMotion provides (reduceMotion || rememberReduceMotion()),
+        LocalAnrealReduceTransparency provides (reduceTransparency || rememberReduceTransparency()),
     ) {
         MaterialExpressiveTheme(
             colorScheme = dynamicScheme ?: brandScheme,

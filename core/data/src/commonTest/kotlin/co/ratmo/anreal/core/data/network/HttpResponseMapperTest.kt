@@ -9,16 +9,36 @@ class HttpResponseMapperTest {
 
     @Test
     fun maps_common_http_statuses() {
-        assertThat(statusToNetworkError(401)).isEqualTo(DataError.Network.UNAUTHORIZED)
-        assertThat(statusToNetworkError(403)).isEqualTo(DataError.Network.FORBIDDEN)
-        assertThat(statusToNetworkError(404)).isEqualTo(DataError.Network.NOT_FOUND)
-        assertThat(statusToNetworkError(408)).isEqualTo(DataError.Network.REQUEST_TIMEOUT)
-        assertThat(statusToNetworkError(409)).isEqualTo(DataError.Network.CONFLICT)
-        assertThat(statusToNetworkError(413)).isEqualTo(DataError.Network.PAYLOAD_TOO_LARGE)
-        assertThat(statusToNetworkError(429)).isEqualTo(DataError.Network.TOO_MANY_REQUESTS)
-        assertThat(statusToNetworkError(500)).isEqualTo(DataError.Network.SERVER_ERROR)
-        assertThat(statusToNetworkError(503)).isEqualTo(DataError.Network.SERVICE_UNAVAILABLE)
-        assertThat(statusToNetworkError(418)).isEqualTo(DataError.Network.UNKNOWN)
+        assertThat(statusToNetworkError(400).kind).isEqualTo(DataError.Network.Kind.BAD_REQUEST)
+        assertThat(statusToNetworkError(401).kind).isEqualTo(DataError.Network.Kind.UNAUTHORIZED)
+        assertThat(statusToNetworkError(403).kind).isEqualTo(DataError.Network.Kind.FORBIDDEN)
+        assertThat(statusToNetworkError(404).kind).isEqualTo(DataError.Network.Kind.NOT_FOUND)
+        assertThat(statusToNetworkError(408).kind).isEqualTo(DataError.Network.Kind.REQUEST_TIMEOUT)
+        assertThat(statusToNetworkError(409).kind).isEqualTo(DataError.Network.Kind.CONFLICT)
+        assertThat(statusToNetworkError(413).kind).isEqualTo(DataError.Network.Kind.PAYLOAD_TOO_LARGE)
+        assertThat(statusToNetworkError(422).kind)
+            .isEqualTo(DataError.Network.Kind.UNPROCESSABLE_ENTITY)
+        assertThat(statusToNetworkError(429).kind)
+            .isEqualTo(DataError.Network.Kind.TOO_MANY_REQUESTS)
+        assertThat(statusToNetworkError(500).kind).isEqualTo(DataError.Network.Kind.SERVER_ERROR)
+        assertThat(statusToNetworkError(503).kind)
+            .isEqualTo(DataError.Network.Kind.SERVICE_UNAVAILABLE)
+        assertThat(statusToNetworkError(418).kind).isEqualTo(DataError.Network.Kind.UNKNOWN)
+    }
+
+    @Test
+    fun parses_server_error_message_code_and_primitive_details() {
+        val payload = parseServerErrorPayload(
+            """{"error":"Storage limit exceeded","code":"STORAGE_QUOTA_EXCEEDED","maxBytes":200,"retry":true}""",
+        )
+
+        assertThat(payload).isEqualTo(
+            ServerErrorPayload(
+                message = "Storage limit exceeded",
+                code = "STORAGE_QUOTA_EXCEEDED",
+                details = mapOf("maxBytes" to "200", "retry" to "true"),
+            ),
+        )
     }
 
     @Test

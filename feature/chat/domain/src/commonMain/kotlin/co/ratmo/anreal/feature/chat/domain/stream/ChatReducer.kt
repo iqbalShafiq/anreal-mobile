@@ -47,6 +47,21 @@ private fun ChatThreadState.applyEvent(envelope: StreamEnvelope.Event): ChatThre
             status = RunStatus.Failed,
         )
         is ChatStreamEvent.QueuedMessageApplied -> advanced
+        is ChatStreamEvent.ApprovalRequested -> advanced.copy(
+            pendingApprovals = advanced.pendingApprovals.filterNot { it.id == event.approval.id } + event.approval,
+        )
+        is ChatStreamEvent.ApprovalResolved -> advanced.copy(
+            pendingApprovals = advanced.pendingApprovals.filterNot { it.id == event.id },
+        )
+        is ChatStreamEvent.ClarificationRequested -> advanced.copy(
+            pendingClarifications = advanced.pendingClarifications.filterNot {
+                it.id == event.clarification.id
+            } + event.clarification,
+        )
+        is ChatStreamEvent.ClarificationResolved -> advanced.copy(
+            pendingClarifications = advanced.pendingClarifications.filterNot { it.id == event.id },
+        )
+        is ChatStreamEvent.Compaction -> advanced
         is ChatStreamEvent.Unknown -> advanced
     }
 }

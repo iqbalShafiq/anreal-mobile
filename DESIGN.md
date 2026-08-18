@@ -298,9 +298,12 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 | Documents | “Upload a PDF or image” | Library skeletons + upload progress | Quota / failed ingest | Status → ready |
 | Projects | “Create a project” | Skeletons | Retry | Open project |
 | Gallery | “No images yet” | Grid skeletons | Retry | New image at start |
-| Settings / account | Profile summary + name + email + fixed floating Log out dock | — | — | Sign out → boarding |
-| Settings / usage | Zero-state usage (API not wired) | Section shimmer | Retry section | — |
+| Settings / account | Profile summary + name + email + fixed floating Log out dock | Health check | Retry API status | Persist appearance locally; sign out → boarding |
+| Settings / usage | Zero-state usage | Section shimmer | Retry section with server-safe message | Storage and request/token breakdowns |
 | Settings / personalization | “No profile yet…” | Section shimmer | Retry section | Reset profile confirm |
+| Workspace / projects | “Create a project” | Project skeletons | Retry section | Create, edit, open, and delete projects |
+| Workspace / documents | “Attach one from a chat” | Document skeletons | Retry section | Preview pages/images and delete |
+| Workspace / images | “Generate or attach an image” | Image skeletons | Retry section | Authenticated image bytes and metadata |
 | Approval / clarification | — | Card while pending | Late response is idempotent | Card dismisses |
 
 ### 8.3 Copy for states
@@ -396,6 +399,7 @@ Every Screen preview file includes at minimum:
 
 - Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets.
 - Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use a compact text-only section switcher, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is fixed in a floating bottom dock across this screen.
+- Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses one segmented section switcher and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).

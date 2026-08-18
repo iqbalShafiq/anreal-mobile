@@ -59,6 +59,17 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun bootstrap_creates_draft_in_route_project_when_no_session_exists() = runTest {
+        val fake = FakeChatRepository()
+        val viewModel = ChatViewModel(SavedStateHandle(mapOf("projectId" to "p1")), fake)
+
+        advanceUntilIdle()
+
+        assertThat(fake.openedProjectIds).isEqualTo(listOf("p1"))
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("draft")
+    }
+
+    @Test
     fun send_keeps_user_bubble_and_records_text() = runTest {
         val fake = FakeChatRepository().apply {
             refreshResult = Result.Success(

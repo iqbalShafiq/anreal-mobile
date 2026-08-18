@@ -19,6 +19,7 @@ kotlin {
         implementation(project(":core:domain"))
         implementation(libs.kotlinx.coroutines.core)
         implementation(libs.koin.core)
+        implementation(libs.kermit)
         implementation(libs.androidx.datastore.preferences.core)
     }
     sourceSets.androidMain.dependencies {

@@ -21,6 +21,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -134,6 +135,25 @@ internal fun SessionDrawer(
                                     onRename = { onAction(ChatAction.OnSessionMenuRename(session.id)) },
                                     onDelete = { onAction(ChatAction.OnSessionMenuDelete(session.id)) },
                                 )
+                            }
+                        }
+                        if (state.sessionsNextCursor != null) {
+                            item(key = "load-more-sessions") {
+                                TextButton(
+                                    onClick = { onAction(ChatAction.OnLoadMoreSessions) },
+                                    enabled = !state.sessionsLoadingMore,
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(
+                                        AnrealCopy.get(
+                                            if (state.sessionsLoadingMore) {
+                                                AnrealCopy.STATUS_LOADING
+                                            } else {
+                                                AnrealCopy.ACTION_LOAD_MORE
+                                            },
+                                        ),
+                                    )
+                                }
                             }
                         }
                     }

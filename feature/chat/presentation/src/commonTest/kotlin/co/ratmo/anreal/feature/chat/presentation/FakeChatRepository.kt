@@ -4,13 +4,21 @@ import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.ContextSnippet
+import co.ratmo.anreal.feature.chat.domain.ContextUsage
+import co.ratmo.anreal.feature.chat.domain.DocumentIngest
+import co.ratmo.anreal.feature.chat.domain.DocumentStorage
+import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
+import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -47,10 +55,19 @@ class FakeChatRepository : ChatRepository {
     var recentProjects: Result<List<RecentProject>, ChatError> = Result.Success(emptyList())
     var lastUnlinked: Pair<String, String>? = null
     var unlinkResult: EmptyResult<ChatError> = Result.Success(Unit)
+    var uploadDocumentResult: Result<DocumentIngest, ChatError> = Result.Success(
+        DocumentIngest("doc", "file.pdf", "ready", 1, 1, null, null),
+    )
+    var uploadImageResult: Result<SessionImage, ChatError> = Result.Success(
+        SessionImage("image", "image.png", "image/png", 1, 1, "user-upload"),
+    )
+    var lastUpload: Triple<String, ChatUpload, Boolean>? = null
+    var contextSnippet: ContextSnippet? = null
+    val openedProjectIds = mutableListOf<String?>()
 
     override fun observeSessions(): Flow<List<ChatSession>> = sessions
 
-    override suspend fun refreshSessions(): Result<SessionPage, ChatError> {
+    override suspend fun refreshSessions(cursor: String?): Result<SessionPage, ChatError> {
         when (val result = refreshResult) {
             is Result.Success -> sessions.value = result.data.items
             is Result.Error -> Unit
@@ -58,7 +75,13 @@ class FakeChatRepository : ChatRepository {
         return refreshResult
     }
 
-    override suspend fun openDraft(): Result<ChatSession, ChatError> {
+    override suspend fun createSession(
+        sessionId: String?,
+        projectId: String?,
+    ): Result<ChatSession, ChatError> = openDraft(projectId)
+
+    override suspend fun openDraft(projectId: String?): Result<ChatSession, ChatError> {
+        openedProjectIds += projectId
         sessions.value = listOf(draft) + sessions.value.filterNot { it.id == draft.id }
         return Result.Success(draft)
     }
@@ -132,6 +155,26 @@ class FakeChatRepository : ChatRepository {
 
     override suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError> = runStatus
 
+    override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = Result.Success(emptyList())
+
+    override suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError> =
+        Result.Success((history as? Result.Success)?.data?.size ?: 0)
+
+    override suspend fun getContextUsage(
+        sessionId: String,
+        model: String?,
+        reasoningEffort: String?,
+    ): Result<ContextUsage, ChatError> = Result.Success(
+        ContextUsage(model.orEmpty(), model.orEmpty(), 100, 10, 0.1, 0.7, 0.3, reasoningEffort),
+    )
+
+    override suspend fun truncateSession(
+        sessionId: String,
+        mode: String,
+        clientMessageId: String?,
+        memoryPosition: Int?,
+    ): EmptyResult<ChatError> = Result.Success(Unit)
+
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) = Unit
 
     override suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError> {
@@ -145,6 +188,79 @@ class FakeChatRepository : ChatRepository {
         lastUnlinked = sessionId to documentId
         return unlinkResult
     }
+
+    override suspend fun getDocumentStorage(): Result<DocumentStorage, ChatError> =
+        Result.Success(DocumentStorage(0, 100, 100))
+
+    override suspend fun listLibraryDocuments(
+        query: String?,
+        cursor: String?,
+        projectId: String?,
+    ): Result<LibraryDocumentPage, ChatError> = Result.Success(LibraryDocumentPage(emptyList(), null))
+
+    override suspend fun linkDocuments(
+        sessionId: String,
+        documentIds: List<String>,
+    ): Result<List<SessionDocument>, ChatError> = sessionDocuments
+
+    override suspend fun uploadDocument(sessionId: String, file: ChatUpload): Result<DocumentIngest, ChatError> {
+        lastUpload = Triple(sessionId, file, false)
+        return uploadDocumentResult
+    }
+
+    override suspend fun getDocumentStatus(
+        sessionId: String,
+        documentId: String,
+    ): Result<DocumentIngest, ChatError> = uploadDocumentResult
+
+    override suspend fun uploadImage(sessionId: String, file: ChatUpload): Result<SessionImage, ChatError> {
+        lastUpload = Triple(sessionId, file, true)
+        return uploadImageResult
+    }
+
+    override suspend fun listSessionImages(sessionId: String): Result<List<SessionImage>, ChatError> =
+        Result.Success(emptyList())
+
+    override suspend fun listPinnedImages(sessionId: String): Result<List<SessionImage>, ChatError> =
+        Result.Success(emptyList())
+
+    override suspend fun pinImage(sessionId: String, imageId: String): EmptyResult<ChatError> = Result.Success(Unit)
+
+    override suspend fun unpinImage(sessionId: String, imageId: String): EmptyResult<ChatError> = Result.Success(Unit)
+
+    override suspend fun loadImageBytes(imageId: String): Result<ByteArray, ChatError> = Result.Success(ByteArray(0))
+
+    override suspend fun loadContextSnippet(sessionId: String): Result<ContextSnippet?, ChatError> =
+        Result.Success(contextSnippet)
+
+    override suspend fun saveContextSnippet(
+        sessionId: String,
+        text: String,
+        sourceRole: String,
+    ): Result<ContextSnippet, ChatError> {
+        val snippet = ContextSnippet("snippet", text, sourceRole)
+        contextSnippet = snippet
+        return Result.Success(snippet)
+    }
+
+    override suspend fun clearContextSnippet(
+        sessionId: String,
+        snippetId: String,
+    ): EmptyResult<ChatError> {
+        contextSnippet = null
+        return Result.Success(Unit)
+    }
+
+    override suspend fun decideApproval(
+        approvalId: String,
+        approved: Boolean,
+    ): EmptyResult<ChatError> = Result.Success(Unit)
+
+    override suspend fun respondClarification(
+        clarificationId: String,
+        answers: Map<String, List<String>>,
+        skipped: List<String>,
+    ): EmptyResult<ChatError> = Result.Success(Unit)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> = recentProjects
 }

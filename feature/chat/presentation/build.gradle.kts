@@ -26,6 +26,8 @@ kotlin {
         implementation(libs.androidx.navigation.compose)
         implementation(libs.kotlinx.coroutines.core)
         implementation(libs.icons.material.symbols.rounded)
+        implementation(libs.filekit.dialogs.compose)
+        implementation(libs.coil.compose)
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)

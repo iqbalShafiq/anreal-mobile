@@ -5,13 +5,21 @@ import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.domain.util.onSuccess
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.ContextSnippet
+import co.ratmo.anreal.feature.chat.domain.ContextUsage
+import co.ratmo.anreal.feature.chat.domain.DocumentIngest
+import co.ratmo.anreal.feature.chat.domain.DocumentStorage
+import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
+import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -26,14 +34,20 @@ class OfflineFirstChatRepository(
 
     override fun observeSessions(): Flow<List<ChatSession>> = local.observeSessions()
 
-    override suspend fun refreshSessions(): Result<SessionPage, ChatError> {
-        return remote.listSessions().onSuccess { page ->
+    override suspend fun refreshSessions(cursor: String?): Result<SessionPage, ChatError> {
+        return remote.listSessions(cursor).onSuccess { page ->
             local.replaceSessions(page.items)
         }
     }
 
-    override suspend fun openDraft(): Result<ChatSession, ChatError> {
-        return remote.openDraft().onSuccess { local.upsertSession(it) }
+    override suspend fun createSession(
+        sessionId: String?,
+        projectId: String?,
+    ): Result<ChatSession, ChatError> = remote.createSession(sessionId, projectId)
+        .onSuccess { local.upsertSession(it) }
+
+    override suspend fun openDraft(projectId: String?): Result<ChatSession, ChatError> {
+        return remote.openDraft(projectId).onSuccess { local.upsertSession(it) }
     }
 
     override suspend fun renameSession(sessionId: String, title: String): Result<ChatSession, ChatError> {
@@ -124,6 +138,24 @@ class OfflineFirstChatRepository(
         return remote.runStatus(sessionId)
     }
 
+    override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = remote.listActiveRuns()
+
+    override suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError> =
+        remote.getSessionMessageCount(sessionId)
+
+    override suspend fun getContextUsage(
+        sessionId: String,
+        model: String?,
+        reasoningEffort: String?,
+    ): Result<ContextUsage, ChatError> = remote.getContextUsage(sessionId, model, reasoningEffort)
+
+    override suspend fun truncateSession(
+        sessionId: String,
+        mode: String,
+        clientMessageId: String?,
+        memoryPosition: Int?,
+    ): EmptyResult<ChatError> = remote.truncateSession(sessionId, mode, clientMessageId, memoryPosition)
+
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) {
         local.saveResume(sessionId, streamId, lastEventId)
     }
@@ -138,6 +170,79 @@ class OfflineFirstChatRepository(
     ): EmptyResult<ChatError> {
         return remote.unlinkSessionDocument(sessionId, documentId)
     }
+
+    override suspend fun getDocumentStorage(): Result<DocumentStorage, ChatError> =
+        remote.getDocumentStorage()
+
+    override suspend fun listLibraryDocuments(
+        query: String?,
+        cursor: String?,
+        projectId: String?,
+    ): Result<LibraryDocumentPage, ChatError> = remote.listLibraryDocuments(query, cursor, projectId)
+
+    override suspend fun linkDocuments(
+        sessionId: String,
+        documentIds: List<String>,
+    ): Result<List<SessionDocument>, ChatError> = remote.linkDocuments(sessionId, documentIds)
+
+    override suspend fun uploadDocument(
+        sessionId: String,
+        file: ChatUpload,
+    ): Result<DocumentIngest, ChatError> {
+        return remote.uploadDocument(sessionId, file)
+    }
+
+    override suspend fun getDocumentStatus(
+        sessionId: String,
+        documentId: String,
+    ): Result<DocumentIngest, ChatError> = remote.getDocumentStatus(sessionId, documentId)
+
+    override suspend fun uploadImage(
+        sessionId: String,
+        file: ChatUpload,
+    ): Result<SessionImage, ChatError> {
+        return remote.uploadImage(sessionId, file)
+    }
+
+    override suspend fun listSessionImages(sessionId: String): Result<List<SessionImage>, ChatError> =
+        remote.listSessionImages(sessionId)
+
+    override suspend fun listPinnedImages(sessionId: String): Result<List<SessionImage>, ChatError> =
+        remote.listPinnedImages(sessionId)
+
+    override suspend fun pinImage(sessionId: String, imageId: String): EmptyResult<ChatError> =
+        remote.pinImage(sessionId, imageId)
+
+    override suspend fun unpinImage(sessionId: String, imageId: String): EmptyResult<ChatError> =
+        remote.unpinImage(sessionId, imageId)
+
+    override suspend fun loadImageBytes(imageId: String): Result<ByteArray, ChatError> =
+        remote.loadImageBytes(imageId)
+
+    override suspend fun loadContextSnippet(sessionId: String): Result<ContextSnippet?, ChatError> =
+        remote.loadContextSnippet(sessionId)
+
+    override suspend fun saveContextSnippet(
+        sessionId: String,
+        text: String,
+        sourceRole: String,
+    ): Result<ContextSnippet, ChatError> = remote.saveContextSnippet(sessionId, text, sourceRole)
+
+    override suspend fun clearContextSnippet(
+        sessionId: String,
+        snippetId: String,
+    ): EmptyResult<ChatError> = remote.clearContextSnippet(sessionId, snippetId)
+
+    override suspend fun decideApproval(
+        approvalId: String,
+        approved: Boolean,
+    ): EmptyResult<ChatError> = remote.decideApproval(approvalId, approved)
+
+    override suspend fun respondClarification(
+        clarificationId: String,
+        answers: Map<String, List<String>>,
+        skipped: List<String>,
+    ): EmptyResult<ChatError> = remote.respondClarification(clarificationId, answers, skipped)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return remote.listRecentProjects()
