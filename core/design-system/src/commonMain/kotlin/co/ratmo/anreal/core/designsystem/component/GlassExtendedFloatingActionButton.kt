@@ -26,7 +26,7 @@ fun GlassExtendedFloatingActionButton(
     GlassSurface(
         modifier = modifier,
         shape = FloatingActionButtonDefaults.extendedFabShape,
-        tone = GlassTone.Thin,
+        tone = GlassTone.Regular,
         error = destructive,
     ) {
         ExtendedFloatingActionButton(

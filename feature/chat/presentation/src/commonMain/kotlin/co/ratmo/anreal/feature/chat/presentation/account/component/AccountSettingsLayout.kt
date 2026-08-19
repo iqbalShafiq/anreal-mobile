@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
@@ -78,8 +77,7 @@ import com.composables.icons.materialsymbols.rounded.Logout
 import com.composables.icons.materialsymbols.rounded.Person
 
 private val SettingsContentMaxWidth = 640.dp
-private val LogoutDockMaxWidth = 480.dp
-private val LogoutDockClearance = 104.dp
+private val LogoutFabClearance = 92.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,6 +92,8 @@ internal fun AccountSettingsLayout(
     onRequestResetProjectProfile: (String, String) -> Unit = { _, _ -> },
     onConfirmResetProfile: () -> Unit = {},
     onDismissResetProfile: () -> Unit = {},
+    onRequestSignOut: () -> Unit = {},
+    onDismissSignOut: () -> Unit = {},
     onThemeModeChange: (AppThemeMode) -> Unit = {},
     onToggleDynamicColor: () -> Unit = {},
     onToggleReduceMotion: () -> Unit = {},
@@ -147,8 +147,10 @@ internal fun AccountSettingsLayout(
                         .fillMaxWidth()
                         .align(Alignment.CenterHorizontally)
                         .padding(
-                            horizontal = AnrealSpacing.screenCompact,
-                            vertical = AnrealSpacing.xs,
+                            start = AnrealSpacing.screenCompact,
+                            end = AnrealSpacing.screenCompact,
+                            top = AnrealSpacing.lg,
+                            bottom = AnrealSpacing.xs,
                         ),
                 )
                 Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -162,7 +164,7 @@ internal fun AccountSettingsLayout(
                             start = AnrealSpacing.screenCompact,
                             top = AnrealSpacing.md,
                             end = AnrealSpacing.screenCompact,
-                            bottom = LogoutDockClearance,
+                            bottom = LogoutFabClearance,
                         ),
                         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
                     ) {
@@ -192,14 +194,12 @@ internal fun AccountSettingsLayout(
                             },
                         ),
                         icon = MaterialSymbols.Rounded.Logout,
-                        onClick = onSignOut,
+                        onClick = onRequestSignOut,
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = LogoutDockMaxWidth)
-                            .navigationBarsPadding()
+                            .align(Alignment.BottomEnd)
                             .padding(
-                                horizontal = AnrealSpacing.screenCompact,
-                                vertical = AnrealSpacing.sm,
+                                end = AnrealSpacing.screenCompact,
+                                bottom = AnrealSpacing.sm,
                             ),
                         loading = state.isSigningOut,
                         destructive = true,
@@ -235,6 +235,23 @@ internal fun AccountSettingsLayout(
             },
             dismissButton = {
                 TextButton(onClick = onDismissResetProfile, enabled = !state.isResettingProfile) {
+                    Text(AnrealCopy.get(AnrealCopy.ACTION_CANCEL))
+                }
+            },
+        )
+    }
+    if (state.showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = onDismissSignOut,
+            title = { Text(AnrealCopy.get(AnrealCopy.DIALOG_SIGN_OUT_TITLE)) },
+            text = { Text(AnrealCopy.get(AnrealCopy.DIALOG_SIGN_OUT_BODY)) },
+            confirmButton = {
+                TextButton(onClick = onSignOut, enabled = !state.isSigningOut) {
+                    Text(AnrealCopy.get(AnrealCopy.ACTION_LOG_OUT))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissSignOut, enabled = !state.isSigningOut) {
                     Text(AnrealCopy.get(AnrealCopy.ACTION_CANCEL))
                 }
             },
@@ -828,6 +845,23 @@ private fun AccountSettingsSigningOutPreview() {
                 name = "shafiq",
                 email = "shafiq@testing.com",
                 isSigningOut = true,
+            ),
+            onBack = {},
+            onSelectSection = {},
+            onSignOut = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AccountSettingsSignOutDialogPreview() {
+    AnrealPreview {
+        AccountSettingsLayout(
+            state = AccountState(
+                name = "shafiq",
+                email = "shafiq@testing.com",
+                showSignOutDialog = true,
             ),
             onBack = {},
             onSelectSection = {},

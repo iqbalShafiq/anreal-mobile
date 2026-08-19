@@ -73,10 +73,30 @@ class AccountViewModelTest {
     }
 
     @Test
-    fun sign_out_emits_once_and_marks_in_flight() = runTest {
+    fun request_sign_out_opens_confirmation_dialog() {
+        val viewModel = createViewModel()
+        viewModel.onAction(AccountAction.OnRequestSignOut)
+        assertThat(viewModel.state.value.showSignOutDialog).isTrue()
+        assertThat(viewModel.state.value.isSigningOut).isFalse()
+    }
+
+    @Test
+    fun dismiss_sign_out_closes_confirmation_dialog() {
+        val viewModel = createViewModel()
+        viewModel.onAction(AccountAction.OnRequestSignOut)
+        viewModel.onAction(AccountAction.OnDismissSignOut)
+        assertThat(viewModel.state.value.showSignOutDialog).isFalse()
+        assertThat(viewModel.state.value.isSigningOut).isFalse()
+    }
+
+    @Test
+    fun confirming_sign_out_closes_dialog_emits_once_and_marks_in_flight() = runTest {
         val viewModel = createViewModel()
         viewModel.events.test {
+            viewModel.onAction(AccountAction.OnRequestSignOut)
+            assertThat(viewModel.state.value.showSignOutDialog).isTrue()
             viewModel.onAction(AccountAction.OnSignOut)
+            assertThat(viewModel.state.value.showSignOutDialog).isFalse()
             assertThat(viewModel.state.value.isSigningOut).isTrue()
             assertThat(awaitItem()).isEqualTo(AccountEvent.SignOut)
             viewModel.onAction(AccountAction.OnSignOut)

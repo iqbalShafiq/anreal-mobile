@@ -64,6 +64,23 @@ class AccountScreensScreenshotTest {
     }
 
     @Test
+    fun accountSignOutDialogLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                AccountScreen(
+                    state = AccountState(
+                        name = "Ada Lovelace",
+                        email = "ada@analytical.engine",
+                        showSignOutDialog = true,
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun usagePopulatedDark() {
         composeTestRule.setContent {
             AnrealPreview(dark = true) {

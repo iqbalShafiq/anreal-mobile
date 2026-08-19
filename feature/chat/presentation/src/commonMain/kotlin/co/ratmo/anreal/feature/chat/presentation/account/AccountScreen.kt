@@ -67,6 +67,8 @@ fun AccountScreen(
         },
         onConfirmResetProfile = { onAction(AccountAction.OnConfirmResetProfile) },
         onDismissResetProfile = { onAction(AccountAction.OnDismissResetProfile) },
+        onRequestSignOut = { onAction(AccountAction.OnRequestSignOut) },
+        onDismissSignOut = { onAction(AccountAction.OnDismissSignOut) },
         onSignOut = { onAction(AccountAction.OnSignOut) },
         onThemeModeChange = { onAction(AccountAction.OnThemeModeChange(it)) },
         onToggleDynamicColor = { onAction(AccountAction.OnToggleDynamicColor) },

@@ -18,6 +18,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -26,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -130,7 +132,11 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     selected = state.section,
                     label = WorkspaceSection::label,
                     onSelect = { onAction(WorkspaceAction.SelectSection(it)) },
-                    modifier = Modifier.padding(horizontal = AnrealSpacing.screenCompact),
+                    modifier = Modifier.padding(
+                        start = AnrealSpacing.screenCompact,
+                        end = AnrealSpacing.screenCompact,
+                        top = AnrealSpacing.lg,
+                    ),
                 )
                 if (state.section != WorkspaceSection.Images) {
                     AnrealTextField(
@@ -280,7 +286,7 @@ private fun WorkspaceCard(
                     body,
                     style = MaterialTheme.typography.bodySmall,
                     color = glassMutedTextColor(),
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (detail.isNotBlank()) Text(
@@ -290,15 +296,32 @@ private fun WorkspaceCard(
                 )
             }
             onEdit?.let { edit ->
-                IconButton(onClick = edit) {
-                    Icon(MaterialSymbols.Rounded.Edit, AnrealCopy.get(AnrealCopy.ACTION_RENAME))
-                }
+                WorkspaceRowAction(
+                    icon = MaterialSymbols.Rounded.Edit,
+                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_RENAME),
+                    onClick = edit,
+                )
             }
             onDelete?.let { delete ->
-                IconButton(onClick = delete) {
-                    Icon(MaterialSymbols.Rounded.Delete, AnrealCopy.get(AnrealCopy.ACTION_DELETE))
-                }
+                WorkspaceRowAction(
+                    icon = MaterialSymbols.Rounded.Delete,
+                    contentDescription = AnrealCopy.get(AnrealCopy.ACTION_DELETE),
+                    onClick = delete,
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceRowAction(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides 0.dp) {
+        IconButton(onClick = onClick, modifier = Modifier.size(32.dp)) {
+            Icon(icon, contentDescription)
         }
     }
 }

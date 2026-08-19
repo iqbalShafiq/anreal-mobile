@@ -39,13 +39,13 @@ fun <T> AnrealSegmentedTabs(
                 .fillMaxWidth()
                 .padding(AnrealSpacing.xxs)
                 .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
         ) {
             items.forEach { item ->
                 val isSelected = item == selected
                 Surface(
                     modifier = Modifier.weight(1f),
-                    shape = MaterialTheme.shapes.large,
+                    shape = if (isSelected) MaterialTheme.shapes.extraLarge else MaterialTheme.shapes.large,
                     color = if (isSelected) glassHighlightColor() else Color.Transparent,
                 ) {
                     Box(

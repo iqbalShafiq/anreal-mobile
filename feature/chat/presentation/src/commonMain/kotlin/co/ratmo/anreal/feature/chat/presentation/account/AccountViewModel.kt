@@ -76,6 +76,7 @@ data class AccountState(
     val email: String = "",
     val section: AccountSection = AccountSection.Account,
     val isSigningOut: Boolean = false,
+    val showSignOutDialog: Boolean = false,
     val isHealthLoading: Boolean = true,
     val isApiHealthy: Boolean? = null,
     val usage: AccountUsageUi? = null,
@@ -104,6 +105,8 @@ sealed interface AccountAction {
     data object OnConfirmResetProfile : AccountAction
     data object OnDismissResetProfile : AccountAction
     data object OnBack : AccountAction
+    data object OnRequestSignOut : AccountAction
+    data object OnDismissSignOut : AccountAction
     data object OnSignOut : AccountAction
     data class OnThemeModeChange(val mode: AppThemeMode) : AccountAction
     data object OnToggleDynamicColor : AccountAction
@@ -182,9 +185,17 @@ class AccountViewModel(
             AccountAction.OnBack -> viewModelScope.launch {
                 _events.send(AccountEvent.NavigateBack)
             }
+            AccountAction.OnRequestSignOut -> {
+                if (!_state.value.isSigningOut) {
+                    _state.update { it.copy(showSignOutDialog = true) }
+                }
+            }
+            AccountAction.OnDismissSignOut -> if (!_state.value.isSigningOut) {
+                _state.update { it.copy(showSignOutDialog = false) }
+            }
             AccountAction.OnSignOut -> {
                 if (_state.value.isSigningOut) return
-                _state.update { it.copy(isSigningOut = true) }
+                _state.update { it.copy(showSignOutDialog = false, isSigningOut = true) }
                 viewModelScope.launch { _events.send(AccountEvent.SignOut) }
             }
             is AccountAction.OnThemeModeChange -> viewModelScope.launch {
