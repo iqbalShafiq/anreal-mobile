@@ -128,6 +128,30 @@ class ChatStreamParserTest {
     }
 
     @Test
+    fun parses_tool_update_input_and_output() {
+        val envelope = parseStreamLine(
+            """{"type":"stream_event","streamId":"s1","eventId":8,"event":{"type":"tool_update","messageId":"m1","part":{"id":"t1","type":"tool","toolName":"web_search","toolCallId":"c1","state":"output-available","input":{"query":"kotlin"},"output":{"results":[]}}}}""",
+        )
+        assertThat(envelope).isEqualTo(
+            StreamEnvelope.Event(
+                streamId = "s1",
+                eventId = 8,
+                event = ChatStreamEvent.ToolUpdate(
+                    messageId = "m1",
+                    part = ChatPart.Tool(
+                        id = "t1",
+                        toolName = "web_search",
+                        toolCallId = "c1",
+                        state = "output-available",
+                        input = """{"query":"kotlin"}""",
+                        output = """{"results":[]}""",
+                    ),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun parses_queued_message_applied() {
         val envelope = parseStreamLine(
             """{"type":"stream_event","streamId":"s1","eventId":6,"event":{"type":"queued_message_applied","clientMessageId":"q1","text":"Follow up"}}""",

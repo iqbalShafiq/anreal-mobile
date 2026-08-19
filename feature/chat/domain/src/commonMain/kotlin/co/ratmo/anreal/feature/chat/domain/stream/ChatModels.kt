@@ -35,7 +35,9 @@ sealed interface ChatPart {
         val toolName: String,
         val toolCallId: String,
         val state: String,
+        val input: String? = null,
         val output: String? = null,
+        val errorMessage: String? = null,
     ) : ChatPart
 }
 

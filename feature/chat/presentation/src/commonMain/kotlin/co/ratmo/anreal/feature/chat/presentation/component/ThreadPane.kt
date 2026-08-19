@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -39,7 +41,6 @@ import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Auto_awesome
 import com.composables.icons.materialsymbols.rounded.Arrow_downward
 import com.composables.icons.materialsymbols.rounded.Expand_more
-import com.composables.icons.materialsymbols.rounded.Expand_less
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
 import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
@@ -51,6 +52,7 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 import co.ratmo.anreal.core.presentation.AnrealCopy
+import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
@@ -68,6 +70,9 @@ import co.ratmo.anreal.feature.chat.presentation.preview.previewEmptyPartsMessag
 import co.ratmo.anreal.feature.chat.presentation.preview.previewReasoningAssistant
 import co.ratmo.anreal.feature.chat.presentation.preview.previewUserMessage
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 @Composable
 internal fun ThreadPane(
@@ -179,12 +184,21 @@ private fun StreamingThreadList(
             ),
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
         ) {
+            val lastMessageId = state.thread.messages.lastOrNull()?.id
+            val showThinking = waitingForFirstAssistantToken(state)
             items(state.thread.messages, key = { it.id }) { message ->
                 MessageBubble(
                     message = message,
                     busy = state.isSending || state.thread.status == RunStatus.Streaming,
                     onAction = onAction,
                 )
+                if (showThinking && message.id == lastMessageId) {
+                    Text(
+                        text = AnrealCopy.get(AnrealCopy.STATUS_THINKING),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             item(key = "anreal-thread-end") {
                 Spacer(modifier = Modifier.height(1.dp))
@@ -229,6 +243,19 @@ private fun StreamingThreadList(
     }
 }
 
+private fun waitingForFirstAssistantToken(state: ChatState): Boolean {
+    if (!(state.isSending || state.thread.status == RunStatus.Streaming)) return false
+    val last = state.thread.messages.lastOrNull() ?: return true
+    if (last.role == ChatRole.User) return true
+    return last.role == ChatRole.Assistant && last.parts.none { part ->
+        when (part) {
+            is ChatPart.Text -> part.text.isNotBlank()
+            is ChatPart.Reasoning -> true
+            is ChatPart.Tool -> true
+        }
+    }
+}
+
 @Composable
 private fun MessageBubble(
     message: ChatMessage,
@@ -241,11 +268,19 @@ private fun MessageBubble(
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
     ) {
-        message.parts.forEach { part ->
+        message.parts.forEachIndexed { index, part ->
             key(part.id) {
                 when (part) {
-                    is ChatPart.Reasoning -> if (part.text.isNotBlank()) {
-                        ReasoningBlock(text = part.text)
+                    is ChatPart.Reasoning -> {
+                        val hasFollowUp = message.parts.drop(index + 1).any { later ->
+                            later is ChatPart.Tool ||
+                                (later is ChatPart.Text && later.text.isNotBlank()) ||
+                                (later is ChatPart.Reasoning && later.text.isNotBlank())
+                        }
+                        val isLive = busy && !message.isComplete && !hasFollowUp
+                        if (isLive || part.text.isNotBlank()) {
+                            ReasoningBlock(text = part.text, isLive = isLive)
+                        }
                     }
                     is ChatPart.Tool -> ToolActivityCard(part)
                     is ChatPart.Text -> if (part.text.isNotBlank()) {
@@ -290,39 +325,90 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun ReasoningBlock(text: String) {
-    var expanded by remember { mutableStateOf(false) }
+private fun ReasoningBlock(
+    text: String,
+    isLive: Boolean,
+) {
+    var expanded by remember { mutableStateOf(isLive) }
+    var userToggled by remember { mutableStateOf(false) }
+    var startedAt by remember { mutableStateOf<TimeMark?>(null) }
+    var elapsedLabel by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(isLive) {
+        if (isLive) {
+            if (startedAt == null) startedAt = TimeSource.Monotonic.markNow()
+            elapsedLabel = null
+            if (!userToggled) expanded = true
+        } else if (startedAt != null && elapsedLabel == null) {
+            elapsedLabel = formatThoughtDuration(startedAt!!.elapsedNow())
+            if (!userToggled) expanded = false
+        }
+    }
+
+    val label = when {
+        isLive -> AnrealCopy.get(AnrealCopy.LABEL_THINKING_LIVE)
+        elapsedLabel != null -> UiText.StringResource(
+            AnrealCopy.LABEL_THOUGHT_FOR,
+            listOf(elapsedLabel.orEmpty()),
+        ).asString()
+        else -> AnrealCopy.get(AnrealCopy.LABEL_THOUGHT)
+    }
+    val summary = text.trim()
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .clickable { expanded = !expanded }
-                .padding(vertical = AnrealSpacing.xxs),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
-        ) {
-            Icon(
-                imageVector = if (expanded) {
-                    MaterialSymbols.Rounded.Expand_less
-                } else {
-                    MaterialSymbols.Rounded.Expand_more
-                },
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = AnrealCopy.get(AnrealCopy.LABEL_THOUGHT),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        ActivityToggleRow(
+            expanded = expanded,
+            running = isLive,
+            label = label,
+            status = null,
+            labelColor = if (isLive) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+            statusColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            contentDescription = AnrealCopy.get(AnrealCopy.CD_TOGGLE_REASONING),
+            onClick = {
+                userToggled = true
+                expanded = !expanded
+            },
+        )
         if (expanded) {
-            Text(
-                text = text,
-                modifier = Modifier.padding(start = AnrealSpacing.lg, bottom = AnrealSpacing.xs),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val lineColor = MaterialTheme.colorScheme.outlineVariant
+            Box(
+                modifier = Modifier
+                    .padding(start = AnrealSpacing.lg, top = AnrealSpacing.xxs, bottom = AnrealSpacing.xs)
+                    .drawBehind {
+                        drawLine(
+                            color = lineColor,
+                            start = Offset(0f, 0f),
+                            end = Offset(0f, size.height),
+                            strokeWidth = 1.dp.toPx(),
+                        )
+                    }
+                    .padding(start = AnrealSpacing.sm),
+            ) {
+                if (summary.isNotEmpty()) {
+                    AnrealMarkdown(content = summary, compact = true)
+                } else {
+                    Text(
+                        text = AnrealCopy.get(
+                            if (isLive) AnrealCopy.LABEL_WAITING_SUMMARY else AnrealCopy.LABEL_NO_SUMMARY,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
+    }
+}
+
+internal fun formatThoughtDuration(elapsed: Duration): String {
+    val millis = elapsed.inWholeMilliseconds.coerceAtLeast(0)
+    return when {
+        millis < 1_000L -> "${(millis / 100L).coerceAtLeast(1) / 10.0}s"
+        millis < 10_000L -> "${((millis / 100L) / 10.0)}s"
+        else -> "${(millis / 1_000L)}s"
     }
 }
 
@@ -395,6 +481,25 @@ private fun MessageBubbleAssistantPreview() {
     AnrealPreview {
         Column(modifier = Modifier.padding(AnrealSpacing.md)) {
             MessageBubble(previewAssistantMessage, busy = false, onAction = {})
+        }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun MessageBubbleReasoningLivePreview() {
+    AnrealPreview {
+        Column(modifier = Modifier.padding(AnrealSpacing.md)) {
+            MessageBubble(
+                message = ChatMessage(
+                    id = "live",
+                    role = ChatRole.Assistant,
+                    parts = listOf(ChatPart.Reasoning(id = "r", text = "Checking sources…")),
+                    isComplete = false,
+                ),
+                busy = true,
+                onAction = {},
+            )
         }
     }
 }

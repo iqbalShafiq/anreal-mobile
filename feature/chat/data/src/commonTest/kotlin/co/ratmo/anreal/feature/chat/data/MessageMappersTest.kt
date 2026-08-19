@@ -1,11 +1,14 @@
 package co.ratmo.anreal.feature.chat.data
 
 import assertk.assertThat
+import assertk.assertions.containsExactly
 import assertk.assertions.isEqualTo
 import co.ratmo.anreal.core.database.MessageEntity
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 
 class MessageMappersTest {
@@ -55,13 +58,58 @@ class MessageMappersTest {
 
     @Test
     fun history_dto_maps_text_only() {
-        val dto = HistoryMessageDto(
+        val dto = historyMessageDto(
             role = "user",
-            content = listOf(HistoryContentDto(type = "text", text = "Hi")),
+            parts = listOf(HistoryContentDto(type = "text", text = "Hi")),
         )
-        assertThat(dto.toMessage(0).parts).isEqualTo(
-            listOf(ChatPart.Text(id = "history-0-0", text = "Hi")),
+        assertThat(dto.toMessage(0).parts).containsExactly(
+            ChatPart.Text(id = "history-0-0", text = "Hi"),
         )
+    }
+
+    @Test
+    fun history_dto_maps_system_string_content() {
+        val dto = HistoryMessageDto(
+            role = "system",
+            content = JsonPrimitive("Earlier turns were summarized."),
+            metadata = HistoryMetadataDto(),
+        )
+        val message = dto.toMessage(1)
+        assertThat(message.role).isEqualTo(ChatRole.System)
+        assertThat(message.parts).containsExactly(
+            ChatPart.Text(id = "history-1-0", text = "Earlier turns were summarized."),
+        )
+    }
+
+    @Test
+    fun history_merges_tool_results_into_assistant_tool_call() {
+        val assistant = historyMessageDto(
+            role = "assistant",
+            parts = listOf(
+                HistoryContentDto(type = "text", text = "Let me look that up."),
+            ),
+        ).toMessage(0).copy(
+            parts = listOf(
+                ChatPart.Tool(
+                    id = "call-1",
+                    toolName = "web_search",
+                    toolCallId = "call-1",
+                    state = "input-available",
+                    input = """{"query":"kotlin"}""",
+                ),
+            ),
+        )
+        val tool = HistoryMessageDto(
+            role = "tool",
+            content = Json.parseToJsonElement(
+                """[{"type":"tool_result","id":"call-1","toolName":"web_search","content":[{"type":"text","text":"ok"}]}]""",
+            ),
+        ).toMessage(1)
+        val merged = listOf(assistant, tool).mergeToolResultMessages()
+        assertThat(merged.size).isEqualTo(1)
+        val part = merged.single().parts.single() as ChatPart.Tool
+        assertThat(part.state).isEqualTo("output-available")
+        assertThat(part.output != null).isEqualTo(true)
     }
 
     @Test
@@ -79,9 +127,9 @@ class MessageMappersTest {
 
     @Test
     fun history_dto_maps_tool_content() {
-        val dto = HistoryMessageDto(
+        val dto = historyMessageDto(
             role = "assistant",
-            content = listOf(
+            parts = listOf(
                 HistoryContentDto(
                     type = "tool",
                     id = "t1",
@@ -92,16 +140,14 @@ class MessageMappersTest {
                 HistoryContentDto(type = "text", id = "p1", text = "Done."),
             ),
         )
-        assertThat(dto.toMessage(2).parts).isEqualTo(
-            listOf(
-                ChatPart.Tool(
-                    id = "t1",
-                    toolName = "web_search",
-                    toolCallId = "c1",
-                    state = "output-available",
-                ),
-                ChatPart.Text(id = "p1", text = "Done."),
+        assertThat(dto.toMessage(2).parts).containsExactly(
+            ChatPart.Tool(
+                id = "t1",
+                toolName = "web_search",
+                toolCallId = "c1",
+                state = "output-available",
             ),
+            ChatPart.Text(id = "p1", text = "Done."),
         )
     }
 }

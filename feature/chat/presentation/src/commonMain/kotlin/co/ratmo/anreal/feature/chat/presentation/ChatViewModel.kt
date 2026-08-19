@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 
 private const val MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
@@ -417,13 +418,11 @@ class ChatViewModel(
             is Result.Success -> active.data.firstOrNull { it.status == "running" }?.sessionId
             is Result.Error -> null
         }
-        val page = refreshSessions()
-        val selected = _state.value.selectedSessionId
-            ?: activeSessionId
-            ?: page?.items?.firstOrNull()?.id
-            ?: _state.value.sessions.firstOrNull()?.id
-        if (selected != null) {
-            selectSession(selected)
+        refreshSessions()
+        // A fresh launch always starts on a New chat draft. Rejoin a live run
+        // so a process death mid-stream does not drop the in-flight answer.
+        if (activeSessionId != null) {
+            selectSession(activeSessionId)
         } else {
             openDraft(savedStateHandle[PROJECT_KEY])
         }
@@ -689,13 +688,18 @@ class ChatViewModel(
             .onSuccess { messages ->
                 if (_state.value.selectedSessionId != sessionId) return@onSuccess
                 _state.update { current ->
-                    current.copy(
-                        historyLoading = false,
-                        thread = current.thread.copy(
-                            messages = messages.ifEmpty { current.thread.messages },
-                            status = RunStatus.Idle,
-                        ),
-                    )
+                    // A late snapshot must not overwrite tokens from a live run.
+                    if (isStreaming(current)) {
+                        current.copy(historyLoading = false, historyError = null)
+                    } else {
+                        current.copy(
+                            historyLoading = false,
+                            thread = current.thread.copy(
+                                messages = messages.ifEmpty { current.thread.messages },
+                                status = RunStatus.Idle,
+                            ),
+                        )
+                    }
                 }
             }
             .onFailure { error ->
@@ -844,6 +848,7 @@ class ChatViewModel(
                 ),
             )
         }
+        chatRepository.cacheHistory(sessionId, _state.value.thread.messages)
         val result = chatRepository.sendMessage(
             sessionId = sessionId,
             text = text,
@@ -863,10 +868,9 @@ class ChatViewModel(
         }
         result.onFailure { error -> handleSendError(error) }
         if (result is Result.Success) {
-            // The stream reducer owns live updates. Reloading once after the
-            // terminal event also reconciles any event missed during a brief
-            // transport interruption, so the completed answer is never held
-            // until the session is reopened.
+            // Persist the reducer-owned thread first so a failed or stale
+            // history snapshot cannot fall back to the pre-send cache.
+            chatRepository.cacheHistory(sessionId, _state.value.thread.messages)
             loadHistory(sessionId)
             loadContextUsage(sessionId)
             loadSessionImages(sessionId)
@@ -1046,10 +1050,15 @@ class ChatViewModel(
                 current
             }
         }
+        // Buffered transports may deliver every JSONL record in one burst.
+        // Yield so Compose can paint each reduced frame instead of jumping
+        // straight to the terminal answer.
+        yield()
         if (_state.value.selectedSessionId != sessionId) return
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)
         if (envelope is StreamEnvelope.End) {
+            chatRepository.cacheHistory(sessionId, thread.messages)
             loadSessionImages(sessionId)
             loadContextUsage(sessionId)
         }

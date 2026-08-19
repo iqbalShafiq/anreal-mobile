@@ -8,6 +8,8 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
+import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
+import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -46,6 +48,30 @@ class KtorChatRemoteDataSourceTest {
                 assertThat(result.data.items.single().unread).isEqualTo(true)
             }
             is Result.Error -> error("expected success")
+        }
+    }
+
+    @Test
+    fun loadHistory_accepts_mixed_anvia_content_shapes() = runTest {
+        val source = source(
+            path = "/api/chat",
+            body = """
+                [
+                  {"role":"user","content":[{"type":"text","text":"Hi"}],"metadata":{"clientMessageId":"c1"}},
+                  {"role":"system","content":"Earlier turns were summarized.","metadata":{"kind":"summary"}},
+                  {"role":"assistant","content":[{"type":"text","text":"Hello there"}]}
+                ]
+            """.trimIndent(),
+        )
+
+        when (val result = source.loadHistory("s1")) {
+            is Result.Success -> {
+                assertThat(result.data.size).isEqualTo(3)
+                assertThat((result.data[0].parts.single() as ChatPart.Text).text).isEqualTo("Hi")
+                assertThat(result.data[1].role).isEqualTo(ChatRole.System)
+                assertThat((result.data[2].parts.single() as ChatPart.Text).text).isEqualTo("Hello there")
+            }
+            is Result.Error -> error("expected success, got ${result.error}")
         }
     }
 

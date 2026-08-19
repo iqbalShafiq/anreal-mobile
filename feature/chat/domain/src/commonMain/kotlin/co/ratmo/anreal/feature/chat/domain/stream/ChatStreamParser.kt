@@ -2,6 +2,7 @@ package co.ratmo.anreal.feature.chat.domain.stream
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.booleanOrNull
@@ -95,7 +96,9 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
                         toolName = toolName,
                         toolCallId = toolCallId,
                         state = state,
-                        output = part["output"]?.toString(),
+                        input = part.jsonValue("input"),
+                        output = part.jsonValue("output"),
+                        errorMessage = part.errorMessage(),
                     ),
                 )
             }
@@ -195,7 +198,9 @@ private fun parseParts(message: JsonObject): List<ChatPart> {
                 toolName = part.string("toolName").orEmpty(),
                 toolCallId = part.string("toolCallId").orEmpty(),
                 state = part.string("state") ?: "input-streaming",
-                output = part["output"]?.toString(),
+                input = part.jsonValue("input"),
+                output = part.jsonValue("output"),
+                errorMessage = part.errorMessage(),
             )
             else -> null
         }
@@ -226,4 +231,17 @@ private fun JsonObject.string(key: String): String? {
 
 private fun JsonObject.int(key: String): Int? {
     return this[key]?.jsonPrimitive?.intOrNull
+}
+
+private fun JsonObject.jsonValue(key: String): String? {
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    val primitive = runCatching { value.jsonPrimitive }.getOrNull()
+    return primitive?.content ?: value.toString()
+}
+
+private fun JsonObject.errorMessage(): String? {
+    val error = this["error"] ?: return null
+    if (error is JsonObject) return error.string("message")
+    return runCatching { error.jsonPrimitive.content }.getOrNull()
 }

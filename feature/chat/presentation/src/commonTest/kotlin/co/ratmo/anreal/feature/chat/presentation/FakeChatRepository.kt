@@ -58,6 +58,8 @@ class FakeChatRepository : ChatRepository {
     )
     var runStatusCalls: Int = 0
     var resumeCalls: Int = 0
+    var activeRuns: Result<List<ActiveRun>, ChatError> = Result.Success(emptyList())
+    var cachedSessions: MutableMap<String, List<ChatMessage>> = mutableMapOf()
     var sessionDocuments: Result<List<SessionDocument>, ChatError> = Result.Success(emptyList())
     var recentProjects: Result<List<RecentProject>, ChatError> = Result.Success(emptyList())
     var lastUnlinked: Pair<String, String>? = null
@@ -113,6 +115,11 @@ class FakeChatRepository : ChatRepository {
     override suspend fun markRead(sessionId: String): EmptyResult<ChatError> = Result.Success(Unit)
 
     override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> = cachedHistory
+
+    override suspend fun cacheHistory(sessionId: String, messages: List<ChatMessage>) {
+        cachedSessions[sessionId] = messages
+        cachedHistory = messages
+    }
 
     override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
         if (holdHistory) {
@@ -178,7 +185,7 @@ class FakeChatRepository : ChatRepository {
         return runStatus
     }
 
-    override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = Result.Success(emptyList())
+    override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = activeRuns
 
     override suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError> =
         Result.Success((history as? Result.Success)?.data?.size ?: 0)

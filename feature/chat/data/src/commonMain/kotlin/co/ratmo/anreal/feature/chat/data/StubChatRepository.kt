@@ -106,6 +106,10 @@ class StubChatRepository : ChatRepository {
         return histories[sessionId].orEmpty()
     }
 
+    override suspend fun cacheHistory(sessionId: String, messages: List<ChatMessage>) {
+        histories[sessionId] = messages
+    }
+
     override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
         return Result.Success(histories[sessionId].orEmpty())
     }

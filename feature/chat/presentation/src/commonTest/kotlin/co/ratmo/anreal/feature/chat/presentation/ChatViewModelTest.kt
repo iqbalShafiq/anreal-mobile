@@ -15,6 +15,7 @@ import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
+import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
@@ -53,7 +54,7 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun bootstrap_opens_existing_session() = runTest {
+    fun bootstrap_opens_draft_even_when_sessions_exist() = runTest {
         val fake = FakeChatRepository().apply {
             refreshResult = Result.Success(
                 SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
@@ -62,8 +63,27 @@ class ChatViewModelTest {
         val viewModel = ChatViewModel(SavedStateHandle(), fake)
         advanceUntilIdle()
 
-        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("s1")
+        assertThat(fake.openedProjectIds).isEqualTo(listOf(null))
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("draft")
         assertThat(viewModel.state.value.sessionsLoading).isFalse()
+    }
+
+    @Test
+    fun bootstrap_rejoins_an_active_run_instead_of_opening_draft() = runTest {
+        val fake = populatedRepo().apply {
+            activeRuns = Result.Success(
+                listOf(ActiveRun("s1", "stream-1", "running", lastEventId = 2)),
+            )
+            runStatus = Result.Success(
+                RunStatusSnapshot(streamId = "stream-1", status = "running", lastEventId = 2),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("s1")
+        assertThat(fake.openedProjectIds).isEqualTo(emptyList())
+        assertThat(fake.resumeCalls).isEqualTo(1)
     }
 
     @Test
@@ -124,6 +144,44 @@ class ChatViewModelTest {
         fake.allowSendToFinish.complete(Unit)
         advanceUntilIdle()
         assertThat(viewModel.state.value.thread.messages.any { it.role == ChatRole.Assistant }).isTrue()
+    }
+
+    @Test
+    fun late_history_snapshot_does_not_replace_a_live_stream() = runTest {
+        val stale = ChatMessage(
+            id = "stale-user",
+            role = ChatRole.User,
+            parts = listOf(ChatPart.Text("stale-text", "old prompt")),
+            isComplete = true,
+        )
+        val fake = populatedRepo().apply {
+            holdHistory = true
+            history = Result.Success(listOf(stale))
+            holdSend = true
+            streamLines = listOf(
+                """{"type":"stream_start","streamId":"stream-1","eventId":0}""",
+                """{"type":"stream_event","streamId":"stream-1","eventId":1,"event":{"type":"text_delta","messageId":"assistant-1","partId":"text-1","delta":"Hello"}}""",
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        fake.historyStarted.await()
+
+        viewModel.onAction(ChatAction.OnDraftChange("Hi"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+
+        fake.allowHistoryToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        val streamedText = viewModel.state.value.thread.messages
+            .last { it.role == ChatRole.Assistant }
+            .parts.filterIsInstance<ChatPart.Text>()
+            .joinToString("") { it.text }
+        assertThat(streamedText).isEqualTo("Hello")
+        assertThat(viewModel.state.value.isSending).isTrue()
+
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
     }
 
     @Test

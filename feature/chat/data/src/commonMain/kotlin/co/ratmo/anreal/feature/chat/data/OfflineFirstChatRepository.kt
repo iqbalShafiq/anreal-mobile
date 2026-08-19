@@ -66,6 +66,10 @@ class OfflineFirstChatRepository(
         return local.loadMessages(sessionId)
     }
 
+    override suspend fun cacheHistory(sessionId: String, messages: List<ChatMessage>) {
+        local.replaceMessages(sessionId, messages)
+    }
+
     override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
         return when (val remoteResult = remote.loadHistory(sessionId)) {
             is Result.Success -> {

@@ -19,7 +19,15 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class SessionListPageDto(
@@ -134,7 +142,10 @@ data class HistoryMetadataDto(
 @Serializable
 data class HistoryMessageDto(
     val role: String,
-    val content: List<HistoryContentDto> = emptyList(),
+    // Anvia core messages are a union: system.content is a string, while
+    // user/assistant/tool content is an array of parts. Decode as JSON so a
+    // single system/summary row cannot fail the whole history snapshot.
+    val content: JsonElement? = null,
     val metadata: HistoryMetadataDto? = null,
 )
 
@@ -195,21 +206,6 @@ fun SessionMutationDto.toSession(): ChatSession = ChatSession(
 )
 
 fun HistoryMessageDto.toMessage(index: Int): ChatMessage {
-    val parts = content.mapIndexedNotNull { partIndex, dto ->
-        val id = dto.id ?: "history-$index-$partIndex"
-        when (dto.type) {
-            "text" -> ChatPart.Text(id = id, text = dto.text.orEmpty())
-            "reasoning" -> ChatPart.Reasoning(id = id, text = dto.text.orEmpty())
-            "tool" -> ChatPart.Tool(
-                id = id,
-                toolName = dto.toolName.orEmpty(),
-                toolCallId = dto.toolCallId.orEmpty(),
-                state = dto.state ?: "input-streaming",
-                output = dto.output?.toString(),
-            )
-            else -> null
-        }
-    }
     return ChatMessage(
         id = "history-$index",
         role = when (role) {
@@ -218,7 +214,7 @@ fun HistoryMessageDto.toMessage(index: Int): ChatMessage {
             "tool" -> ChatRole.Tool
             else -> ChatRole.Assistant
         },
-        parts = parts,
+        parts = parseHistoryContent(content, index),
         isComplete = true,
         clientMessageId = metadata?.clientMessageId,
         memoryPosition = metadata?.memoryPosition,
@@ -234,9 +230,121 @@ fun ChatMessage.toHistoryDto(clientMessageId: String? = null): HistoryMessageDto
             ChatRole.Tool -> "tool"
             ChatRole.Assistant -> "assistant"
         },
-        content = listOf(HistoryContentDto(type = "text", text = text)),
+        content = historyJson.encodeToJsonElement(listOf(HistoryContentDto(type = "text", text = text))),
         metadata = clientMessageId?.let { HistoryMetadataDto(clientMessageId = it) },
     )
+}
+
+internal fun historyMessageDto(
+    role: String,
+    parts: List<HistoryContentDto>,
+    metadata: HistoryMetadataDto? = null,
+): HistoryMessageDto = HistoryMessageDto(
+    role = role,
+    content = historyJson.encodeToJsonElement(parts),
+    metadata = metadata,
+)
+
+private val historyJson = Json {
+    ignoreUnknownKeys = true
+}
+
+private fun parseHistoryContent(content: JsonElement?, index: Int): List<ChatPart> {
+    return when (content) {
+        null -> emptyList()
+        is JsonPrimitive -> listOf(
+            ChatPart.Text(id = "history-$index-0", text = content.contentOrNull.orEmpty()),
+        )
+        is JsonArray -> content.mapIndexedNotNull { partIndex, element ->
+            parseHistoryPart(element, fallbackId = "history-$index-$partIndex")
+        }
+        is JsonObject -> listOfNotNull(parseHistoryPart(content, fallbackId = "history-$index-0"))
+    }
+}
+
+private fun parseHistoryPart(element: JsonElement, fallbackId: String): ChatPart? {
+    val part = element as? JsonObject ?: return null
+    val id = part.string("id") ?: fallbackId
+    return when (part.string("type")) {
+        "text" -> ChatPart.Text(id = id, text = part.string("text").orEmpty())
+        "reasoning" -> ChatPart.Reasoning(id = id, text = part.string("text").orEmpty())
+        "tool" -> ChatPart.Tool(
+            id = id,
+            toolName = part.string("toolName").orEmpty(),
+            toolCallId = part.string("toolCallId") ?: part.string("callId").orEmpty(),
+            state = part.string("state") ?: "input-streaming",
+            input = part.jsonOrNull("input")?.jsonText(),
+            output = part.jsonOrNull("output")?.jsonText(),
+            errorMessage = part.errorMessage(),
+        )
+        "tool_call" -> {
+            val function = part["function"] as? JsonObject
+            ChatPart.Tool(
+                id = id,
+                toolName = function?.string("name").orEmpty(),
+                toolCallId = part.string("callId") ?: part.string("id").orEmpty(),
+                state = "input-available",
+                input = function?.jsonOrNull("arguments")?.jsonText(),
+            )
+        }
+        "tool_result" -> ChatPart.Tool(
+            id = id,
+            toolName = part.string("toolName").orEmpty(),
+            toolCallId = part.string("callId") ?: part.string("id").orEmpty(),
+            state = "output-available",
+            output = part.jsonOrNull("content")?.jsonText() ?: part.jsonOrNull("output")?.jsonText(),
+        )
+        else -> null
+    }
+}
+
+private fun JsonObject.string(key: String): String? {
+    return this[key]?.jsonPrimitive?.contentOrNull
+}
+
+private fun JsonObject.jsonOrNull(key: String): JsonElement? {
+    val value = this[key] ?: return null
+    return value.takeUnless { it is JsonNull }
+}
+
+private fun JsonObject.errorMessage(): String? {
+    val error = jsonOrNull("error") ?: return null
+    val obj = error as? JsonObject
+    return obj?.string("message") ?: error.jsonText()
+}
+
+private fun JsonElement.jsonText(): String {
+    val primitive = this as? JsonPrimitive
+    return primitive?.contentOrNull ?: toString()
+}
+
+internal fun List<ChatMessage>.mergeToolResultMessages(): List<ChatMessage> {
+    val merged = mutableListOf<ChatMessage>()
+    for (message in this) {
+        if (message.role != ChatRole.Tool) {
+            merged += message
+            continue
+        }
+        val results = message.parts.filterIsInstance<ChatPart.Tool>()
+        if (results.isEmpty()) continue
+        val assistantIndex = merged.indexOfLast { it.role == ChatRole.Assistant }
+        if (assistantIndex < 0) continue
+        val assistant = merged[assistantIndex]
+        merged[assistantIndex] = assistant.copy(
+            parts = assistant.parts.map { part ->
+                val tool = part as? ChatPart.Tool ?: return@map part
+                val result = results.firstOrNull { candidate ->
+                    candidate.toolCallId == tool.toolCallId || candidate.id == tool.toolCallId
+                } ?: return@map part
+                tool.copy(
+                    state = "output-available",
+                    output = result.output ?: tool.output,
+                    errorMessage = result.errorMessage ?: tool.errorMessage,
+                )
+            },
+        )
+    }
+    return merged
 }
 
 fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(

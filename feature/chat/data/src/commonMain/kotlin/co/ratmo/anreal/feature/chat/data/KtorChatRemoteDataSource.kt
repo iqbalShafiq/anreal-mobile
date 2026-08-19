@@ -88,8 +88,9 @@ class KtorChatRemoteDataSource(
         return httpClient.get<List<HistoryMessageDto>>(
             route = "/api/chat",
             queryParameters = mapOf("sessionId" to sessionId),
-        ).map { messages -> messages.mapIndexed { index, dto -> dto.toMessage(index) } }
-            .mapNetwork()
+        ).map { messages ->
+            messages.mapIndexed { index, dto -> dto.toMessage(index) }.mergeToolResultMessages()
+        }.mapNetwork()
     }
 
     suspend fun send(

@@ -13,20 +13,30 @@ import com.mikepenz.markdown.m3.markdownTypography
 fun AnrealMarkdown(
     content: String,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
+    val textStyle = if (compact) {
+        MaterialTheme.typography.bodySmall
+    } else {
+        MaterialTheme.typography.bodyLarge
+    }
     Markdown(
         content = content,
         modifier = modifier,
         colors = markdownColor(
-            text = MaterialTheme.colorScheme.onSurface,
+            text = if (compact) {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
         ),
         typography = markdownTypography(
-            h1 = MaterialTheme.typography.headlineSmall,
-            h2 = MaterialTheme.typography.titleLarge,
-            h3 = MaterialTheme.typography.titleMedium,
-            text = MaterialTheme.typography.bodyLarge,
-            paragraph = MaterialTheme.typography.bodyLarge,
-            code = MaterialTheme.typography.bodyMedium,
+            h1 = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.headlineSmall,
+            h2 = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleLarge,
+            h3 = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleMedium,
+            text = textStyle,
+            paragraph = textStyle,
+            code = MaterialTheme.typography.bodySmall,
         ),
     )
 }
