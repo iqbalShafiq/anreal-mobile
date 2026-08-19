@@ -2,7 +2,6 @@ package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,6 +46,8 @@ import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
 import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
 import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.glassDrawerBorderColor
+import co.ratmo.anreal.core.designsystem.component.glassDrawerFallbackColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -172,6 +173,41 @@ private fun StreamingThreadList(
         }
     }
 
+    var followedSendMessageId by remember { mutableStateOf<String?>(null) }
+    val lastMessage = state.thread.messages.lastOrNull()
+    LaunchedEffect(lastMessage?.id, state.isSending) {
+        // A new user message is the optimistic send bubble: snap to the bottom
+        // and follow the stream even if the user had scrolled up to read.
+        val message = state.thread.messages.lastOrNull() ?: return@LaunchedEffect
+        if (message.role != ChatRole.User || message.id == followedSendMessageId) {
+            return@LaunchedEffect
+        }
+        followedSendMessageId = message.id
+        withFrameNanos { }
+        val viewportHeight = listState.layoutInfo.run {
+            (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+        }
+        listState.scrollToItem(state.thread.messages.size, viewportHeight)
+        initialScrollSettled = true
+        followStreaming = true
+    }
+    val streamingActive = state.isSending || state.thread.status == RunStatus.Streaming
+    LaunchedEffect(streamingActive, lastMessage?.isComplete, state.thread.messages.size) {
+        // When a run settles, markdown reflow and the composer/IME settle can
+        // leave the thread a frame or two short of the end. Clamp to the true
+        // bottom once the stream is no longer active.
+        if (streamingActive) return@LaunchedEffect
+        if (!initialScrollSettled || !followStreaming || isDragged) return@LaunchedEffect
+        withFrameNanos { }
+        withFrameNanos { }
+        if (followStreaming && !isDragged) {
+            val viewportHeight = listState.layoutInfo.run {
+                (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+            }
+            listState.scrollToItem(state.thread.messages.size, viewportHeight)
+        }
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -182,15 +218,23 @@ private fun StreamingThreadList(
                 top = topContentPadding,
                 bottom = bottomContentPadding,
             ),
-            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
         ) {
             val lastMessageId = state.thread.messages.lastOrNull()?.id
             val showThinking = waitingForFirstAssistantToken(state)
-            items(state.thread.messages, key = { it.id }) { message ->
+            itemsIndexed(state.thread.messages, key = { _, message -> message.id }) { index, message ->
+                val previousEndsActivity = index > 0 &&
+                    state.thread.messages[index - 1].endsWithVisibleActivity()
+                val startsActivity = message.startsWithVisibleActivity()
+                val topGap = when {
+                    index == 0 -> 0.dp
+                    previousEndsActivity && startsActivity -> 0.dp
+                    else -> AnrealSpacing.md
+                }
                 MessageBubble(
                     message = message,
                     busy = state.isSending || state.thread.status == RunStatus.Streaming,
                     onAction = onAction,
+                    modifier = Modifier.padding(top = topGap),
                 )
                 if (showThinking && message.id == lastMessageId) {
                     Text(
@@ -243,6 +287,20 @@ private fun StreamingThreadList(
     }
 }
 
+private fun ChatMessage.startsWithVisibleActivity(): Boolean =
+    parts.firstOrNull { it.isVisiblePart() }?.isActivityPart() == true
+
+private fun ChatMessage.endsWithVisibleActivity(): Boolean =
+    parts.lastOrNull { it.isVisiblePart() }?.isActivityPart() == true
+
+private fun ChatPart.isVisiblePart(): Boolean = when (this) {
+    is ChatPart.Reasoning -> text.isNotBlank()
+    is ChatPart.Tool -> true
+    is ChatPart.Text -> text.isNotBlank()
+}
+
+private fun ChatPart.isActivityPart(): Boolean = this is ChatPart.Reasoning || this is ChatPart.Tool
+
 private fun waitingForFirstAssistantToken(state: ChatState): Boolean {
     if (!(state.isSending || state.thread.status == RunStatus.Streaming)) return false
     val last = state.thread.messages.lastOrNull() ?: return true
@@ -261,40 +319,56 @@ private fun MessageBubble(
     message: ChatMessage,
     busy: Boolean,
     onAction: (ChatAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == ChatRole.User
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
-        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
     ) {
+        var previousIsActivity = false
+        var renderedAny = false
         message.parts.forEachIndexed { index, part ->
-            key(part.id) {
-                when (part) {
-                    is ChatPart.Reasoning -> {
-                        val hasFollowUp = message.parts.drop(index + 1).any { later ->
-                            later is ChatPart.Tool ||
-                                (later is ChatPart.Text && later.text.isNotBlank()) ||
-                                (later is ChatPart.Reasoning && later.text.isNotBlank())
-                        }
-                        val isLive = busy && !message.isComplete && !hasFollowUp
-                        if (isLive || part.text.isNotBlank()) {
-                            ReasoningBlock(text = part.text, isLive = isLive)
-                        }
+            val isActivity = part is ChatPart.Reasoning || part is ChatPart.Tool
+            val content: @Composable () -> Unit = when (part) {
+                is ChatPart.Reasoning -> {
+                    val hasFollowUp = message.parts.drop(index + 1).any { later ->
+                        later is ChatPart.Tool ||
+                            (later is ChatPart.Text && later.text.isNotBlank()) ||
+                            (later is ChatPart.Reasoning && later.text.isNotBlank())
                     }
-                    is ChatPart.Tool -> ToolActivityCard(part)
-                    is ChatPart.Text -> if (part.text.isNotBlank()) {
-                        if (isUser) {
-                            UserBubble(text = part.text)
-                        } else {
-                            AnrealMarkdown(
-                                content = part.text,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
+                    val isLive = busy && !message.isComplete && !hasFollowUp
+                    if (isLive || part.text.isNotBlank()) {
+                        { ReasoningBlock(text = part.text, isLive = isLive) }
+                    } else {
+                        null
                     }
                 }
+                is ChatPart.Tool -> { { ToolActivityCard(part) } }
+                is ChatPart.Text -> if (part.text.isNotBlank()) {
+                    if (isUser) {
+                        { UserBubble(text = part.text) }
+                    } else {
+                        { AnrealMarkdown(content = part.text, modifier = Modifier.fillMaxWidth()) }
+                    }
+                } else {
+                    null
+                }
+            } ?: return@forEachIndexed
+            val topGap = if (!renderedAny) {
+                0.dp
+            } else if (previousIsActivity && isActivity) {
+                0.dp
+            } else {
+                AnrealSpacing.xs
             }
+            key(part.id) {
+                Column(modifier = Modifier.padding(top = topGap)) {
+                    content()
+                }
+            }
+            renderedAny = true
+            previousIsActivity = isActivity
         }
         val showActions = message.role == ChatRole.User ||
             (message.role == ChatRole.Assistant && message.isComplete)
@@ -303,6 +377,7 @@ private fun MessageBubble(
                 message = message,
                 busy = busy,
                 onAction = onAction,
+                modifier = Modifier.padding(top = AnrealSpacing.xs),
             )
         }
     }
@@ -313,7 +388,9 @@ private fun UserBubble(text: String) {
     GlassSurface(
         modifier = Modifier.widthIn(max = 320.dp),
         shape = MaterialTheme.shapes.extraLarge,
-        tone = GlassTone.Pane,
+        tone = GlassTone.Thin,
+        borderColor = glassDrawerBorderColor(),
+        fallbackColor = glassDrawerFallbackColor(),
     ) {
         Text(
             text = text,

@@ -164,7 +164,7 @@ Recipes:
 | Top bar, composer | Thin frost | Highest blur; hairline `outlineVariant` ~12% |
 | Drawer, sheets | Regular | Heavier so content behind doesn't compete |
 | Chips, selected row | Ultra-thin / pane | No extra shadow |
-| User bubble | Elevated frost | Inset highlight `onSurface` ~8% |
+| User bubble | Thin frost (matches top bar chrome) | Same hairline (`glassDrawerBorderColor`) and tint/fallback (`glassDrawerFallbackColor`) as `GlassTopBar` so bubble + chrome read as one glass layer |
 
 Fallback when Haze disables blur (low-end / reliability gate): opaque-enough `surfaceContainer` scrim, same shape, no fake blur.
 
@@ -404,7 +404,7 @@ Every Screen preview file includes at minimum:
 - Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (context ring, documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets. Thread content draws behind both glass chrome surfaces; list content padding keeps the first/last bubble reachable.
 - Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use the same reusable fixed glass segmented tabs as Workspace, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is a glass extended FAB fixed in a floating bottom dock across this screen.
 - Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses the shared fixed glass segmented tabs and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
-- Thread opens at the latest message. It follows appended stream content only while the user is at the bottom; scrolling up suspends follow and reveals a smooth scroll-to-latest control.
+- Thread opens at the latest message. It follows appended stream content only while the user is at the bottom; scrolling up suspends follow and reveals a smooth scroll-to-latest control. Sending a message snaps the thread to the bottom and resumes follow even if the user had scrolled up, and the composer dismisses the keyboard on send. Consecutive collapsible items (thought/tool) stay flush — no gap — even across message boundaries; content (text) keeps the 16.dp rhythm.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).

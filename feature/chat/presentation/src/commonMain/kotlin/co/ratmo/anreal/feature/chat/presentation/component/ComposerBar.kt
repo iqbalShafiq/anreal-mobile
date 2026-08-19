@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -200,6 +201,11 @@ private fun ComposerSubmitButton(
     onAction: (ChatAction) -> Unit,
 ) {
     val colors = IconButtonDefaults.filledIconButtonColors()
+    val keyboard = LocalSoftwareKeyboardController.current
+    val submit: () -> Unit = {
+        keyboard?.hide()
+        onAction(ChatAction.OnSend)
+    }
     when {
         streaming && !canSubmit -> {
             FilledIconButton(
@@ -216,7 +222,7 @@ private fun ComposerSubmitButton(
         }
         streaming -> {
             FilledIconButton(
-                onClick = { onAction(ChatAction.OnSend) },
+                onClick = submit,
                 modifier = Modifier.size(AnrealSpacing.touch),
                 shape = CircleShape,
                 colors = colors,
@@ -229,7 +235,7 @@ private fun ComposerSubmitButton(
         }
         else -> {
             FilledIconButton(
-                onClick = { onAction(ChatAction.OnSend) },
+                onClick = submit,
                 modifier = Modifier.size(AnrealSpacing.touch),
                 enabled = canSubmit,
                 shape = CircleShape,
