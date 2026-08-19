@@ -155,7 +155,7 @@ Compose has no CSS `backdrop-filter`. These are **wrong**:
 - `GlassSheet` / `GlassDialog`
 - `GlassDrawer` — left workspace (start radii), right documents (end radii, `fromEnd = true`)
 
-`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. Top bars use the same thin Haze material, tint composition, hairline, and fallback color as the left drawer so app chrome reads as one glass layer. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
+`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. The aurora is the single haze source; chrome and bubbles apply the thin Haze material directly over it. Do **not** wrap scrollable content in a nested `hazeSource` — a glass element inside a nested source samples the nested source (itself excluded) instead of the aurora, so its frost silently disappears. Top bars use the same thin Haze material, tint composition, hairline, and fallback color as the left drawer so app chrome reads as one glass layer. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
 
 Recipes:
 
@@ -164,7 +164,7 @@ Recipes:
 | Top bar, composer | Thin frost | Highest blur; hairline `outlineVariant` ~12% |
 | Drawer, sheets | Regular | Heavier so content behind doesn't compete |
 | Chips, selected row | Ultra-thin / pane | No extra shadow |
-| User bubble | Thin frost (matches top bar chrome) | Same hairline (`glassDrawerBorderColor`) and tint/fallback (`glassDrawerFallbackColor`) as `GlassTopBar` so bubble + chrome read as one glass layer |
+| User bubble | Thin frost (matches top bar chrome) | Same hairline (`glassDrawerBorderColor`) and tint/fallback (`glassDrawerFallbackColor`) as `GlassTopBar`, plus `glassBubbleTintColor()` scrim so the panel reads on a dim aurora (thin haze alone is invisible there) |
 
 Fallback when Haze disables blur (low-end / reliability gate): opaque-enough `surfaceContainer` scrim, same shape, no fake blur.
 

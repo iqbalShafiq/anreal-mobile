@@ -57,9 +57,9 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 
 private const val MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+private const val STREAM_LINE_PACE_MILLIS = 16L
 
 data class ChatSessionUi(
     val id: String,
@@ -1051,9 +1051,11 @@ class ChatViewModel(
             }
         }
         // Buffered transports may deliver every JSONL record in one burst.
-        // Yield so Compose can paint each reduced frame instead of jumping
-        // straight to the terminal answer.
-        yield()
+        // Pace each line to one frame so Compose paints every reduced state
+        // instead of jumping straight to the terminal answer. A plain yield()
+        // is not enough: the resumed continuation re-queues ahead of the
+        // Choreographer callback, starving recomposition until the stream ends.
+        delay(STREAM_LINE_PACE_MILLIS)
         if (_state.value.selectedSessionId != sessionId) return
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)

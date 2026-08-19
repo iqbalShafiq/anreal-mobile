@@ -56,9 +56,9 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             }
         }
         "text_delta" -> {
-            val messageId = event.string("messageId")
-            val partId = event.string("partId")
             val delta = event.string("delta")
+            val messageId = event.string("messageId") ?: turnMessageId(event)
+            val partId = event.string("partId") ?: messageId?.let { "$it-text" }
             if (messageId == null || partId == null || delta == null) {
                 ChatStreamEvent.Unknown(type = type)
             } else {
@@ -66,9 +66,9 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             }
         }
         "reasoning_delta" -> {
-            val messageId = event.string("messageId")
-            val partId = event.string("partId")
             val delta = event.string("delta")
+            val messageId = event.string("messageId") ?: turnMessageId(event)
+            val partId = event.string("partId") ?: event.string("id")
             if (messageId == null || partId == null || delta == null) {
                 ChatStreamEvent.Unknown(type = type)
             } else {
@@ -80,12 +80,12 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             }
         }
         "tool_update" -> {
-            val messageId = event.string("messageId")
+            val messageId = event.string("messageId") ?: turnMessageId(event)
             val part = event["part"]?.jsonObject
-            val partId = part?.string("id") ?: event.string("partId")
-            val toolName = part?.string("toolName")
-            val toolCallId = part?.string("toolCallId")
-            val state = part?.string("state") ?: "input-streaming"
+            val partId = part?.string("id") ?: event.string("partId") ?: event.string("id")
+            val toolName = part?.string("toolName") ?: event.string("toolName")
+            val toolCallId = part?.string("toolCallId") ?: event.string("toolCallId")
+            val state = part?.string("state") ?: event.string("state") ?: "input-streaming"
             if (messageId == null || partId == null || toolName == null || toolCallId == null) {
                 ChatStreamEvent.Unknown(type = type)
             } else {
@@ -96,9 +96,9 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
                         toolName = toolName,
                         toolCallId = toolCallId,
                         state = state,
-                        input = part.jsonValue("input"),
-                        output = part.jsonValue("output"),
-                        errorMessage = part.errorMessage(),
+                        input = part?.jsonValue("input") ?: event.jsonValue("input"),
+                        output = part?.jsonValue("output") ?: event.jsonValue("output"),
+                        errorMessage = part?.errorMessage() ?: event.errorMessage(),
                     ),
                 )
             }
@@ -108,6 +108,12 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
             if (messageId == null) ChatStreamEvent.Unknown(type = type)
             else ChatStreamEvent.MessageEnd(messageId = messageId)
         }
+        "turn_end" -> {
+            val turn = event.int("turn")
+            if (turn == null) ChatStreamEvent.Unknown(type = type)
+            else ChatStreamEvent.MessageEnd(messageId = "turn-$turn")
+        }
+        "turn_start", "generation_start", "final" -> ChatStreamEvent.Unknown(type = type)
         "queued_message_applied" -> {
             val clientMessageId = event.string("clientMessageId")
             if (clientMessageId == null) {
@@ -184,6 +190,9 @@ private fun parseClarificationRequest(event: JsonObject, type: String): ChatStre
 
 private fun parseResolvedId(event: JsonObject, key: String): String? =
     (event[key] as? JsonObject)?.string("id")
+
+private fun turnMessageId(event: JsonObject): String? =
+    event.int("turn")?.let { "turn-$it" }
 
 private fun parseParts(message: JsonObject): List<ChatPart> {
     val parts = message["parts"] as? JsonArray ?: return emptyList()

@@ -167,4 +167,72 @@ class ChatStreamParserTest {
             ),
         )
     }
+
+    @Test
+    fun parses_anthropic_style_text_delta_with_turn() {
+        val envelope = parseStreamLine(
+            """{"type":"stream_event","streamId":"s1","eventId":31,"event":{"type":"text_delta","turn":1,"delta":"Halo"}}""",
+        )
+
+        assertThat(envelope).isEqualTo(
+            StreamEnvelope.Event(
+                streamId = "s1",
+                eventId = 31,
+                event = ChatStreamEvent.TextDelta(
+                    messageId = "turn-1",
+                    partId = "turn-1-text",
+                    delta = "Halo",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun parses_anthropic_style_reasoning_delta_with_turn_and_id() {
+        val envelope = parseStreamLine(
+            """{"type":"stream_event","streamId":"s1","eventId":3,"event":{"type":"reasoning_delta","turn":1,"delta":"The user","id":"rs_tmp_abc","contentType":"text"}}""",
+        )
+
+        assertThat(envelope).isEqualTo(
+            StreamEnvelope.Event(
+                streamId = "s1",
+                eventId = 3,
+                event = ChatStreamEvent.ReasoningDelta(
+                    messageId = "turn-1",
+                    partId = "rs_tmp_abc",
+                    delta = "The user",
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun turn_end_maps_to_message_end_for_the_turn() {
+        val envelope = parseStreamLine(
+            """{"type":"stream_event","streamId":"s1","eventId":111,"event":{"type":"turn_end","turn":1,"response":{"choice":[]}}}""",
+        )
+
+        assertThat(envelope).isEqualTo(
+            StreamEnvelope.Event(
+                streamId = "s1",
+                eventId = 111,
+                event = ChatStreamEvent.MessageEnd(messageId = "turn-1"),
+            ),
+        )
+    }
+
+    @Test
+    fun turn_start_generation_start_and_final_are_ignored() {
+        val lines = listOf(
+            """{"type":"stream_event","streamId":"s1","eventId":1,"event":{"type":"turn_start","turn":1,"prompt":{}}}""",
+            """{"type":"stream_event","streamId":"s1","eventId":2,"event":{"type":"generation_start","turn":1,"request":{}}}""",
+            """{"type":"stream_event","streamId":"s1","eventId":112,"event":{"type":"final","runId":"r1","output":"done"}}""",
+        )
+
+        val events = lines.map { (parseStreamLine(it) as StreamEnvelope.Event).event }
+
+        assertThat(events[0]).isEqualTo(ChatStreamEvent.Unknown("turn_start"))
+        assertThat(events[1]).isEqualTo(ChatStreamEvent.Unknown("generation_start"))
+        assertThat(events[2]).isEqualTo(ChatStreamEvent.Unknown("final"))
+    }
 }

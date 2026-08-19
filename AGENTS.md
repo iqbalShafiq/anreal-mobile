@@ -207,6 +207,12 @@ Read `DESIGN.md` before writing UI.
 - Auth forms: `windowSoftInputMode=adjustNothing`. Do **not** `imePadding()` a centered form (that recenters and leaves a hole). Shift the form block with `rememberImeFocusShift` so the focused field sits just above the keyboard.
 - Auth fields are single-line: use `Next` between steps and `Done` to submit the final field; never offer a newline. The chat composer is multi-line: Enter inserts a newline and the visible Send / Queue button submits. Single-field mutations such as rename use `Done` to confirm.
 
+### Debug compile & install
+
+- Debug build command is **always** `.\gradlew.bat :app:assembleDebug --console=plain` run directly in PowerShell (use `.\` prefix; do not wrap in `cmd /c` + `Start-Process` — that hides output and can hang the agent shell). Run it from the repo root with a generous timeout; it is fast when incremental.
+- Fast compile check without an APK: `.\gradlew.bat :feature:chat:presentation:compileAndroidMain :feature:chat:presentation:compileKotlinIosArm64 --console=plain` (Android + iOS commonMain coverage).
+- Install to the connected device: `& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" install -r app\build\outputs\apk\debug\app-debug.apk`.
+
 ### Visual QA (no emulator)
 
 1. Compose `@Preview` (light, dark, states).

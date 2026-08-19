@@ -82,6 +82,21 @@ fun glassDrawerFallbackColor(): Color {
     }
 }
 
+/**
+ * Tint for small glass surfaces (user bubbles) that sit over a dim aurora.
+ * The thin haze material alone is invisible there because the backdrop is a
+ * smooth gradient; a containerColor scrim makes the panel read as glass.
+ */
+@Composable
+fun glassBubbleTintColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (scheme.surface.luminance() < 0.5f) {
+        Color(AnrealBrand.canvasArgb).copy(alpha = 0.8f)
+    } else {
+        scheme.surfaceContainer.copy(alpha = 0.85f)
+    }
+}
+
 fun glassDrawerShape(fromEnd: Boolean): Shape {
     val radius = DrawerCorner
     return if (fromEnd) {

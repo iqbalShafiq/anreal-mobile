@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ import co.ratmo.anreal.core.designsystem.component.GlassSurface
 import co.ratmo.anreal.core.designsystem.component.GlassTone
 import co.ratmo.anreal.core.designsystem.component.glassDrawerBorderColor
 import co.ratmo.anreal.core.designsystem.component.glassDrawerFallbackColor
+import co.ratmo.anreal.core.designsystem.component.glassBubbleTintColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -70,6 +72,7 @@ import co.ratmo.anreal.feature.chat.presentation.preview.previewAssistantMessage
 import co.ratmo.anreal.feature.chat.presentation.preview.previewEmptyPartsMessage
 import co.ratmo.anreal.feature.chat.presentation.preview.previewReasoningAssistant
 import co.ratmo.anreal.feature.chat.presentation.preview.previewUserMessage
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -154,22 +157,33 @@ private fun StreamingThreadList(
             initialScrollSettled && atBottom -> followStreaming = true
         }
     }
-    LaunchedEffect(
-        state.thread.messages.lastOrNull(),
-        state.thread.messages.size,
-        bottomContentPadding,
-        followStreaming,
-        isDragged,
-    ) {
-        if (!initialScrollSettled || !followStreaming || isDragged) return@LaunchedEffect
-        // Let text/markdown and composer measurement finish before requesting
-        // the absolute end, otherwise the last item's top can become the anchor.
-        withFrameNanos { }
-        if (followStreaming && !isDragged && listState.canScrollForward) {
-            val viewportHeight = listState.layoutInfo.run {
-                (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+    val currentIsDragged by rememberUpdatedState(isDragged)
+    val currentStreamVersion by rememberUpdatedState(state.thread.messages.lastOrNull())
+    val currentStreamMessageCount by rememberUpdatedState(state.thread.messages.size)
+    val currentStreamActive by rememberUpdatedState(
+        state.isSending || state.thread.status == RunStatus.Streaming,
+    )
+    LaunchedEffect(followStreaming) {
+        // A keyed-on-message effect is useless here: every delta restarts it and
+        // cancels the in-flight scrollToItem before it lands. Keep one stable
+        // loop that reacts to the latest message via rememberUpdatedState and
+        // scrolls once per content change, never mid-scroll.
+        if (!followStreaming) return@LaunchedEffect
+        var lastScrolledVersion: ChatMessage? = null
+        while (true) {
+            val version = currentStreamVersion
+            if (!currentIsDragged && version !== lastScrolledVersion) {
+                lastScrolledVersion = version
+                // The frame callback fires before the layout pass, so the new
+                // content is not measured yet on the first frame after a delta.
+                withFrameNanos { }
+                withFrameNanos { }
+                val viewportHeight = listState.layoutInfo.run {
+                    (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+                }
+                listState.scrollToItem(currentStreamMessageCount, viewportHeight)
             }
-            listState.scrollToItem(state.thread.messages.size, viewportHeight)
+            delay(if (currentStreamActive) 16 else 250)
         }
     }
 
@@ -348,6 +362,15 @@ private fun MessageBubble(
                 is ChatPart.Text -> if (part.text.isNotBlank()) {
                     if (isUser) {
                         { UserBubble(text = part.text) }
+                    } else if (busy && !message.isComplete) {
+                        {
+                            Text(
+                                text = part.text,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                        }
                     } else {
                         { AnrealMarkdown(content = part.text, modifier = Modifier.fillMaxWidth()) }
                     }
@@ -388,9 +411,10 @@ private fun UserBubble(text: String) {
     GlassSurface(
         modifier = Modifier.widthIn(max = 320.dp),
         shape = MaterialTheme.shapes.extraLarge,
-        tone = GlassTone.Thin,
+        tone = GlassTone.UltraThin,
         borderColor = glassDrawerBorderColor(),
         fallbackColor = glassDrawerFallbackColor(),
+        tintColor = glassBubbleTintColor(),
     ) {
         Text(
             text = text,
@@ -465,7 +489,15 @@ private fun ReasoningBlock(
                     .padding(start = AnrealSpacing.sm),
             ) {
                 if (summary.isNotEmpty()) {
-                    AnrealMarkdown(content = summary, compact = true)
+                    if (isLive) {
+                        Text(
+                            text = summary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        AnrealMarkdown(content = summary, compact = true)
+                    }
                 } else {
                     Text(
                         text = AnrealCopy.get(

@@ -34,7 +34,6 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
-import co.ratmo.anreal.core.designsystem.component.AnrealHazeSource
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
 import co.ratmo.anreal.core.designsystem.component.GlassTopBar
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -251,16 +250,14 @@ fun ChatScreen(
                     },
                 ) { padding ->
                     Box(modifier = Modifier.fillMaxSize()) {
-                        AnrealHazeSource(modifier = Modifier.fillMaxSize()) {
-                            ThreadPane(
-                                state = state,
-                                onAction = onAction,
-                                modifier = Modifier.fillMaxSize(),
-                                topContentPadding = padding.calculateTopPadding() + AnrealSpacing.sm,
-                                bottomContentPadding = with(density) { composerHeightPx.toDp() } + AnrealSpacing.sm,
-                                initialScrollReady = composerHeightPx > 0,
-                            )
-                        }
+                        ThreadPane(
+                            state = state,
+                            onAction = onAction,
+                            modifier = Modifier.fillMaxSize(),
+                            topContentPadding = padding.calculateTopPadding() + AnrealSpacing.sm,
+                            bottomContentPadding = with(density) { composerHeightPx.toDp() } + AnrealSpacing.sm,
+                            initialScrollReady = composerHeightPx > 0,
+                        )
                         ComposerBar(
                             state = state,
                             onAction = onAction,

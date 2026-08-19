@@ -32,6 +32,7 @@ import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import dev.chrisbanes.haze.materials.HazeMaterials
 
 enum class GlassTone {
+    UltraThin,
     Thin,
     Regular,
     Pane,
@@ -78,6 +79,7 @@ fun GlassSurface(
     tone: GlassTone = GlassTone.Thin,
     borderColor: Color? = null,
     fallbackColor: Color? = null,
+    tintColor: Color? = null,
     emphasized: Boolean = false,
     error: Boolean = false,
     content: @Composable () -> Unit,
@@ -85,9 +87,10 @@ fun GlassSurface(
     val scheme = MaterialTheme.colorScheme
     val reduceTransparency = LocalAnrealReduceTransparency.current
     val style = when (tone) {
-        GlassTone.Thin -> HazeMaterials.thin()
-        GlassTone.Regular -> HazeMaterials.regular()
-        GlassTone.Pane -> HazeMaterials.thin()
+        GlassTone.UltraThin -> tintColor?.let { HazeMaterials.ultraThin(containerColor = it) } ?: HazeMaterials.ultraThin()
+        GlassTone.Thin -> tintColor?.let { HazeMaterials.thin(containerColor = it) } ?: HazeMaterials.thin()
+        GlassTone.Regular -> tintColor?.let { HazeMaterials.regular(containerColor = it) } ?: HazeMaterials.regular()
+        GlassTone.Pane -> tintColor?.let { HazeMaterials.thin(containerColor = it) } ?: HazeMaterials.thin()
     }
     val border = when {
         error -> scheme.error
