@@ -170,6 +170,7 @@ fun ChatScreen(
     var documentsOpen by remember { mutableStateOf(initialDocumentsDrawer) }
     var contextUsageOpen by remember { mutableStateOf(false) }
     var composerHeightPx by remember { mutableIntStateOf(0) }
+    val frostedTopBar = remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val documentCount = documentsBadgeCount(state)
@@ -181,6 +182,7 @@ fun ChatScreen(
         }
         drawerState.close()
         documentsOpen = false
+        frostedTopBar.value = false
     }
 
     AnrealAtmosphere {
@@ -200,7 +202,7 @@ fun ChatScreen(
                 Scaffold(
                     containerColor = Color.Transparent,
                     topBar = {
-                        GlassTopBar {
+                        GlassTopBar(frosted = frostedTopBar.value) {
                             TopAppBar(
                                 title = {
                                     Text(
@@ -257,6 +259,7 @@ fun ChatScreen(
                             topContentPadding = padding.calculateTopPadding() + AnrealSpacing.sm,
                             bottomContentPadding = with(density) { composerHeightPx.toDp() } + AnrealSpacing.sm,
                             initialScrollReady = composerHeightPx > 0,
+                            onFrostedTopBarChange = { frostedTopBar.value = it },
                         )
                         ComposerBar(
                             state = state,

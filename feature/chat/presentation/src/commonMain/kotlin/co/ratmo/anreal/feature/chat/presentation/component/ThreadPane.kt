@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
 import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
 import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.rememberFrostedTopBar
 import co.ratmo.anreal.core.designsystem.component.glassDrawerBorderColor
 import co.ratmo.anreal.core.designsystem.component.glassDrawerFallbackColor
 import co.ratmo.anreal.core.designsystem.component.glassBubbleTintColor
@@ -86,14 +88,17 @@ internal fun ThreadPane(
     topContentPadding: Dp = AnrealSpacing.sm,
     bottomContentPadding: Dp = AnrealSpacing.lg,
     initialScrollReady: Boolean = true,
+    onFrostedTopBarChange: (Boolean) -> Unit = {},
 ) {
     when {
         state.historyLoading && state.thread.messages.isEmpty() -> {
+            SideEffect { onFrostedTopBarChange(false) }
             Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 AnrealLoadingIndicator()
             }
         }
         state.historyError != null && state.thread.messages.isEmpty() -> {
+            SideEffect { onFrostedTopBarChange(false) }
             AnrealError(
                 modifier = modifier.fillMaxSize(),
                 message = state.historyError.asString(),
@@ -101,6 +106,7 @@ internal fun ThreadPane(
             )
         }
         state.thread.messages.isEmpty() -> {
+            SideEffect { onFrostedTopBarChange(false) }
             AnrealEmpty(
                 modifier = modifier.fillMaxSize(),
                 icon = MaterialSymbols.Rounded.Auto_awesome,
@@ -117,6 +123,7 @@ internal fun ThreadPane(
                     topContentPadding = topContentPadding,
                     bottomContentPadding = bottomContentPadding,
                     initialScrollReady = initialScrollReady,
+                    onFrostedTopBarChange = onFrostedTopBarChange,
                 )
             }
         }
@@ -131,11 +138,15 @@ private fun StreamingThreadList(
     topContentPadding: Dp,
     bottomContentPadding: Dp,
     initialScrollReady: Boolean,
+    onFrostedTopBarChange: (Boolean) -> Unit,
 ) {
     val endIndex = state.thread.messages.size
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = endIndex)
     val scope = rememberCoroutineScope()
     val reduceMotion = LocalAnrealReduceMotion.current
+    val frostedTopBar = rememberFrostedTopBar(listState)
+    val currentOnFrostedTopBarChange by rememberUpdatedState(onFrostedTopBarChange)
+    SideEffect { currentOnFrostedTopBarChange(frostedTopBar) }
     val isDragged by listState.interactionSource.collectIsDraggedAsState()
     val atBottom by remember(listState) { derivedStateOf { !listState.canScrollForward } }
     var initialScrollSettled by remember { mutableStateOf(false) }

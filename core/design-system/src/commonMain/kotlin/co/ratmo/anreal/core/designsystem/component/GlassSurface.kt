@@ -82,6 +82,7 @@ fun GlassSurface(
     tintColor: Color? = null,
     emphasized: Boolean = false,
     error: Boolean = false,
+    effectAlpha: Float = 1f,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -98,21 +99,33 @@ fun GlassSurface(
         borderColor != null -> borderColor
         else -> scheme.outlineVariant.copy(alpha = 0.45f)
     }
-    val useHaze = hazeState != null && !reduceTransparency
+    val clampedAlpha = effectAlpha.coerceIn(0f, 1f)
+    val useHaze = hazeState != null && !reduceTransparency && clampedAlpha > 0f
     val frost = if (useHaze) {
-        Modifier.hazeEffect(state = hazeState, style = style)
+        Modifier.hazeEffect(state = hazeState, style = style) {
+            alpha = clampedAlpha
+        }
     } else {
         Modifier
     }
+    val fallback = fallbackColor ?: scheme.surfaceContainer
     Surface(
         modifier = modifier
             .clip(shape)
             .then(frost)
-            .border(width = 1.dp, color = border, shape = shape),
+            .border(
+                width = 1.dp,
+                color = border.copy(alpha = border.alpha * clampedAlpha),
+                shape = shape,
+            ),
         shape = shape,
         // HazeMaterials already provides tint and noise. Drawing another
         // translucent Surface tint here makes the material look opaque.
-        color = if (useHaze) Color.Transparent else fallbackColor ?: scheme.surfaceContainer,
+        color = if (useHaze) {
+            Color.Transparent
+        } else {
+            fallback.copy(alpha = fallback.alpha * clampedAlpha)
+        },
         contentColor = scheme.onSurface,
         content = content,
     )

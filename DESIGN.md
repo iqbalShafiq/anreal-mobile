@@ -157,6 +157,8 @@ Compose has no CSS `backdrop-filter`. These are **wrong**:
 
 `AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. The aurora is the single haze source; chrome and bubbles apply the thin Haze material directly over it. Do **not** wrap scrollable content in a nested `hazeSource` — a glass element inside a nested source samples the nested source (itself excluded) instead of the aurora, so its frost silently disappears. Top bars use the same thin Haze material, tint composition, hairline, and fallback color as the left drawer so app chrome reads as one glass layer. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
 
+**Scroll-aware top chrome:** `GlassTopBar` is clear over the status bar and app bar until the scrolling surface *under it* has left the start (`rememberFrostedTopBar`). Frost then fades in at `durationFast` / `easeOut` via Haze `alpha` (not `graphicsLayer` on the glass ancestor). Reduced motion snaps. Account / Settings and Workspace keep `frosted = false` because only the pane below the segmented tabs scrolls — the top bar never has content sliding under it.
+
 Recipes:
 
 | Chrome | Material | Notes |
@@ -247,6 +249,7 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 | Theme switch | Color 200ms | Instant |
 | Aurora | Independent orb wander, 16–32s | Hidden |
 | Success check | 200ms scale 0.96→1 once | Static icon |
+| Top bar frost | Opacity 160ms `easeOut` when the list under the bar can scroll backward | Snap |
 
 Sheets and drawers that the user can drag use **springs** (critically damped). Hand off release velocity. Rubber-band past the edge. Never lock input during the transition.
 
@@ -401,7 +404,7 @@ Every Screen preview file includes at minimum:
 
 ## 11. Layout
 
-- Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (context ring, documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets. Thread content draws behind both glass chrome surfaces; list content padding keeps the first/last bubble reachable.
+- Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (context ring, documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets. Thread content draws behind both chrome surfaces; list content padding keeps the first/last bubble reachable. The top bar (status + app bar) is clear until the thread can scroll backward, then the thin frost fades in.
 - Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use the same reusable fixed glass segmented tabs as Workspace, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is a glass extended FAB fixed in a floating bottom dock across this screen.
 - Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses the shared fixed glass segmented tabs and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
 - Thread opens at the latest message. It follows appended stream content only while the user is at the bottom; scrolling up suspends follow and reveals a smooth scroll-to-latest control. Sending a message snaps the thread to the bottom and resumes follow even if the user had scrolled up, and the composer dismisses the keyboard on send. Consecutive collapsible items (thought/tool) stay flush — no gap — even across message boundaries; content (text) keeps the 16.dp rhythm.

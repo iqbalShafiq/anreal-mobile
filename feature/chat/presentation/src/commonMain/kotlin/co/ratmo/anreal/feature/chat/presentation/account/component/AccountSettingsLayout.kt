@@ -104,7 +104,7 @@ internal fun AccountSettingsLayout(
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                GlassTopBar {
+                GlassTopBar(frosted = false) {
                     TopAppBar(
                         title = {
                             Text(

@@ -102,7 +102,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                GlassTopBar {
+                GlassTopBar(frosted = false) {
                     TopAppBar(
                         title = { Text(AnrealCopy.get(AnrealCopy.LABEL_WORKSPACE)) },
                         navigationIcon = {
