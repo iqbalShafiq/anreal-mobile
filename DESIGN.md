@@ -408,6 +408,7 @@ Every Screen preview file includes at minimum:
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
 - Content never sits under system bars. Use `WindowInsets` (status, nav, ime, cutout).
+- System bars are fully transparent. Icon and caption colors follow the **app** light/dark theme (`SystemBarStyle.light` / `dark`), not the OS night mode. Navigation-bar contrast enforcement is off so 3-button nav has no scrim.
 - Thread: user bubbles end-aligned, assistant start-aligned, 8.dp vertical rhythm, 16.dp inset.
 
 ---

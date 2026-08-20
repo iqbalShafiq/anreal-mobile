@@ -28,4 +28,7 @@ kotlin {
         implementation(libs.markdown.renderer)
         implementation(libs.markdown.renderer.m3)
     }
+    sourceSets.androidMain.dependencies {
+        implementation(libs.androidx.activity.compose)
+    }
 }

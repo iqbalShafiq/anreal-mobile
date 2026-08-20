@@ -19,6 +19,7 @@ fun AnrealTheme(
     content: @Composable () -> Unit,
 ) {
     val darkTheme = settings.resolveDark(isSystemInDarkTheme())
+    ApplySystemBars(darkTheme)
     val dynamicScheme = if (settings.dynamicColor) {
         platformDynamicColorScheme(darkTheme)
     } else {
