@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.component.AnrealMarkdown
+import co.ratmo.anreal.core.designsystem.component.AnrealSkeleton
 import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
 import co.ratmo.anreal.core.designsystem.component.AnrealSegmentedTabs
 import co.ratmo.anreal.core.designsystem.component.AnrealTextField
@@ -164,10 +165,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
 @Composable
 private fun WorkspaceContent(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) {
     when {
-        state.isLoading && state.section !in state.loadedSections -> Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center,
-        ) { AnrealSkeletonList(count = 6, itemHeight = 72.dp) }
+        state.isLoading && state.section !in state.loadedSections -> WorkspaceLoading(state.section)
         state.error != null && state.section !in state.loadedSections -> WorkspaceStatus(
             title = state.error.asString(),
             action = AnrealCopy.get(AnrealCopy.ACTION_RETRY),
@@ -240,11 +238,7 @@ private fun WorkspaceList(
     } else {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = AnrealSpacing.screenCompact,
-                end = AnrealSpacing.screenCompact,
-                bottom = 120.dp,
-            ),
+            contentPadding = WorkspaceListPadding,
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
             content = content,
         )
@@ -594,6 +588,43 @@ private fun DeleteWorkspaceDialog(
     )
 }
 
+@Composable
+private fun WorkspaceLoading(section: WorkspaceSection) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = WorkspaceListPadding,
+        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+    ) {
+        if (section == WorkspaceSection.Images) {
+            items(3) { WorkspaceImageSkeleton() }
+        } else {
+            items(6) { AnrealSkeleton(height = 72.dp) }
+        }
+    }
+}
+
+@Composable
+private fun WorkspaceImageSkeleton() {
+    GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+        Column {
+            AnrealSkeleton(height = 160.dp)
+            Column(
+                modifier = Modifier.padding(AnrealSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+            ) {
+                AnrealSkeleton(height = 16.dp)
+                AnrealSkeleton(height = 12.dp)
+            }
+        }
+    }
+}
+
+private val WorkspaceListPadding = PaddingValues(
+    start = AnrealSpacing.screenCompact,
+    end = AnrealSpacing.screenCompact,
+    bottom = 120.dp,
+)
+
 private fun WorkspaceSection.label(): String = when (this) {
     WorkspaceSection.Projects -> AnrealCopy.get(AnrealCopy.LABEL_PROJECTS)
     WorkspaceSection.Documents -> AnrealCopy.get(AnrealCopy.LABEL_DOCUMENTS)
@@ -622,6 +653,20 @@ private fun WorkspaceDocumentsEmptyPreview() {
             state = WorkspaceState(
                 section = WorkspaceSection.Documents,
                 loadedSections = setOf(WorkspaceSection.Documents),
+            ),
+            onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun WorkspaceImagesLoadingPreview() {
+    AnrealPreview {
+        WorkspaceScreen(
+            state = WorkspaceState(
+                section = WorkspaceSection.Images,
+                isLoading = true,
             ),
             onAction = {},
         )

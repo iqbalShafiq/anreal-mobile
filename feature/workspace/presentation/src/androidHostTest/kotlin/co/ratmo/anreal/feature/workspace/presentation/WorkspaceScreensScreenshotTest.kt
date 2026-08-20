@@ -71,6 +71,22 @@ class WorkspaceScreensScreenshotTest {
     }
 
     @Test
+    fun imagesLoadingLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                WorkspaceScreen(
+                    state = WorkspaceState(
+                        section = WorkspaceSection.Images,
+                        isLoading = true,
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     @OptIn(ExperimentalTestApi::class)
     fun imagesPopulatedLight() {
         composeTestRule.setContent {
