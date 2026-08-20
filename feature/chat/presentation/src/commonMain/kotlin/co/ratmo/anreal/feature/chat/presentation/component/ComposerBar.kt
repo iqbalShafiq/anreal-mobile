@@ -5,18 +5,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,7 +30,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
@@ -125,45 +126,29 @@ internal fun ComposerBar(
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+                    horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
                 ) {
-                    IconButton(
-                        onClick = { sheet = ComposerSheet.Features },
-                        modifier = Modifier.size(AnrealSpacing.touch),
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
                     ) {
-                        Icon(
-                            imageVector = MaterialSymbols.Rounded.Add,
-                            contentDescription = AnrealCopy.get(AnrealCopy.CD_FEATURES),
-                            tint = if (
-                                state.webSearchEnabled || state.imageGenerationEnabled || state.isUploading
-                            ) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                        ComposerAddButton(
+                            featuresActive = state.webSearchEnabled ||
+                                state.imageGenerationEnabled ||
+                                state.isUploading,
+                            onClick = { sheet = ComposerSheet.Features },
+                        )
+                        ComposerModelTrigger(
+                            label = modelTriggerLabel,
+                            contentDescription = modelTriggerDescription,
+                            onClick = {
+                                if (state.models.isEmpty() && !state.catalogLoading) {
+                                    onAction(ChatAction.OnRetryCatalog)
+                                }
+                                sheet = ComposerSheet.Model
                             },
-                        )
-                    }
-                    TextButton(
-                        onClick = {
-                            if (state.models.isEmpty() && !state.catalogLoading) {
-                                onAction(ChatAction.OnRetryCatalog)
-                            }
-                            sheet = ComposerSheet.Model
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .semantics { contentDescription = modelTriggerDescription },
-                    ) {
-                        Text(
-                            text = modelTriggerLabel,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Start,
-                        )
-                        Icon(
-                            imageVector = MaterialSymbols.Rounded.Expand_more,
-                            contentDescription = null,
+                            modifier = Modifier.weight(1f, fill = false),
                         )
                     }
                     ComposerSubmitButton(
@@ -193,6 +178,70 @@ private fun String.toUploadStatusLabel(): String = AnrealCopy.get(
         else -> AnrealCopy.STATUS_UPLOAD_PROCESSING
     },
 )
+
+@Composable
+private fun ComposerAddButton(
+    featuresActive: Boolean,
+    onClick: () -> Unit,
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier.size(AnrealSpacing.touch),
+        shape = CircleShape,
+        colors = if (featuresActive) {
+            IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            IconButtonDefaults.filledTonalIconButtonColors()
+        },
+    ) {
+        Icon(
+            imageVector = MaterialSymbols.Rounded.Add,
+            contentDescription = AnrealCopy.get(AnrealCopy.CD_FEATURES),
+        )
+    }
+}
+
+@Composable
+private fun ComposerModelTrigger(
+    label: String,
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier
+            .heightIn(min = AnrealSpacing.touch)
+            .semantics { this.contentDescription = contentDescription },
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Row(
+            modifier = Modifier.padding(
+                start = AnrealSpacing.sm,
+                end = AnrealSpacing.xs,
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+        ) {
+            Text(
+                text = label,
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Icon(
+                imageVector = MaterialSymbols.Rounded.Expand_more,
+                contentDescription = null,
+            )
+        }
+    }
+}
 
 @Composable
 private fun ComposerSubmitButton(
@@ -273,6 +322,25 @@ private fun ComposerBarFilledPreview() {
     AnrealPreview {
         ComposerBar(
             state = chatComposerCatalogPreviewState(),
+            onAction = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ComposerBarLongModelPreview() {
+    AnrealPreview {
+        ComposerBar(
+            state = chatComposerCatalogPreviewState().copy(
+                models = chatComposerCatalogPreviewState().models.map { model ->
+                    if (model.id == "luna") {
+                        model.copy(label = "GPT Luna 5.6 Extended Reasoning")
+                    } else {
+                        model
+                    }
+                },
+            ),
             onAction = {},
         )
     }
