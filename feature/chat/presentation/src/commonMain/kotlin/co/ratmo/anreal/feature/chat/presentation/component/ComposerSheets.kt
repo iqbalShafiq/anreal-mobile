@@ -9,19 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -43,7 +37,6 @@ internal enum class ComposerSheet {
     Attach,
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ComposerSheets(
     sheet: ComposerSheet?,
@@ -53,24 +46,7 @@ internal fun ComposerSheets(
     onDismiss: () -> Unit,
 ) {
     if (sheet == null) return
-    if (LocalInspectionMode.current) {
-        InspectionBottomSheet {
-            ComposerSheetBody(
-                sheet = sheet,
-                state = state,
-                onAction = onAction,
-                onOpenAttachments = onOpenAttachments,
-                onDismiss = onDismiss,
-            )
-        }
-        return
-    }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-    ) {
+    ChatBottomSheet(onDismiss = onDismiss) {
         ComposerSheetBody(
             sheet = sheet,
             state = state,
@@ -78,27 +54,6 @@ internal fun ComposerSheets(
             onOpenAttachments = onOpenAttachments,
             onDismiss = onDismiss,
         )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun InspectionBottomSheet(content: @Composable () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = BottomSheetDefaults.ExpandedShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = BottomSheetDefaults.Elevation,
-    ) {
-        Column {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                BottomSheetDefaults.DragHandle()
-            }
-            content()
-        }
     }
 }
 
@@ -119,18 +74,6 @@ private fun ComposerSheetBody(
         )
         ComposerSheet.Attach -> AttachSheet(onAction = onAction, onDismiss = onDismiss)
     }
-}
-
-@Composable
-private fun SheetTitle(text: String) {
-    Text(
-        text = text,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
-        style = MaterialTheme.typography.titleMedium,
-        color = MaterialTheme.colorScheme.onSurface,
-    )
 }
 
 @Composable

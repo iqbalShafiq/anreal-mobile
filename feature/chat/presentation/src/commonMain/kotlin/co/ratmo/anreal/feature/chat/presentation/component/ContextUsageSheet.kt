@@ -8,22 +8,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import co.ratmo.anreal.core.designsystem.component.GlassSurface
-import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -63,17 +58,13 @@ internal fun ContextUsageButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ContextUsageSheet(
     usage: ContextUsageUi?,
     error: Boolean,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = Color.Transparent,
-    ) {
+    ChatBottomSheet(onDismiss = onDismiss) {
         ContextUsageContent(usage = usage, error = error)
     }
 }
@@ -83,36 +74,31 @@ private fun ContextUsageContent(
     usage: ContextUsageUi?,
     error: Boolean,
 ) {
-    GlassSurface(
-        modifier = Modifier.fillMaxWidth(),
-        tone = GlassTone.Regular,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(AnrealSpacing.lg),
-            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
-        ) {
-            Text(
-                text = AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE),
-                style = MaterialTheme.typography.titleLarge,
-            )
-            if (usage == null) {
+    Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
+        SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE))
+        when {
+            usage == null && error -> {
                 Text(
-                    text = AnrealCopy.get(
-                        if (error) AnrealCopy.STATUS_UNAVAILABLE else AnrealCopy.STATUS_LOADING,
-                    ),
+                    text = AnrealCopy.get(AnrealCopy.STATUS_UNAVAILABLE),
+                    modifier = Modifier.padding(AnrealSpacing.md),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (error) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    color = MaterialTheme.colorScheme.error,
                 )
-            } else {
+            }
+            usage == null -> {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.xl),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnrealLoadingIndicator()
+                }
+            }
+            else -> {
                 LinearProgressIndicator(
                     progress = { usage.ratio },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
                     color = if (usage.nearThreshold) {
                         MaterialTheme.colorScheme.error
                     } else {
@@ -151,20 +137,22 @@ private fun ContextUsageContent(
 @Composable
 private fun ContextUsageRow(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -179,9 +167,9 @@ private fun Int.grouped(): String = toString()
 
 @AnrealPreviews
 @Composable
-private fun ContextUsageContentPreview() {
+private fun ContextUsageSheetPreview() {
     AnrealPreview {
-        ContextUsageContent(
+        ContextUsageSheet(
             usage = ContextUsageUi(
                 modelLabel = "GPT Luna 5.6",
                 estimatedTokens = 12_400,
@@ -193,6 +181,23 @@ private fun ContextUsageContentPreview() {
                 nearThreshold = false,
             ),
             error = false,
+            onDismiss = {},
         )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ContextUsageSheetLoadingPreview() {
+    AnrealPreview {
+        ContextUsageSheet(usage = null, error = false, onDismiss = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ContextUsageSheetErrorPreview() {
+    AnrealPreview {
+        ContextUsageSheet(usage = null, error = true, onDismiss = {})
     }
 }
