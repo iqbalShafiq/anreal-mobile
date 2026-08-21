@@ -11,7 +11,7 @@ data class WorkspaceRoute(val section: WorkspaceSection)
 
 fun NavGraphBuilder.workspaceGraph(
     navController: NavController,
-    onOpenProject: (String) -> Unit,
+    onOpenProject: (projectId: String, name: String) -> Unit,
 ) {
     composable<WorkspaceRoute> { backStackEntry ->
         val route = backStackEntry.toRoute<WorkspaceRoute>()

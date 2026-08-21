@@ -82,14 +82,14 @@ import org.koin.core.parameter.parametersOf
 fun WorkspaceRoot(
     initialSection: WorkspaceSection,
     onBack: () -> Unit,
-    onOpenProject: (String) -> Unit = {},
+    onOpenProject: (projectId: String, name: String) -> Unit = { _, _ -> },
     viewModel: WorkspaceViewModel = koinViewModel { parametersOf(initialSection) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ObserveAsEvents(viewModel.events) { event ->
         when (event) {
             WorkspaceEvent.NavigateBack -> onBack()
-            is WorkspaceEvent.OpenProject -> onOpenProject(event.projectId)
+            is WorkspaceEvent.OpenProject -> onOpenProject(event.projectId, event.name)
         }
     }
     WorkspaceScreen(state, viewModel::onAction)

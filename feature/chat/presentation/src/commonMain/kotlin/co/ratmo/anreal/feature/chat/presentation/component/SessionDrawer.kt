@@ -54,6 +54,7 @@ import co.ratmo.anreal.feature.chat.presentation.groupSessionsByDate
 import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatProjectWorkspacePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatWorkspacePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.previewAccount
 import co.ratmo.anreal.feature.chat.presentation.preview.previewReadSession
@@ -84,13 +85,13 @@ internal fun SessionDrawer(
         when {
             state.sessionsLoading && state.sessions.isEmpty() -> {
                 Column(modifier = Modifier.weight(1f).padding(horizontal = AnrealSpacing.sm)) {
-                    WorkspaceNav(onAction = onAction)
+                    WorkspaceNav(state = state, onAction = onAction)
                     AnrealSkeletonList(count = 6, itemHeight = 48.dp)
                 }
             }
             state.sessionsError != null && state.sessions.isEmpty() -> {
                 Column(modifier = Modifier.weight(1f).padding(horizontal = AnrealSpacing.sm)) {
-                    WorkspaceNav(onAction = onAction)
+                    WorkspaceNav(state = state, onAction = onAction)
                     AnrealError(
                         message = state.sessionsError.asString(),
                         onRetry = { onAction(ChatAction.OnRefreshSessions) },
@@ -100,7 +101,7 @@ internal fun SessionDrawer(
             else -> {
                 LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     item(key = "workspace") {
-                        WorkspaceNav(onAction = onAction)
+                        WorkspaceNav(state = state, onAction = onAction)
                     }
                     if (state.recentProjects.isNotEmpty()) {
                         item(key = "recent-label") {
@@ -109,6 +110,7 @@ internal fun SessionDrawer(
                         items(state.recentProjects, key = { "project-${it.id}" }) { project ->
                             RecentProjectRow(
                                 name = project.name,
+                                selected = project.id == state.activeProjectId,
                                 onClick = { onAction(ChatAction.OnOpenRecentProject(project.id)) },
                             )
                         }
@@ -210,14 +212,14 @@ private fun DrawerHeader(
 }
 
 @Composable
-private fun WorkspaceNav(onAction: (ChatAction) -> Unit) {
+private fun WorkspaceNav(state: ChatState, onAction: (ChatAction) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = AnrealSpacing.xs, vertical = AnrealSpacing.xxs)) {
         SectionLabel(AnrealCopy.get(AnrealCopy.LABEL_WORKSPACE))
         WorkspaceItem(
             icon = MaterialSymbols.Rounded.Chat_bubble,
             label = AnrealCopy.get(AnrealCopy.LABEL_ALL_CHATS),
-            selected = true,
-            onClick = {},
+            selected = !state.inProject,
+            onClick = { onAction(ChatAction.OnOpenAllChats) },
         )
         WorkspaceItem(
             icon = MaterialSymbols.Rounded.Folder,
@@ -301,19 +303,37 @@ private fun SectionLabel(text: String) {
 @Composable
 private fun RecentProjectRow(
     name: String,
+    selected: Boolean,
     onClick: () -> Unit,
 ) {
-    Text(
-        text = name,
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
-        style = MaterialTheme.typography.bodyMedium,
-        color = glassMutedTextColor(),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+            .padding(horizontal = AnrealSpacing.xs, vertical = 1.dp)
+            .clickable(onClick = onClick),
+        shape = MaterialTheme.shapes.medium,
+        color = if (selected) glassHighlightColor() else MaterialTheme.colorScheme.surface.copy(alpha = 0f),
+    ) {
+        Text(
+            text = name,
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = AnrealSpacing.touch)
+                .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+            style = if (selected) {
+                MaterialTheme.typography.labelLarge
+            } else {
+                MaterialTheme.typography.bodyMedium
+            },
+            color = if (selected) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                glassMutedTextColor()
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -511,6 +531,18 @@ private fun SessionDrawerEmptyPreview() {
 private fun SessionDrawerPopulatedPreview() {
     AnrealPreview {
         SessionDrawer(state = chatWorkspacePreviewState(), onAction = {}, account = previewAccount)
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun SessionDrawerProjectPreview() {
+    AnrealPreview {
+        SessionDrawer(
+            state = chatProjectWorkspacePreviewState(),
+            onAction = {},
+            account = previewAccount,
+        )
     }
 }
 

@@ -52,6 +52,45 @@ class KtorChatRemoteDataSourceTest {
     }
 
     @Test
+    fun listSessions_sends_project_id_query() = runTest {
+        var captured: String? = "unset"
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/chat/sessions")
+            captured = request.url.parameters["projectId"]
+            respond(
+                content = """{"items":[],"nextCursor":null}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        source.listSessions(projectId = "p1")
+        assertThat(captured).isEqualTo("p1")
+
+        source.listSessions()
+        assertThat(captured).isEqualTo(null)
+    }
+
+    @Test
+    fun openProject_maps_name() = runTest {
+        val source = source(
+            path = "/api/projects/p1/open",
+            body = """{"id":"p1","name":"Research","description":"Notes","documentCount":1,"chatCount":2}""",
+        )
+
+        val project = (source.openProject("p1") as Result.Success).data
+        assertThat(project.id).isEqualTo("p1")
+        assertThat(project.name).isEqualTo("Research")
+    }
+
+    @Test
     fun loadHistory_accepts_mixed_anvia_content_shapes() = runTest {
         val source = source(
             path = "/api/chat",

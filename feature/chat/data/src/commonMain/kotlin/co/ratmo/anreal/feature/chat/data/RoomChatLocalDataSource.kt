@@ -19,8 +19,13 @@ class RoomChatLocalDataSource(
     private val messageDao: MessageDao,
     private val queuedItemDao: QueuedItemDao,
 ) {
-    fun observeSessions(): Flow<List<ChatSession>> {
-        return sessionDao.observeSessions().map { rows -> rows.map { it.toSession() } }
+    fun observeSessions(projectId: String?): Flow<List<ChatSession>> {
+        val rows = if (projectId == null) {
+            sessionDao.observeStandalone()
+        } else {
+            sessionDao.observeForProject(projectId)
+        }
+        return rows.map { entities -> entities.map { it.toSession() } }
     }
 
     suspend fun replaceSessions(sessions: List<ChatSession>) {

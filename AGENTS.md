@@ -32,7 +32,7 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 ```
 
 Shipped feature modules: `auth`, `chat`, `workspace`.
-Account / Settings is a **screen inside** `feature:chat:presentation` (`AccountRoute`), not `:feature:settings` yet. Projects, documents, and images share the cohesive `:feature:workspace:{domain,data,presentation}` browser; session-scoped attachment and context actions remain owned by chat.
+Account / Settings is a **screen inside** `feature:chat:presentation` (`AccountRoute`), not `:feature:settings` yet. Projects, documents, and images share the cohesive `:feature:workspace:{domain,data,presentation}` browser; session-scoped attachment and context actions remain owned by chat. Opening a project is Chat state (`activeProjectId`), not a new feature or a second `ChatRoute`. `:app` holds a one-shot `EnterProjectRequest` flow; Workspace writes it then pops to the existing Chat destination. Do not pass the request as a captured `String?` into the `NavHost` builder — that snapshot stays null.
 
 ### Dependency rules
 
@@ -155,7 +155,8 @@ Read `DESIGN.md` before writing UI.
 - Transitions live on the root `NavHost` in `shared` (`anrealEnter` / `anrealExit`). Classify with `classifyNavMotion`. Do not leave NavHost on the default crossfade.
 - Compose splash (aurora + mark + `Anreal v<versionName>` + “Presented by Ratmo.co”) is not a route. It holds until session resolve + `durationSplash`, then fades to boarding or chat. Android 12+ uses `Theme.Anreal.Splash`.
 - Signed-out start is **boarding** (feature carousel + email + Create account). Login and Register sit above it.
-- Signed-in start is a **New chat** draft, not the most recent session. Rejoin a session only when a run is still `running`.
+- Signed-in start is a **New chat** draft, not the most recent session. Rejoin a session only when a run is still `running`. Do not push a second `ChatRoute` to open a project.
+- **Chat → Workspace** is a horizontal push. Opening a project pops Workspace and enters project-workspace on the existing Chat (drawer auto-opens). All chats leaves the project.
 - **Boarding → Login / Register** is a one-way vertical **pager**: boarding is replaced by the form and both move **up**. Login and Register have no back affordance and system back must not reveal boarding. **Login ↔ Register** is the same replace-current strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
 - **Auth → Chat** slides forward (right → left). Logout / pop to **boarding** is the reverse.
 - **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). The Account screen uses a compact section switcher with 160ms directional content motion; Logout is fixed in a floating bottom dock on that screen, never in the drawer menu.

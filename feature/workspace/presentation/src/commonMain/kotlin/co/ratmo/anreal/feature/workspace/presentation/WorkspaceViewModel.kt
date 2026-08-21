@@ -123,7 +123,7 @@ sealed interface WorkspaceAction {
 
 sealed interface WorkspaceEvent {
     data object NavigateBack : WorkspaceEvent
-    data class OpenProject(val projectId: String) : WorkspaceEvent
+    data class OpenProject(val projectId: String, val name: String) : WorkspaceEvent
 }
 
 class WorkspaceViewModel(
@@ -413,7 +413,7 @@ class WorkspaceViewModel(
         when (val result = repository.openProject(id)) {
             is Result.Success -> {
                 _state.update { it.copy(isLoading = false) }
-                _events.send(WorkspaceEvent.OpenProject(result.data.id))
+                _events.send(WorkspaceEvent.OpenProject(result.data.id, result.data.name))
             }
             is Result.Error -> _state.update {
                 it.copy(isLoading = false, error = result.error.toUiText())

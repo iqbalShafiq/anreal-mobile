@@ -163,7 +163,10 @@ class ChatScreensScreenshotTest {
         }
         composeTestRule.waitForIdle()
 
-        composeTestRule.onRoot().performTouchInput { swipeDown() }
+        composeTestRule.onNodeWithText("Latest loaded answer", substring = true)
+            .performTouchInput {
+                repeat(3) { swipeDown() }
+            }
         composeTestRule.waitForIdle()
         composeTestRule
             .onNodeWithContentDescription(AnrealCopy.get(AnrealCopy.CD_SCROLL_TO_BOTTOM))

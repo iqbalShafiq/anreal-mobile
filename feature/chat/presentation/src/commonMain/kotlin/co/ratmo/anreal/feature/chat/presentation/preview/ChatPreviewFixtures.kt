@@ -182,6 +182,28 @@ internal fun chatWorkspacePreviewState(): ChatState = chatPopulatedPreviewState(
     ),
 )
 
+internal fun chatProjectWorkspacePreviewState(): ChatState = chatWorkspacePreviewState().copy(
+    activeProjectId = "p1",
+    activeProjectName = "Agentic Course",
+    sessions = listOf(
+        ChatSessionUi(
+            id = "p-s1",
+            title = "New chat",
+            unread = false,
+            updatedAt = "2026-08-14T10:00:00Z",
+            projectId = "p1",
+        ),
+        ChatSessionUi(
+            id = "p-s2",
+            title = "Eval notes",
+            unread = false,
+            updatedAt = "2026-08-13T18:00:00Z",
+            projectId = "p1",
+        ),
+    ),
+    selectedSessionId = "p-s1",
+)
+
 internal fun chatDocumentsPreviewState(): ChatState = chatWorkspacePreviewState()
 
 internal fun chatComposerCatalogPreviewState(

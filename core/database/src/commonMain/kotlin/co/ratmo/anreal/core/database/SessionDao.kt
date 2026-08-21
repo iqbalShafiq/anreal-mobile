@@ -7,8 +7,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SessionDao {
-    @Query("SELECT * FROM sessions ORDER BY updatedAt DESC")
-    fun observeSessions(): Flow<List<SessionEntity>>
+    @Query("SELECT * FROM sessions WHERE projectId IS NULL ORDER BY updatedAt DESC")
+    fun observeStandalone(): Flow<List<SessionEntity>>
+
+    @Query("SELECT * FROM sessions WHERE projectId = :projectId ORDER BY updatedAt DESC")
+    fun observeForProject(projectId: String): Flow<List<SessionEntity>>
 
     @Query("SELECT * FROM sessions WHERE id = :id")
     suspend fun getSession(id: String): SessionEntity?

@@ -102,7 +102,7 @@ class WorkspaceViewModelTest {
 
         viewModel.events.test {
             viewModel.onAction(WorkspaceAction.OpenProject("p1"))
-            assertThat(awaitItem()).isEqualTo(WorkspaceEvent.OpenProject("p1"))
+            assertThat(awaitItem()).isEqualTo(WorkspaceEvent.OpenProject("p1", "Research"))
         }
     }
 

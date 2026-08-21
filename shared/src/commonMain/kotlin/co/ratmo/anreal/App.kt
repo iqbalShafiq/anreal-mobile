@@ -39,7 +39,9 @@ import co.ratmo.anreal.feature.auth.presentation.RegisterRoute
 import co.ratmo.anreal.feature.auth.presentation.authGraph
 import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
+import co.ratmo.anreal.feature.chat.presentation.EnterProjectRequest
 import co.ratmo.anreal.feature.chat.presentation.chatGraph
+import kotlinx.coroutines.flow.MutableStateFlow
 import co.ratmo.anreal.feature.workspace.presentation.WorkspaceRoute
 import co.ratmo.anreal.feature.workspace.presentation.WorkspaceSection
 import co.ratmo.anreal.feature.workspace.presentation.workspaceGraph
@@ -137,6 +139,7 @@ private fun AuthenticatedHost(
     val reduceMotion = LocalAnrealReduceMotion.current
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val enterProjectRequest = remember { MutableStateFlow<EnterProjectRequest?>(null) }
     AnrealAtmosphere {
         NavHost(
             modifier = Modifier.fillMaxSize(),
@@ -172,13 +175,14 @@ private fun AuthenticatedHost(
                 onNavigateProjects = { navController.navigate(WorkspaceRoute(WorkspaceSection.Projects)) },
                 onNavigateDocuments = { navController.navigate(WorkspaceRoute(WorkspaceSection.Documents)) },
                 onNavigateImages = { navController.navigate(WorkspaceRoute(WorkspaceSection.Images)) },
+                enterProjectRequest = enterProjectRequest,
+                onEnterProjectConsumed = { enterProjectRequest.value = null },
             )
             workspaceGraph(
                 navController = navController,
-                onOpenProject = { projectId ->
-                    navController.navigate(ChatRoute(projectId = projectId)) {
-                        popUpTo<WorkspaceRoute> { inclusive = true }
-                    }
+                onOpenProject = { projectId, name ->
+                    enterProjectRequest.value = EnterProjectRequest(projectId, name)
+                    navController.popBackStack()
                 },
             )
         }

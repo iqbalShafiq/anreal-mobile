@@ -25,6 +25,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
 class FakeChatRepository : ChatRepository {
     val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
@@ -74,10 +75,22 @@ class FakeChatRepository : ChatRepository {
     var contextSnippet: ContextSnippet? = null
     var lastTruncatedMessageId: String? = null
     val openedProjectIds = mutableListOf<String?>()
+    val refreshProjectIds = mutableListOf<String?>()
+    val openProjectCalls = mutableListOf<String>()
+    var openProjectResult: Result<RecentProject, ChatError>? = null
 
-    override fun observeSessions(): Flow<List<ChatSession>> = sessions
+    override fun observeSessions(projectId: String?): Flow<List<ChatSession>> =
+        sessions.map { list ->
+            list.filter { session ->
+                if (projectId == null) session.projectId == null else session.projectId == projectId
+            }
+        }
 
-    override suspend fun refreshSessions(cursor: String?): Result<SessionPage, ChatError> {
+    override suspend fun refreshSessions(
+        cursor: String?,
+        projectId: String?,
+    ): Result<SessionPage, ChatError> {
+        refreshProjectIds += projectId
         when (val result = refreshResult) {
             is Result.Success -> sessions.value = result.data.items
             is Result.Error -> Unit
@@ -296,4 +309,13 @@ class FakeChatRepository : ChatRepository {
     ): EmptyResult<ChatError> = Result.Success(Unit)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> = recentProjects
+
+    override suspend fun openProject(id: String): Result<RecentProject, ChatError> {
+        openProjectCalls += id
+        val forced = openProjectResult
+        if (forced != null) return forced
+        val name = (recentProjects as? Result.Success)?.data?.firstOrNull { it.id == id }?.name
+            ?: "Project"
+        return Result.Success(RecentProject(id = id, name = name))
+    }
 }

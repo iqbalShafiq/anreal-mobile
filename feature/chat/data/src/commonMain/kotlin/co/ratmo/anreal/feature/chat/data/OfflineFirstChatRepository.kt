@@ -32,10 +32,14 @@ class OfflineFirstChatRepository(
     private val local: RoomChatLocalDataSource,
 ) : ChatRepository {
 
-    override fun observeSessions(): Flow<List<ChatSession>> = local.observeSessions()
+    override fun observeSessions(projectId: String?): Flow<List<ChatSession>> =
+        local.observeSessions(projectId)
 
-    override suspend fun refreshSessions(cursor: String?): Result<SessionPage, ChatError> {
-        return remote.listSessions(cursor).onSuccess { page ->
+    override suspend fun refreshSessions(
+        cursor: String?,
+        projectId: String?,
+    ): Result<SessionPage, ChatError> {
+        return remote.listSessions(cursor, projectId).onSuccess { page ->
             local.replaceSessions(page.items)
         }
     }
@@ -254,5 +258,9 @@ class OfflineFirstChatRepository(
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return remote.listRecentProjects()
+    }
+
+    override suspend fun openProject(id: String): Result<RecentProject, ChatError> {
+        return remote.openProject(id)
     }
 }

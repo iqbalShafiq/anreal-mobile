@@ -19,6 +19,7 @@ import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionPage
@@ -87,14 +88,189 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun bootstrap_creates_draft_in_route_project_when_no_session_exists() = runTest {
+    fun bootstrap_creates_standalone_draft_even_if_enter_project_keys_are_absent() = runTest {
         val fake = FakeChatRepository()
-        val viewModel = ChatViewModel(SavedStateHandle(mapOf("projectId" to "p1")), fake)
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
 
         advanceUntilIdle()
 
-        assertThat(fake.openedProjectIds).isEqualTo(listOf("p1"))
+        assertThat(fake.openedProjectIds).isEqualTo(listOf(null))
         assertThat(viewModel.state.value.selectedSessionId).isEqualTo("draft")
+        assertThat(viewModel.state.value.activeProjectId).isNull()
+    }
+
+    @Test
+    fun opening_recent_project_selects_existing_chat_without_opening_a_draft() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.openedProjectIds.clear()
+        fake.refreshResult = Result.Success(
+            SessionPage(
+                listOf(
+                    ChatSession(id = "p-s1", title = "Docs", updatedAt = "now", projectId = "p1"),
+                    ChatSession(id = "p-s2", title = "Notes", updatedAt = "earlier", projectId = "p1"),
+                ),
+            ),
+        )
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+            advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(ChatEvent.RevealChatsDrawer)
+        }
+
+        assertThat(fake.openedProjectIds).isEqualTo(emptyList())
+        assertThat(fake.openProjectCalls).isEqualTo(listOf("p1"))
+        assertThat(fake.refreshProjectIds.last()).isEqualTo("p1")
+        assertThat(viewModel.state.value.activeProjectId).isEqualTo("p1")
+        assertThat(viewModel.state.value.activeProjectName).isEqualTo("Research")
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("p-s1")
+        assertThat(viewModel.state.value.inProject).isTrue()
+    }
+
+    @Test
+    fun enter_project_action_uses_supplied_name_and_scopes_sessions() = runTest {
+        val fake = populatedRepo().apply {
+            openProjectResult = Result.Success(RecentProject("a1", "Anvia Project"))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.refreshResult = Result.Success(
+            SessionPage(
+                listOf(ChatSession(id = "a-s1", title = "Docs", updatedAt = "now", projectId = "a1")),
+            ),
+        )
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnEnterProject("a1", "Anvia Project"))
+            advanceUntilIdle()
+            assertThat(awaitItem()).isEqualTo(ChatEvent.RevealChatsDrawer)
+        }
+
+        assertThat(viewModel.state.value.activeProjectId).isEqualTo("a1")
+        assertThat(viewModel.state.value.activeProjectName).isEqualTo("Anvia Project")
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("a-s1")
+        assertThat(fake.refreshProjectIds.last()).isEqualTo("a1")
+    }
+
+    @Test
+    fun opening_project_prefers_empty_draft_in_the_list() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.openedProjectIds.clear()
+        fake.refreshResult = Result.Success(
+            SessionPage(
+                listOf(
+                    ChatSession(id = "p-s1", title = "Docs", updatedAt = "now", projectId = "p1"),
+                    ChatSession(id = "p-draft", title = "New chat", updatedAt = "now", projectId = "p1"),
+                ),
+            ),
+        )
+
+        viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+        advanceUntilIdle()
+
+        assertThat(fake.openedProjectIds).isEqualTo(emptyList())
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("p-draft")
+    }
+
+    @Test
+    fun opening_empty_project_opens_a_project_draft() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+            draft = ChatSession(id = "p-draft", title = "New chat", updatedAt = "now", projectId = "p1")
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.openedProjectIds.clear()
+        fake.refreshResult = Result.Success(SessionPage(emptyList()))
+
+        viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+        advanceUntilIdle()
+
+        assertThat(fake.openedProjectIds).isEqualTo(listOf("p1"))
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("p-draft")
+        assertThat(viewModel.state.value.activeProjectId).isEqualTo("p1")
+    }
+
+    @Test
+    fun new_chat_in_project_uses_project_id() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+            draft = ChatSession(id = "p-draft", title = "New chat", updatedAt = "now", projectId = "p1")
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.refreshResult = Result.Success(
+            SessionPage(listOf(ChatSession(id = "p-s1", title = "Docs", updatedAt = "now", projectId = "p1"))),
+        )
+        viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+        advanceUntilIdle()
+        fake.openedProjectIds.clear()
+
+        viewModel.onAction(ChatAction.OnNewChat)
+        advanceUntilIdle()
+
+        assertThat(fake.openedProjectIds).isEqualTo(listOf("p1"))
+    }
+
+    @Test
+    fun all_chats_leaves_project_and_restores_standalone_session() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        val standaloneId = viewModel.state.value.selectedSessionId
+        fake.refreshResult = Result.Success(
+            SessionPage(listOf(ChatSession(id = "p-s1", title = "Docs", updatedAt = "now", projectId = "p1"))),
+        )
+        viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+        advanceUntilIdle()
+        fake.refreshResult = Result.Success(
+            SessionPage(listOf(ChatSession(id = standaloneId ?: "draft", title = "New chat", updatedAt = "now"))),
+        )
+        fake.openedProjectIds.clear()
+
+        viewModel.onAction(ChatAction.OnOpenAllChats)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.activeProjectId).isNull()
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo(standaloneId)
+        assertThat(fake.openedProjectIds).isEqualTo(emptyList())
+        assertThat(fake.refreshProjectIds.last()).isEqualTo(null)
+    }
+
+    @Test
+    fun deleting_selected_project_chat_opens_a_project_draft() = runTest {
+        val fake = populatedRepo().apply {
+            recentProjects = Result.Success(listOf(RecentProject("p1", "Research")))
+            draft = ChatSession(id = "p-draft", title = "New chat", updatedAt = "now", projectId = "p1")
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.refreshResult = Result.Success(
+            SessionPage(listOf(ChatSession(id = "p-s1", title = "Docs", updatedAt = "now", projectId = "p1"))),
+        )
+        fake.openedProjectIds.clear()
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnOpenRecentProject("p1"))
+            assertThat(awaitItem()).isEqualTo(ChatEvent.RevealChatsDrawer)
+            fake.openedProjectIds.clear()
+            viewModel.onAction(ChatAction.OnSessionMenuDelete("p-s1"))
+            viewModel.onAction(ChatAction.OnConfirmDelete)
+            assertThat((awaitItem() as ChatEvent.ShowMessage).message)
+                .isEqualTo(UiText.StringResource(AnrealCopy.TOAST_CHAT_DELETED))
+        }
+
+        assertThat(fake.openedProjectIds).isEqualTo(listOf("p1"))
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("p-draft")
     }
 
     @Test

@@ -32,8 +32,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
+import co.ratmo.anreal.core.designsystem.component.AnrealBackHandler
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
 import co.ratmo.anreal.core.designsystem.component.GlassTopBar
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -41,6 +43,7 @@ import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
+import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageButton
@@ -61,6 +64,7 @@ import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatProjectWorkspacePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatDeletePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatRenamePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatQueueConflictPreviewState
@@ -88,11 +92,20 @@ fun ChatRoot(
     onNavigateProjects: () -> Unit = {},
     onNavigateDocuments: () -> Unit = {},
     onNavigateImages: () -> Unit = {},
+    enterProjectId: String? = null,
+    enterProjectName: String? = null,
+    onEnterProjectConsumed: () -> Unit = {},
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val snackbarScope = rememberCoroutineScope()
+    var revealChats by remember { mutableIntStateOf(0) }
+    LaunchedEffect(enterProjectId) {
+        val projectId = enterProjectId ?: return@LaunchedEffect
+        viewModel.onAction(ChatAction.OnEnterProject(projectId, enterProjectName))
+        onEnterProjectConsumed()
+    }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
     ObserveAsEvents(viewModel.events) { event ->
@@ -139,10 +152,16 @@ fun ChatRoot(
             ChatEvent.OpenProjects -> onNavigateProjects()
             ChatEvent.OpenDocuments -> onNavigateDocuments()
             ChatEvent.OpenImages -> onNavigateImages()
+            ChatEvent.RevealChatsDrawer -> revealChats += 1
         }
     }
     Box(modifier = Modifier.fillMaxSize()) {
-        ChatScreen(state = state, onAction = viewModel::onAction, account = account)
+        ChatScreen(
+            state = state,
+            onAction = viewModel::onAction,
+            account = account,
+            revealChatsGeneration = revealChats,
+        )
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -165,6 +184,7 @@ fun ChatScreen(
     account: AccountUi = AccountUi(),
     initialChatsDrawer: DrawerValue = DrawerValue.Closed,
     initialDocumentsDrawer: Boolean = false,
+    revealChatsGeneration: Int = 0,
 ) {
     val drawerState = rememberDrawerState(initialValue = initialChatsDrawer)
     var documentsOpen by remember { mutableStateOf(initialDocumentsDrawer) }
@@ -174,15 +194,21 @@ fun ChatScreen(
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     val documentCount = documentsBadgeCount(state)
-    var skipInitialDrawerClose by remember { mutableStateOf(true) }
-    LaunchedEffect(state.selectedSessionId) {
-        if (skipInitialDrawerClose) {
-            skipInitialDrawerClose = false
-            return@LaunchedEffect
+    LaunchedEffect(revealChatsGeneration) {
+        if (revealChatsGeneration > 0) drawerState.open()
+    }
+    val onScreenAction: (ChatAction) -> Unit = { action ->
+        onAction(action)
+        if (action is ChatAction.OnSessionClick) {
+            scope.launch {
+                drawerState.close()
+                documentsOpen = false
+                frostedTopBar.value = false
+            }
         }
-        drawerState.close()
-        documentsOpen = false
-        frostedTopBar.value = false
+    }
+    AnrealBackHandler(enabled = state.inProject && !drawerState.isOpen) {
+        onScreenAction(ChatAction.OnOpenAllChats)
     }
 
     AnrealAtmosphere {
@@ -193,7 +219,7 @@ fun ChatScreen(
                     GlassDrawer(fromEnd = false) {
                         SessionDrawer(
                             state = state,
-                            onAction = onAction,
+                            onAction = onScreenAction,
                             account = account,
                         )
                     }
@@ -206,9 +232,10 @@ fun ChatScreen(
                             TopAppBar(
                                 title = {
                                     Text(
-                                        text = state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title
-                                            ?: AnrealCopy.get(AnrealCopy.LABEL_CHATS),
+                                        text = chatBarTitle(state),
                                         style = MaterialTheme.typography.titleMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
                                 },
                                 navigationIcon = {
@@ -310,6 +337,17 @@ fun ChatScreen(
     }
 }
 
+private fun chatBarTitle(state: ChatState): String {
+    val sessionTitle = state.sessions.firstOrNull { it.id == state.selectedSessionId }?.title
+        ?: AnrealCopy.get(AnrealCopy.LABEL_CHATS)
+    val project = state.activeProjectName
+    return if (project.isNullOrBlank()) {
+        sessionTitle
+    } else {
+        UiText.StringResource(AnrealCopy.LABEL_PROJECT_CHAT_TITLE, listOf(project, sessionTitle)).asString()
+    }
+}
+
 @AnrealPreviews
 @Composable
 private fun ChatEmptyPreview() {
@@ -339,6 +377,18 @@ private fun ChatErrorPreview() {
 private fun ChatPopulatedPreview() {
     AnrealPreview {
         ChatScreen(state = chatPopulatedPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatProjectWorkspacePreview() {
+    AnrealPreview {
+        ChatScreen(
+            state = chatProjectWorkspacePreviewState(),
+            onAction = {},
+            initialChatsDrawer = DrawerValue.Open,
+        )
     }
 }
 

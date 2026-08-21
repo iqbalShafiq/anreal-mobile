@@ -89,8 +89,11 @@ data class ContextSnippet(
 )
 
 interface ChatRepository {
-    fun observeSessions(): Flow<List<ChatSession>>
-    suspend fun refreshSessions(cursor: String? = null): Result<SessionPage, ChatError>
+    fun observeSessions(projectId: String? = null): Flow<List<ChatSession>>
+    suspend fun refreshSessions(
+        cursor: String? = null,
+        projectId: String? = null,
+    ): Result<SessionPage, ChatError>
     suspend fun createSession(sessionId: String? = null, projectId: String? = null): Result<ChatSession, ChatError>
     suspend fun openDraft(projectId: String? = null): Result<ChatSession, ChatError>
     suspend fun renameSession(sessionId: String, title: String): Result<ChatSession, ChatError>
@@ -165,4 +168,5 @@ interface ChatRepository {
         skipped: List<String>,
     ): EmptyResult<ChatError>
     suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError>
+    suspend fun openProject(id: String): Result<RecentProject, ChatError>
 }

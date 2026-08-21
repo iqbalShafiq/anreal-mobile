@@ -5,6 +5,7 @@ import co.ratmo.anreal.core.data.network.get
 import co.ratmo.anreal.core.data.network.getBytes
 import co.ratmo.anreal.core.data.network.patch
 import co.ratmo.anreal.core.data.network.post
+import co.ratmo.anreal.core.data.network.postForResponse
 import co.ratmo.anreal.core.data.network.postJsonl
 import co.ratmo.anreal.core.data.network.postMultipart
 import co.ratmo.anreal.core.data.network.put
@@ -39,10 +40,17 @@ import io.ktor.client.HttpClient
 class KtorChatRemoteDataSource(
     private val httpClient: HttpClient,
 ) {
-    suspend fun listSessions(cursor: String? = null): Result<SessionPage, ChatError> {
+    suspend fun listSessions(
+        cursor: String? = null,
+        projectId: String? = null,
+    ): Result<SessionPage, ChatError> {
         return httpClient.get<SessionListPageDto>(
             route = "/api/chat/sessions",
-            queryParameters = mapOf("limit" to 50, "cursor" to cursor),
+            queryParameters = mapOf(
+                "limit" to 50,
+                "cursor" to cursor,
+                "projectId" to projectId,
+            ),
         ).map { page ->
             SessionPage(items = page.items.map { it.toSession() }, nextCursor = page.nextCursor)
         }.mapNetwork()
@@ -343,6 +351,12 @@ class KtorChatRemoteDataSource(
             route = "/api/projects",
             queryParameters = mapOf("limit" to 5, "sort" to "lastOpenedAt"),
         ).map { page -> page.items.map { it.toProject() } }.mapNetwork()
+    }
+
+    suspend fun openProject(id: String): Result<RecentProject, ChatError> {
+        return httpClient.postForResponse<ProjectListItemDto>(
+            route = "/api/projects/$id/open",
+        ).map { it.toProject() }.mapNetwork()
     }
 }
 

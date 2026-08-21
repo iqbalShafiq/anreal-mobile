@@ -47,12 +47,16 @@ import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.domain.stream.StreamEnvelope
 import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -180,7 +184,11 @@ data class ChatState(
     val citedDocuments: List<CitedDocumentUi> = emptyList(),
     val isUploading: Boolean = false,
     val humanInputBusy: Boolean = false,
-)
+    val activeProjectId: String? = null,
+    val activeProjectName: String? = null,
+) {
+    val inProject: Boolean get() = activeProjectId != null
+}
 
 data class PickedUploadUi(
     val filename: String,
@@ -247,7 +255,9 @@ sealed interface ChatAction {
     data object OnOpenDocumentsLibrary : ChatAction
     data object OnOpenImages : ChatAction
     data object OnOpenSettings : ChatAction
+    data object OnOpenAllChats : ChatAction
     data class OnOpenRecentProject(val projectId: String) : ChatAction
+    data class OnEnterProject(val projectId: String, val name: String?) : ChatAction
     data class OnRemoveActiveDocument(val documentId: String) : ChatAction
 }
 
@@ -259,8 +269,10 @@ sealed interface ChatEvent {
     data object OpenProjects : ChatEvent
     data object OpenDocuments : ChatEvent
     data object OpenImages : ChatEvent
+    data object RevealChatsDrawer : ChatEvent
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository,
@@ -279,12 +291,17 @@ class ChatViewModel(
     val events = _events.receiveAsFlow()
     private var hold: Boolean = false
     private var librarySearchJob: Job? = null
+    private var lastStandaloneSessionId: String? = null
 
     init {
         viewModelScope.launch {
-            chatRepository.observeSessions().collect { sessions ->
-                _state.update { it.copy(sessions = sessions.map { session -> session.toUi() }) }
-            }
+            _state
+                .map { it.activeProjectId }
+                .distinctUntilChanged()
+                .flatMapLatest { projectId -> chatRepository.observeSessions(projectId) }
+                .collect { sessions ->
+                    _state.update { it.copy(sessions = sessions.map { session -> session.toUi() }) }
+                }
         }
         viewModelScope.launch { bootstrap() }
         viewModelScope.launch { loadCatalog() }
@@ -295,7 +312,7 @@ class ChatViewModel(
         when (action) {
             ChatAction.OnRefreshSessions -> viewModelScope.launch { refreshSessions() }
             ChatAction.OnLoadMoreSessions -> viewModelScope.launch { loadMoreSessions() }
-            ChatAction.OnNewChat -> viewModelScope.launch { openDraft() }
+            ChatAction.OnNewChat -> viewModelScope.launch { newChat() }
             is ChatAction.OnSessionClick -> viewModelScope.launch { selectSession(action.sessionId) }
             is ChatAction.OnSessionMenuRename -> openRename(action.sessionId)
             is ChatAction.OnSessionMenuDelete -> openDelete(action.sessionId)
@@ -404,8 +421,13 @@ class ChatViewModel(
             ChatAction.OnOpenSettings -> viewModelScope.launch {
                 _events.send(ChatEvent.OpenAccount)
             }
+            ChatAction.OnOpenAllChats -> viewModelScope.launch { leaveProject() }
             is ChatAction.OnOpenRecentProject -> viewModelScope.launch {
-                _events.send(ChatEvent.OpenProjects)
+                val name = _state.value.recentProjects.firstOrNull { it.id == action.projectId }?.name
+                enterProject(action.projectId, name)
+            }
+            is ChatAction.OnEnterProject -> viewModelScope.launch {
+                enterProject(action.projectId, action.name)
             }
             is ChatAction.OnRemoveActiveDocument -> viewModelScope.launch {
                 unlinkDocument(action.documentId)
@@ -424,14 +446,14 @@ class ChatViewModel(
         if (activeSessionId != null) {
             selectSession(activeSessionId)
         } else {
-            openDraft(savedStateHandle[PROJECT_KEY])
+            openDraft()
         }
     }
 
     private suspend fun refreshSessions(): SessionPage? {
         _state.update { it.copy(sessionsLoading = true, sessionsError = null) }
         var page: SessionPage? = null
-        chatRepository.refreshSessions(cursor = null)
+        chatRepository.refreshSessions(cursor = null, projectId = _state.value.activeProjectId)
             .onSuccess { loaded ->
                 page = loaded
                 _state.update {
@@ -450,7 +472,7 @@ class ChatViewModel(
         val cursor = _state.value.sessionsNextCursor ?: return
         if (_state.value.sessionsLoadingMore) return
         _state.update { it.copy(sessionsLoadingMore = true) }
-        chatRepository.refreshSessions(cursor)
+        chatRepository.refreshSessions(cursor, projectId = _state.value.activeProjectId)
             .onSuccess { page ->
                 _state.update {
                     it.copy(sessionsLoadingMore = false, sessionsNextCursor = page.nextCursor)
@@ -527,7 +549,7 @@ class ChatViewModel(
                 dismissSessionDialog()
                 _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_CHAT_DELETED)))
                 if (selected == sessionId) {
-                    openDraft()
+                    openDraft(_state.value.activeProjectId)
                 }
             }
             .onFailure { error ->
@@ -545,13 +567,102 @@ class ChatViewModel(
             }
     }
 
+    private suspend fun newChat() {
+        val emptyTitle = AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT)
+        val empty = _state.value.sessions.firstOrNull { it.title == emptyTitle }
+        if (empty != null) {
+            if (empty.id != _state.value.selectedSessionId) selectSession(empty.id)
+            return
+        }
+        openDraft(_state.value.activeProjectId)
+    }
+
+    private suspend fun enterProject(projectId: String, projectName: String?) {
+        if (_state.value.activeProjectId == projectId) {
+            if (!projectName.isNullOrBlank()) {
+                _state.update { it.copy(activeProjectName = projectName) }
+            }
+            _events.send(ChatEvent.RevealChatsDrawer)
+            return
+        }
+        val previousId = _state.value.activeProjectId
+        val previousName = _state.value.activeProjectName
+        if (previousId == null) {
+            lastStandaloneSessionId = _state.value.selectedSessionId
+        }
+        _state.update {
+            it.copy(
+                activeProjectId = projectId,
+                activeProjectName = projectName,
+                sessionsError = null,
+                sessionsNextCursor = null,
+                sessionsLoading = true,
+            )
+        }
+        viewModelScope.launch {
+            chatRepository.openProject(projectId)
+                .onSuccess { opened ->
+                    _state.update { state ->
+                        if (state.activeProjectId == projectId) {
+                            state.copy(activeProjectName = opened.name)
+                        } else {
+                            state
+                        }
+                    }
+                    loadRecentProjects()
+                }
+        }
+        val page = refreshSessions()
+        if (page == null) {
+            _state.update {
+                it.copy(activeProjectId = previousId, activeProjectName = previousName)
+            }
+            _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_UNKNOWN)))
+            return
+        }
+        val pick = pickScopedSession(page.items)
+        if (pick != null) {
+            selectSession(pick.id)
+        } else {
+            openDraft(projectId)
+        }
+        _events.send(ChatEvent.RevealChatsDrawer)
+    }
+
+    private suspend fun leaveProject() {
+        if (_state.value.activeProjectId == null) return
+        _state.update {
+            it.copy(
+                activeProjectId = null,
+                activeProjectName = null,
+                sessionsError = null,
+                sessionsNextCursor = null,
+                sessionsLoading = true,
+            )
+        }
+        val page = refreshSessions()
+        val last = lastStandaloneSessionId
+        val items = page?.items.orEmpty()
+        when {
+            last != null && items.any { it.id == last } -> selectSession(last)
+            else -> openDraft()
+        }
+    }
+
+    private fun pickScopedSession(items: List<ChatSession>): ChatSession? {
+        val emptyTitle = AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT)
+        return items.firstOrNull { session ->
+            session.title == emptyTitle || session.title.isBlank()
+        } ?: items.firstOrNull()
+    }
+
     private suspend fun uploadFiles(files: List<PickedUploadUi>, imagesOnly: Boolean) {
         if (files.isEmpty() || _state.value.isUploading) return
         if (files.any { it.bytes.size > MAX_UPLOAD_BYTES }) {
             _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_FILE_TOO_LARGE)))
             return
         }
-        if (_state.value.selectedSessionId == null) openDraft()
+        if (_state.value.selectedSessionId == null) openDraft(_state.value.activeProjectId)
         val sessionId = _state.value.selectedSessionId ?: return
         if (!imagesOnly) {
             when (val storage = chatRepository.getDocumentStorage()) {
@@ -1250,9 +1361,7 @@ class ChatViewModel(
         chatRepository.listLibraryDocuments(
             query = _state.value.libraryQuery.trim().ifBlank { null },
             cursor = cursor,
-            projectId = _state.value.sessions
-                .firstOrNull { it.id == _state.value.selectedSessionId }
-                ?.projectId,
+            projectId = _state.value.activeProjectId,
         ).onSuccess { page ->
             val selectedIds = _state.value.libraryDocuments.filter { it.selected }.mapTo(mutableSetOf()) { it.id }
             val mapped = page.items.map { document -> document.toUi(document.id in selectedIds) }
@@ -1396,7 +1505,6 @@ class ChatViewModel(
 
     private companion object {
         const val SESSION_KEY = "sessionId"
-        const val PROJECT_KEY = "projectId"
         const val DRAFT_KEY = "draft"
         const val SESSION_TITLE_MAX = 48
         const val DOCUMENT_POLL_ATTEMPTS = 20

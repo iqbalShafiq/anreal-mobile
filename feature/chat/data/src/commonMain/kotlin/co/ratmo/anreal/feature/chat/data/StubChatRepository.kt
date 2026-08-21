@@ -29,7 +29,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -42,6 +42,12 @@ class StubChatRepository : ChatRepository {
                 id = "dev-session",
                 title = "Development chat",
                 updatedAt = nowIso(),
+            ),
+            ChatSession(
+                id = "dev-project-session",
+                title = "Agentic notes",
+                updatedAt = nowIso(),
+                projectId = "p1",
             ),
         ),
     )
@@ -58,10 +64,16 @@ class StubChatRepository : ChatRepository {
     )
     private val snippets = mutableMapOf<String, ContextSnippet>()
 
-    override fun observeSessions(): Flow<List<ChatSession>> = sessions.asStateFlow()
+    override fun observeSessions(projectId: String?): Flow<List<ChatSession>> =
+        sessions.map { list -> list.filter { session -> session.matchesScope(projectId) } }
 
-    override suspend fun refreshSessions(cursor: String?): Result<SessionPage, ChatError> {
-        return Result.Success(SessionPage(items = sessions.value))
+    override suspend fun refreshSessions(
+        cursor: String?,
+        projectId: String?,
+    ): Result<SessionPage, ChatError> {
+        return Result.Success(
+            SessionPage(items = sessions.value.filter { it.matchesScope(projectId) }),
+        )
     }
 
     override suspend fun createSession(
@@ -347,7 +359,19 @@ class StubChatRepository : ChatRepository {
             ),
         )
     }
+
+    override suspend fun openProject(id: String): Result<RecentProject, ChatError> {
+        val name = when (id) {
+            "p1" -> "Agentic Course"
+            "p2" -> "Anvia Project"
+            else -> "Project"
+        }
+        return Result.Success(RecentProject(id = id, name = name))
+    }
 }
+
+private fun ChatSession.matchesScope(projectId: String?): Boolean =
+    if (projectId == null) this.projectId == null else this.projectId == projectId
 
 @OptIn(ExperimentalTime::class)
 private fun nowIso(): String = Clock.System.now().toString()
