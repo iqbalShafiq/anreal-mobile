@@ -31,9 +31,30 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE sessionId = :sessionId ORDER BY position ASC")
     suspend fun getMessages(sessionId: String): List<MessageEntity>
 
+    @Query(
+        "SELECT * FROM messages WHERE sessionId = :sessionId ORDER BY position DESC LIMIT :limit",
+    )
+    suspend fun getLatestMessages(sessionId: String, limit: Int): List<MessageEntity>
+
+    @Query(
+        "SELECT * FROM messages WHERE sessionId = :sessionId AND position < :beforePosition " +
+            "ORDER BY position DESC LIMIT :limit",
+    )
+    suspend fun getMessagesBefore(
+        sessionId: String,
+        beforePosition: Int,
+        limit: Int,
+    ): List<MessageEntity>
+
+    @Query("SELECT COUNT(*) FROM messages WHERE sessionId = :sessionId")
+    suspend fun countMessages(sessionId: String): Int
+
     @Upsert
     suspend fun upsert(messages: List<MessageEntity>)
 
     @Query("DELETE FROM messages WHERE sessionId = :sessionId")
     suspend fun deleteForSession(sessionId: String)
+
+    @Query("DELETE FROM messages WHERE sessionId = :sessionId AND position >= :fromPosition")
+    suspend fun deleteFromPosition(sessionId: String, fromPosition: Int)
 }

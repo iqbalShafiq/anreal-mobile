@@ -22,6 +22,7 @@ import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -425,6 +426,56 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun session_history_opens_on_the_latest_page_only() = runTest {
+        val messages = historyMessages(HISTORY_PAGE_SIZE + 5)
+        val fake = populatedRepo().apply {
+            cachedHistory = messages
+            history = Result.Success(messages)
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.thread.messages).isEqualTo(messages.takeLast(HISTORY_PAGE_SIZE))
+        assertThat(viewModel.state.value.canLoadOlderHistory).isTrue()
+        assertThat(viewModel.state.value.olderHistoryLoading).isFalse()
+        assertThat(viewModel.state.value.historyLoading).isFalse()
+    }
+
+    @Test
+    fun load_older_history_prepends_earlier_messages() = runTest {
+        val messages = historyMessages(HISTORY_PAGE_SIZE + 5)
+        val fake = populatedRepo().apply {
+            cachedHistory = messages
+            history = Result.Success(messages)
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnLoadOlderHistory)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.thread.messages).isEqualTo(messages)
+        assertThat(viewModel.state.value.canLoadOlderHistory).isFalse()
+        assertThat(viewModel.state.value.olderHistoryLoading).isFalse()
+    }
+
+    @Test
+    fun load_older_history_is_ignored_when_the_page_is_complete() = runTest {
+        val messages = historyMessages(3)
+        val fake = populatedRepo().apply {
+            history = Result.Success(messages)
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnLoadOlderHistory)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.thread.messages).isEqualTo(messages)
+        assertThat(viewModel.state.value.canLoadOlderHistory).isFalse()
+    }
+
+    @Test
     fun send_conflict_opens_resume_dialog() = runTest {
         val fake = FakeChatRepository().apply {
             refreshResult = Result.Success(
@@ -777,6 +828,15 @@ class ChatViewModelTest {
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
         )
     }
+}
+
+private fun historyMessages(count: Int): List<ChatMessage> = List(count) { index ->
+    ChatMessage(
+        id = "history-$index",
+        role = if (index % 2 == 0) ChatRole.User else ChatRole.Assistant,
+        parts = listOf(ChatPart.Text("t$index", "Message $index")),
+        isComplete = true,
+    )
 }
 
 private fun ChatViewModel(

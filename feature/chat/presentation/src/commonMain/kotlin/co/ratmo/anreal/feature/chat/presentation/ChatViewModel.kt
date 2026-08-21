@@ -19,6 +19,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
+import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocument
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
@@ -141,6 +142,8 @@ data class ChatState(
     val selectedSessionId: String? = null,
     val thread: ChatThreadState = ChatThreadState(),
     val historyLoading: Boolean = false,
+    val olderHistoryLoading: Boolean = false,
+    val canLoadOlderHistory: Boolean = false,
     val historyError: UiText? = null,
     val draft: String = "",
     val editingMessageId: String? = null,
@@ -223,6 +226,7 @@ sealed interface ChatAction {
     data object OnResumeConflict : ChatAction
     data object OnDismissConflict : ChatAction
     data object OnRetryHistory : ChatAction
+    data object OnLoadOlderHistory : ChatAction
     data class OnSelectModel(val modelId: String) : ChatAction
     data class OnSelectReasoning(val effort: String?) : ChatAction
     data object OnToggleWebSearch : ChatAction
@@ -292,6 +296,7 @@ class ChatViewModel(
     private var hold: Boolean = false
     private var librarySearchJob: Job? = null
     private var lastStandaloneSessionId: String? = null
+    private var historyOldestPosition: Int = 0
 
     init {
         viewModelScope.launch {
@@ -346,6 +351,7 @@ class ChatViewModel(
             ChatAction.OnRetryHistory -> viewModelScope.launch {
                 _state.value.selectedSessionId?.let { loadHistory(it) }
             }
+            ChatAction.OnLoadOlderHistory -> viewModelScope.launch { loadOlderHistory() }
             is ChatAction.OnSelectModel -> selectModel(action.modelId)
             is ChatAction.OnSelectReasoning -> {
                 val allowed = _state.value.models
@@ -753,6 +759,8 @@ class ChatViewModel(
                 queueConflict = false,
                 thread = ChatThreadState(),
                 historyLoading = true,
+                olderHistoryLoading = false,
+                canLoadOlderHistory = false,
                 historyError = null,
                 queue = emptyList(),
                 queueHidden = false,
@@ -767,11 +775,10 @@ class ChatViewModel(
                 contextUsage = null,
             )
         }
-        val cachedMessages = chatRepository.loadCachedHistory(sessionId)
-        if (cachedMessages.isNotEmpty() && _state.value.selectedSessionId == sessionId) {
-            _state.update { current ->
-                current.copy(thread = current.thread.copy(messages = cachedMessages))
-            }
+        historyOldestPosition = 0
+        val cached = chatRepository.loadCachedHistory(sessionId)
+        if (cached.messages.isNotEmpty() && _state.value.selectedSessionId == sessionId) {
+            applyHistoryWindow(sessionId, cached, keepLoading = true)
         }
         val queue = restoreQueue(chatRepository.loadQueue(sessionId))
         if (_state.value.selectedSessionId == sessionId) {
@@ -796,21 +803,23 @@ class ChatViewModel(
         if (_state.value.selectedSessionId != sessionId) return
         _state.update { it.copy(historyLoading = true, historyError = null) }
         chatRepository.loadHistory(sessionId)
-            .onSuccess { messages ->
+            .onSuccess { window ->
                 if (_state.value.selectedSessionId != sessionId) return@onSuccess
-                _state.update { current ->
-                    // A late snapshot must not overwrite tokens from a live run.
-                    if (isStreaming(current)) {
-                        current.copy(historyLoading = false, historyError = null)
+                val current = _state.value
+                // A late snapshot must not overwrite tokens from a live run.
+                if (isStreaming(current)) {
+                    _state.update { it.copy(historyLoading = false, historyError = null) }
+                } else {
+                    val resolved = if (window.messages.isNotEmpty()) {
+                        window
                     } else {
-                        current.copy(
-                            historyLoading = false,
-                            thread = current.thread.copy(
-                                messages = messages.ifEmpty { current.thread.messages },
-                                status = RunStatus.Idle,
-                            ),
+                        HistoryWindow(
+                            messages = current.thread.messages,
+                            oldestPosition = historyOldestPosition,
+                            totalCount = historyOldestPosition + current.thread.messages.size,
                         )
                     }
+                    applyHistoryWindow(sessionId, resolved, keepLoading = false)
                 }
             }
             .onFailure { error ->
@@ -819,6 +828,52 @@ class ChatViewModel(
                     it.copy(historyLoading = false, historyError = error.toUiText())
                 }
             }
+    }
+
+    private suspend fun loadOlderHistory() {
+        val sessionId = _state.value.selectedSessionId ?: return
+        val current = _state.value
+        if (
+            current.historyLoading ||
+            current.olderHistoryLoading ||
+            !current.canLoadOlderHistory
+        ) {
+            return
+        }
+        _state.update { it.copy(olderHistoryLoading = true) }
+        val older = chatRepository.loadOlderHistory(sessionId, historyOldestPosition)
+        if (_state.value.selectedSessionId != sessionId) return
+        val existingIds = _state.value.thread.messages.map { it.id }.toHashSet()
+        val prepended = older.messages.filterNot { it.id in existingIds }
+        historyOldestPosition = older.oldestPosition
+        _state.update {
+            it.copy(
+                olderHistoryLoading = false,
+                canLoadOlderHistory = older.canLoadOlder && prepended.isNotEmpty(),
+                thread = it.thread.copy(messages = prepended + it.thread.messages),
+            )
+        }
+    }
+
+    private fun applyHistoryWindow(
+        sessionId: String,
+        window: HistoryWindow,
+        keepLoading: Boolean,
+    ) {
+        if (_state.value.selectedSessionId != sessionId) return
+        historyOldestPosition = window.oldestPosition
+        _state.update { current ->
+            current.copy(
+                historyLoading = keepLoading,
+                historyError = if (keepLoading) current.historyError else null,
+                olderHistoryLoading = false,
+                canLoadOlderHistory = window.canLoadOlder,
+                thread = current.thread.copy(
+                    messages = window.messages,
+                    status = if (keepLoading) current.thread.status else RunStatus.Idle,
+                ),
+            )
+        }
     }
 
     private suspend fun loadContextSnippet(sessionId: String) {
@@ -959,7 +1014,11 @@ class ChatViewModel(
                 ),
             )
         }
-        chatRepository.cacheHistory(sessionId, _state.value.thread.messages)
+        chatRepository.cacheHistory(
+            sessionId,
+            _state.value.thread.messages,
+            historyOldestPosition,
+        )
         val result = chatRepository.sendMessage(
             sessionId = sessionId,
             text = text,
@@ -981,7 +1040,11 @@ class ChatViewModel(
         if (result is Result.Success) {
             // Persist the reducer-owned thread first so a failed or stale
             // history snapshot cannot fall back to the pre-send cache.
-            chatRepository.cacheHistory(sessionId, _state.value.thread.messages)
+            chatRepository.cacheHistory(
+                sessionId,
+                _state.value.thread.messages,
+                historyOldestPosition,
+            )
             loadHistory(sessionId)
             loadContextUsage(sessionId)
             loadSessionImages(sessionId)
@@ -1171,7 +1234,7 @@ class ChatViewModel(
         val thread = _state.value.thread
         chatRepository.saveResume(sessionId, thread.streamId, thread.lastEventId)
         if (envelope is StreamEnvelope.End) {
-            chatRepository.cacheHistory(sessionId, thread.messages)
+            chatRepository.cacheHistory(sessionId, thread.messages, historyOldestPosition)
             loadSessionImages(sessionId)
             loadContextUsage(sessionId)
         }
@@ -1273,7 +1336,8 @@ class ChatViewModel(
         }
         when (val count = chatRepository.getSessionMessageCount(sessionId)) {
             is Result.Success -> {
-                val localCount = messages.count { it.role == ChatRole.User || it.role == ChatRole.Assistant }
+                val localCount = historyOldestPosition +
+                    messages.count { it.role == ChatRole.User || it.role == ChatRole.Assistant }
                 if (count.data != localCount) {
                     loadHistory(sessionId)
                     _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_SESSION_STALE)))
@@ -1292,6 +1356,8 @@ class ChatViewModel(
             clientMessageId = clientId,
             memoryPosition = target.memoryPosition,
         ).onSuccess {
+            val keepCount = historyOldestPosition + targetIndex
+            chatRepository.trimCachedHistory(sessionId, keepCount)
             _state.update {
                 it.copy(
                     editingMessageId = null,

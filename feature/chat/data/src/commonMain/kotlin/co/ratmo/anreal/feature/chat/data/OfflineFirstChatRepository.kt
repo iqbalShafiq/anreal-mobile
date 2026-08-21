@@ -14,6 +14,7 @@ import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
 import co.ratmo.anreal.feature.chat.domain.DocumentStorage
+import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
@@ -66,25 +67,37 @@ class OfflineFirstChatRepository(
         return remote.markRead(sessionId)
     }
 
-    override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> {
-        return local.loadMessages(sessionId)
+    override suspend fun loadCachedHistory(sessionId: String): HistoryWindow {
+        return local.loadLatestWindow(sessionId)
     }
 
-    override suspend fun cacheHistory(sessionId: String, messages: List<ChatMessage>) {
-        local.replaceMessages(sessionId, messages)
+    override suspend fun cacheHistory(
+        sessionId: String,
+        messages: List<ChatMessage>,
+        startPosition: Int,
+    ) {
+        local.upsertMessages(sessionId, messages, startPosition)
     }
 
-    override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
+    override suspend fun loadHistory(sessionId: String): Result<HistoryWindow, ChatError> {
         return when (val remoteResult = remote.loadHistory(sessionId)) {
             is Result.Success -> {
                 local.replaceMessages(sessionId, remoteResult.data)
-                remoteResult
+                Result.Success(local.loadLatestWindow(sessionId))
             }
             is Result.Error -> {
-                val cached = local.loadMessages(sessionId)
-                if (cached.isNotEmpty()) Result.Success(cached) else remoteResult
+                val cached = local.loadLatestWindow(sessionId)
+                if (cached.messages.isNotEmpty()) Result.Success(cached) else remoteResult
             }
         }
+    }
+
+    override suspend fun loadOlderHistory(sessionId: String, beforePosition: Int): HistoryWindow {
+        return local.loadOlderWindow(sessionId, beforePosition)
+    }
+
+    override suspend fun trimCachedHistory(sessionId: String, keepCount: Int) {
+        local.deleteFromPosition(sessionId, keepCount)
     }
 
     override suspend fun sendMessage(

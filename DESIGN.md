@@ -324,7 +324,7 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 
 ### 8.4 Perceived performance
 
-- First paint: show chrome immediately. For chat history, render Room cache first and refresh the network in the background; only show the compact loading indicator when no cache exists.
+- First paint: show chrome immediately. For chat history, render Room cache first and refresh the network in the background; only show the compact loading indicator when no cache exists. Bind only the latest page of messages; scrolling to the top prepends older rows from Room with a compact loading indicator.
 - Optimistic user bubble on send; reconcile with history.
 - Fast `LoadingIndicator` (M3) — a quicker indicator feels like a faster app.
 - Never block the composer while a run is streaming (queue instead).

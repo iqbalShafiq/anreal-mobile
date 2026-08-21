@@ -101,6 +101,13 @@ internal fun chatErrorPreviewState(): ChatState = ChatState(
     historyError = UiText.StringResource(AnrealCopy.ERROR_NO_INTERNET),
 )
 
+internal fun chatOlderHistoryPreviewState(): ChatState = chatPopulatedPreviewState(
+    messages = listOf(previewUserMessage, previewAssistantMessage, previewReasoningAssistant),
+).copy(
+    olderHistoryLoading = true,
+    canLoadOlderHistory = true,
+)
+
 internal fun chatPopulatedPreviewState(
     draft: String = "What about costs?",
     isSending: Boolean = false,

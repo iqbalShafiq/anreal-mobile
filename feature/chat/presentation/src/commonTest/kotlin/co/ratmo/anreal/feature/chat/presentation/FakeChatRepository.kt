@@ -13,6 +13,9 @@ import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
 import co.ratmo.anreal.feature.chat.domain.DocumentStorage
+import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
+import co.ratmo.anreal.feature.chat.domain.HistoryWindow
+import co.ratmo.anreal.feature.chat.domain.toLatestHistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
@@ -127,20 +130,50 @@ class FakeChatRepository : ChatRepository {
 
     override suspend fun markRead(sessionId: String): EmptyResult<ChatError> = Result.Success(Unit)
 
-    override suspend fun loadCachedHistory(sessionId: String): List<ChatMessage> = cachedHistory
+    override suspend fun loadCachedHistory(sessionId: String): HistoryWindow =
+        storedHistory(sessionId).toLatestHistoryWindow()
 
-    override suspend fun cacheHistory(sessionId: String, messages: List<ChatMessage>) {
-        cachedSessions[sessionId] = messages
-        cachedHistory = messages
+    override suspend fun cacheHistory(
+        sessionId: String,
+        messages: List<ChatMessage>,
+        startPosition: Int,
+    ) {
+        val merged = storedHistory(sessionId).take(startPosition) + messages
+        cachedSessions[sessionId] = merged
+        cachedHistory = merged
     }
 
-    override suspend fun loadHistory(sessionId: String): Result<List<ChatMessage>, ChatError> {
+    override suspend fun loadHistory(sessionId: String): Result<HistoryWindow, ChatError> {
         if (holdHistory) {
             if (!historyStarted.isCompleted) historyStarted.complete(Unit)
             allowHistoryToFinish.await()
         }
-        return history
+        return when (val result = history) {
+            is Result.Success -> {
+                cachedSessions[sessionId] = result.data
+                cachedHistory = result.data
+                Result.Success(result.data.toLatestHistoryWindow())
+            }
+            is Result.Error -> Result.Error(result.error)
+        }
     }
+
+    override suspend fun loadOlderHistory(sessionId: String, beforePosition: Int): HistoryWindow {
+        val existing = storedHistory(sessionId)
+        val older = existing.take(beforePosition)
+        val window = older.takeLast(HISTORY_PAGE_SIZE)
+        val oldest = (beforePosition - window.size).coerceAtLeast(0)
+        return HistoryWindow(window, oldestPosition = oldest, totalCount = existing.size)
+    }
+
+    override suspend fun trimCachedHistory(sessionId: String, keepCount: Int) {
+        val trimmed = storedHistory(sessionId).take(keepCount)
+        cachedSessions[sessionId] = trimmed
+        cachedHistory = trimmed
+    }
+
+    private fun storedHistory(sessionId: String): List<ChatMessage> =
+        cachedSessions[sessionId] ?: cachedHistory
 
     override suspend fun sendMessage(
         sessionId: String,

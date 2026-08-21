@@ -7,6 +7,8 @@ import co.ratmo.anreal.core.database.SessionDao
 import co.ratmo.anreal.core.database.toEntity
 import co.ratmo.anreal.core.database.toSession
 import co.ratmo.anreal.core.domain.model.ChatSession
+import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
+import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.queue.restoreQueue
@@ -84,7 +86,48 @@ class RoomChatLocalDataSource(
         )
     }
 
-    suspend fun loadMessages(sessionId: String): List<ChatMessage> {
-        return messageDao.getMessages(sessionId).map { it.toMessage() }
+    suspend fun upsertMessages(
+        sessionId: String,
+        messages: List<ChatMessage>,
+        startPosition: Int,
+    ) {
+        messageDao.upsert(
+            messages.mapIndexed { index, message ->
+                message.toEntity(sessionId, startPosition + index)
+            },
+        )
+    }
+
+    suspend fun deleteFromPosition(sessionId: String, fromPosition: Int) {
+        messageDao.deleteFromPosition(sessionId, fromPosition)
+    }
+
+    suspend fun loadLatestWindow(
+        sessionId: String,
+        limit: Int = HISTORY_PAGE_SIZE,
+    ): HistoryWindow {
+        val total = messageDao.countMessages(sessionId)
+        val latest = messageDao.getLatestMessages(sessionId, limit).asReversed()
+        val oldest = latest.firstOrNull()?.position ?: 0
+        return HistoryWindow(
+            messages = latest.map { it.toMessage() },
+            oldestPosition = oldest,
+            totalCount = total,
+        )
+    }
+
+    suspend fun loadOlderWindow(
+        sessionId: String,
+        beforePosition: Int,
+        limit: Int = HISTORY_PAGE_SIZE,
+    ): HistoryWindow {
+        val total = messageDao.countMessages(sessionId)
+        val older = messageDao.getMessagesBefore(sessionId, beforePosition, limit).asReversed()
+        val oldest = older.firstOrNull()?.position ?: 0
+        return HistoryWindow(
+            messages = older.map { it.toMessage() },
+            oldestPosition = oldest,
+            totalCount = total,
+        )
     }
 }

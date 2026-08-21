@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
@@ -27,14 +28,18 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
@@ -67,6 +72,7 @@ import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatOlderHistoryPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatStreamingPreviewState
@@ -75,6 +81,7 @@ import co.ratmo.anreal.feature.chat.presentation.preview.previewEmptyPartsMessag
 import co.ratmo.anreal.feature.chat.presentation.preview.previewReasoningAssistant
 import co.ratmo.anreal.feature.chat.presentation.preview.previewUserMessage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -140,8 +147,9 @@ private fun StreamingThreadList(
     initialScrollReady: Boolean,
     onFrostedTopBarChange: (Boolean) -> Unit,
 ) {
-    val endIndex = state.thread.messages.size
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = endIndex)
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = (state.thread.messages.size + 1).coerceAtLeast(0),
+    )
     val scope = rememberCoroutineScope()
     val reduceMotion = LocalAnrealReduceMotion.current
     val frostedTopBar = rememberFrostedTopBar(listState)
@@ -152,13 +160,18 @@ private fun StreamingThreadList(
     var initialScrollSettled by remember { mutableStateOf(false) }
     var followStreaming by remember { mutableStateOf(false) }
 
-    LaunchedEffect(initialScrollReady) {
-        if (!initialScrollReady) return@LaunchedEffect
-        withFrameNanos { }
-        val viewportHeight = listState.layoutInfo.run {
-            (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+    val lastMessageId = state.thread.messages.lastOrNull()?.id
+    LaunchedEffect(initialScrollReady, state.historyLoading, lastMessageId) {
+        if (!initialScrollReady || state.thread.messages.isEmpty()) return@LaunchedEffect
+        if (initialScrollSettled && !followStreaming) return@LaunchedEffect
+        run {
+            repeat(8) {
+                withFrameNanos { }
+                listState.pinToEnd()
+                withFrameNanos { }
+                if (!listState.canScrollForward) return@run
+            }
         }
-        listState.scrollToItem(endIndex, viewportHeight)
         initialScrollSettled = true
         followStreaming = true
     }
@@ -170,7 +183,6 @@ private fun StreamingThreadList(
     }
     val currentIsDragged by rememberUpdatedState(isDragged)
     val currentStreamVersion by rememberUpdatedState(state.thread.messages.lastOrNull())
-    val currentStreamMessageCount by rememberUpdatedState(state.thread.messages.size)
     val currentStreamActive by rememberUpdatedState(
         state.isSending || state.thread.status == RunStatus.Streaming,
     )
@@ -189,10 +201,7 @@ private fun StreamingThreadList(
                 // content is not measured yet on the first frame after a delta.
                 withFrameNanos { }
                 withFrameNanos { }
-                val viewportHeight = listState.layoutInfo.run {
-                    (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
-                }
-                listState.scrollToItem(currentStreamMessageCount, viewportHeight)
+                listState.pinToEnd()
             }
             delay(if (currentStreamActive) 16 else 250)
         }
@@ -209,10 +218,7 @@ private fun StreamingThreadList(
         }
         followedSendMessageId = message.id
         withFrameNanos { }
-        val viewportHeight = listState.layoutInfo.run {
-            (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
-        }
-        listState.scrollToItem(state.thread.messages.size, viewportHeight)
+        listState.pinToEnd()
         initialScrollSettled = true
         followStreaming = true
     }
@@ -226,11 +232,53 @@ private fun StreamingThreadList(
         withFrameNanos { }
         withFrameNanos { }
         if (followStreaming && !isDragged) {
-            val viewportHeight = listState.layoutInfo.run {
-                (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
-            }
-            listState.scrollToItem(state.thread.messages.size, viewportHeight)
+            listState.pinToEnd()
         }
+    }
+
+    var olderAnchorId by remember { mutableStateOf<String?>(null) }
+    var olderAnchorOffset by remember { mutableIntStateOf(0) }
+    var wasLoadingOlder by remember { mutableStateOf(false) }
+    LaunchedEffect(state.olderHistoryLoading, state.thread.messages.firstOrNull()?.id) {
+        if (state.olderHistoryLoading && !wasLoadingOlder) {
+            val anchor = listState.layoutInfo.visibleItemsInfo.firstOrNull { info ->
+                val key = info.key as? String
+                key != null && key != OLDER_HEADER_KEY && key != THREAD_END_KEY
+            }
+            olderAnchorId = anchor?.key as? String
+            olderAnchorOffset = if (anchor != null && listState.firstVisibleItemIndex == anchor.index) {
+                listState.firstVisibleItemScrollOffset
+            } else {
+                0
+            }
+        }
+        if (!state.olderHistoryLoading && wasLoadingOlder) {
+            val anchorId = olderAnchorId
+            if (anchorId != null) {
+                val messageIndex = state.thread.messages.indexOfFirst { it.id == anchorId }
+                if (messageIndex >= 0) {
+                    listState.scrollToItem(messageIndex + 1, olderAnchorOffset)
+                }
+            }
+            olderAnchorId = null
+        }
+        wasLoadingOlder = state.olderHistoryLoading
+    }
+    val canRequestOlder by rememberUpdatedState(
+        initialScrollSettled &&
+            state.canLoadOlderHistory &&
+            !state.olderHistoryLoading &&
+            !state.historyLoading,
+    )
+    LaunchedEffect(listState, initialScrollSettled) {
+        if (!initialScrollSettled) return@LaunchedEffect
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { index ->
+                if (index <= 1 && canRequestOlder) {
+                    onAction(ChatAction.OnLoadOlderHistory)
+                }
+            }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -244,6 +292,22 @@ private fun StreamingThreadList(
                 bottom = bottomContentPadding,
             ),
         ) {
+            item(key = OLDER_HEADER_KEY) {
+                if (state.olderHistoryLoading) {
+                    val loadingLabel = AnrealCopy.get(AnrealCopy.CD_LOADING_OLDER_MESSAGES)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = AnrealSpacing.sm)
+                            .semantics { contentDescription = loadingLabel },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AnrealLoadingIndicator(size = 24.dp)
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(1.dp))
+                }
+            }
             val lastMessageId = state.thread.messages.lastOrNull()?.id
             val showThinking = waitingForFirstAssistantToken(state)
             itemsIndexed(state.thread.messages, key = { _, message -> message.id }) { index, message ->
@@ -269,7 +333,7 @@ private fun StreamingThreadList(
                     )
                 }
             }
-            item(key = "anreal-thread-end") {
+            item(key = THREAD_END_KEY) {
                 Spacer(modifier = Modifier.height(1.dp))
             }
         }
@@ -286,16 +350,11 @@ private fun StreamingThreadList(
                         followStreaming = false
                         scope.launch {
                             if (reduceMotion) {
-                                val viewportHeight = listState.layoutInfo.run {
-                                    (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
-                                }
-                                listState.scrollToItem(endIndex, viewportHeight)
+                                listState.pinToEnd()
                             } else {
-                                listState.animateScrollToItem(endIndex)
-                                val viewportHeight = listState.layoutInfo.run {
-                                    (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
-                                }
-                                listState.scrollToItem(endIndex, viewportHeight)
+                                val lastIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                                listState.animateScrollToItem(lastIndex)
+                                listState.pinToEnd()
                             }
                             initialScrollSettled = true
                             followStreaming = true
@@ -310,6 +369,17 @@ private fun StreamingThreadList(
             }
         }
     }
+}
+
+private const val OLDER_HEADER_KEY = "anreal-older-header"
+private const val THREAD_END_KEY = "anreal-thread-end"
+
+private suspend fun LazyListState.pinToEnd() {
+    val lastIndex = (layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+    val viewportHeight = layoutInfo.run {
+        (viewportEndOffset - viewportStartOffset).coerceAtLeast(0)
+    }
+    scrollToItem(lastIndex, viewportHeight)
 }
 
 private fun ChatMessage.startsWithVisibleActivity(): Boolean =
@@ -558,6 +628,18 @@ private fun ThreadPaneEmptyPreview() {
     AnrealPreview {
         ThreadPane(
             state = chatEmptyPreviewState(),
+            onAction = {},
+            modifier = Modifier.height(480.dp),
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ThreadPaneOlderHistoryLoadingPreview() {
+    AnrealPreview {
+        ThreadPane(
+            state = chatOlderHistoryPreviewState(),
             onAction = {},
             modifier = Modifier.height(480.dp),
         )
