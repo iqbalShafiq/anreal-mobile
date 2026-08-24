@@ -192,6 +192,7 @@ private fun AnrealFormScreenWithBackPreview() {
                 value = "you@company.com",
                 onValueChange = {},
                 label = "Email",
+                placeholder = "you@company.com",
             )
             AnrealPrimaryButton(label = "Continue", onClick = {})
         }
@@ -240,12 +241,14 @@ private fun AnrealFormScreenSubmittingPreview() {
                 value = "you@company.com",
                 onValueChange = {},
                 label = "Email",
+                placeholder = "you@company.com",
                 enabled = false,
             )
             AnrealPasswordField(
                 value = "password1",
                 onValueChange = {},
                 label = "Password",
+                placeholder = "Your password",
                 enabled = false,
             )
             AnrealPrimaryButton(

@@ -76,6 +76,7 @@ class ImeActionsTest {
                 AnrealComposerField(
                     value = value,
                     onValueChange = { value = it },
+                    placeholder = "Ask about your documents…",
                 )
             }
         }

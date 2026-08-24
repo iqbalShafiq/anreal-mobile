@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 
 enum class AccountSection {
     Account,
+    Appearance,
     Usage,
     Personalization,
 }
@@ -98,7 +99,6 @@ data class AccountState(
 sealed interface AccountAction {
     data class OnSelectSection(val section: AccountSection) : AccountAction
     data object OnRetryUsage : AccountAction
-    data object OnRetryHealth : AccountAction
     data object OnRetryPersonalization : AccountAction
     data object OnRequestResetUserProfile : AccountAction
     data class OnRequestResetProjectProfile(val id: String, val name: String) : AccountAction
@@ -156,6 +156,7 @@ class AccountViewModel(
                 _state.update { it.copy(section = action.section) }
                 when (action.section) {
                     AccountSection.Account -> Unit
+                    AccountSection.Appearance -> Unit
                     AccountSection.Usage -> if (_state.value.usage == null) {
                         viewModelScope.launch { loadUsage() }
                     }
@@ -167,7 +168,6 @@ class AccountViewModel(
                 }
             }
             AccountAction.OnRetryUsage -> viewModelScope.launch { loadUsage() }
-            AccountAction.OnRetryHealth -> viewModelScope.launch { checkHealth() }
             AccountAction.OnRetryPersonalization -> viewModelScope.launch { loadPersonalization() }
             AccountAction.OnRequestResetUserProfile -> _state.update {
                 it.copy(resetTarget = ProfileResetTarget.User, resetError = null)
@@ -182,8 +182,12 @@ class AccountViewModel(
             AccountAction.OnDismissResetProfile -> if (!_state.value.isResettingProfile) {
                 _state.update { it.copy(resetTarget = null, resetError = null) }
             }
-            AccountAction.OnBack -> viewModelScope.launch {
-                _events.send(AccountEvent.NavigateBack)
+            AccountAction.OnBack -> {
+                if (_state.value.section != AccountSection.Account) {
+                    _state.update { it.copy(section = AccountSection.Account) }
+                } else {
+                    viewModelScope.launch { _events.send(AccountEvent.NavigateBack) }
+                }
             }
             AccountAction.OnRequestSignOut -> {
                 if (!_state.value.isSigningOut) {

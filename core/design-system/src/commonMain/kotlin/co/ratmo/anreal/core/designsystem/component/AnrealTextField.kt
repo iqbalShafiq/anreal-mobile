@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.em
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
@@ -35,18 +37,23 @@ fun AnrealTextField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    placeholder: String = "",
+    placeholder: String,
     error: String? = null,
     enabled: Boolean = true,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    showLabel: Boolean = true,
+    glass: Boolean = true,
+    minHeight: Dp = AnrealSpacing.field,
+    textStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    leadingIcon: (@Composable (() -> Unit))? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     onFocusChange: (Boolean) -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     val reportFocusedBottom = LocalFocusedImeAnchor.current
-    val textStyle = MaterialTheme.typography.bodyLarge.copy(
+    val resolvedTextStyle = textStyle.copy(
         color = if (enabled) {
             MaterialTheme.colorScheme.onSurface
         } else {
@@ -57,28 +64,37 @@ fun AnrealTextField(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
     ) {
-        Text(
-            text = label.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (showLabel) {
+            Text(
+                text = label.uppercase(),
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.08.em),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         GlassSurface(
             modifier = Modifier.fillMaxWidth(),
+            hazeState = if (glass) LocalAnrealHazeState.current else null,
             shape = MaterialTheme.shapes.extraLarge,
             tone = GlassTone.Thin,
+            fallbackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             emphasized = focused && error == null,
             error = error != null,
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = AnrealSpacing.field)
+                    .heightIn(min = minHeight)
                     .padding(
-                        start = AnrealSpacing.md,
+                        start = if (leadingIcon != null) AnrealSpacing.xs else AnrealSpacing.md,
                         end = if (trailingIcon != null) AnrealSpacing.xxs else AnrealSpacing.md,
                     ),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                leadingIcon?.let { icon ->
+                    Box(modifier = Modifier.padding(end = AnrealSpacing.xs)) {
+                        icon()
+                    }
+                }
                 BasicTextField(
                     value = value,
                     onValueChange = onValueChange,
@@ -99,7 +115,7 @@ fun AnrealTextField(
                             }
                         },
                     enabled = enabled,
-                    textStyle = textStyle,
+                    textStyle = resolvedTextStyle,
                     cursorBrush = SolidColor(
                         if (error != null) {
                             MaterialTheme.colorScheme.error
@@ -116,7 +132,7 @@ fun AnrealTextField(
                             if (value.isEmpty()) {
                                 Text(
                                     text = placeholder,
-                                    style = MaterialTheme.typography.bodyLarge,
+                                    style = resolvedTextStyle,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
@@ -178,6 +194,7 @@ private fun AnrealTextFieldErrorPreview() {
                 value = "nope",
                 onValueChange = {},
                 label = "Email",
+                placeholder = "you@company.com",
                 error = "Enter a valid email address.",
                 modifier = Modifier.padding(AnrealSpacing.md),
             )
@@ -194,6 +211,7 @@ private fun AnrealTextFieldDisabledPreview() {
                 value = "you@company.com",
                 onValueChange = {},
                 label = "Email",
+                placeholder = "you@company.com",
                 enabled = false,
                 modifier = Modifier.padding(AnrealSpacing.md),
             )

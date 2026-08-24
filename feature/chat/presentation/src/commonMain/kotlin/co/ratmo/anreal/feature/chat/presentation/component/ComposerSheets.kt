@@ -1,4 +1,4 @@
-package co.ratmo.anreal.feature.chat.presentation.component
+﻿package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -23,7 +23,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.component.AnrealBottomSheet
 import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
+import co.ratmo.anreal.core.designsystem.component.AnrealSheetTitle
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.asString
@@ -46,7 +48,7 @@ internal fun ComposerSheets(
     onDismiss: () -> Unit,
 ) {
     if (sheet == null) return
-    ChatBottomSheet(onDismiss = onDismiss) {
+    AnrealBottomSheet(onDismiss = onDismiss) {
         ComposerSheetBody(
             sheet = sheet,
             state = state,
@@ -164,7 +166,7 @@ private fun ModelAndReasoningSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             else -> {
-                SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
+                AnrealSheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
                 state.models.forEach { model ->
                     SheetOption(
                         title = model.label,
@@ -177,7 +179,7 @@ private fun ModelAndReasoningSheet(
                         onClick = { onAction(ChatAction.OnSelectModel(model.id)) },
                     )
                 }
-                SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_REASONING))
+                AnrealSheetTitle(AnrealCopy.get(AnrealCopy.LABEL_REASONING))
                 SheetOption(
                     title = AnrealCopy.get(AnrealCopy.LABEL_REASONING_NONE),
                     subtitle = null,
@@ -204,7 +206,7 @@ private fun FeaturesSheet(
     onOpenAttachments: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
-        SheetTitle(AnrealCopy.get(AnrealCopy.CD_FEATURES))
+        AnrealSheetTitle(AnrealCopy.get(AnrealCopy.CD_FEATURES))
         SheetOption(
             title = AnrealCopy.get(AnrealCopy.LABEL_ATTACH),
             subtitle = AnrealCopy.get(AnrealCopy.ATTACH_LIBRARY_BODY),
@@ -257,7 +259,7 @@ private fun AttachSheet(
     onDismiss: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
-        SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_ATTACH))
+        AnrealSheetTitle(AnrealCopy.get(AnrealCopy.LABEL_ATTACH))
         SheetOption(
             title = AnrealCopy.get(AnrealCopy.LABEL_ATTACH_PHOTOS),
             subtitle = AnrealCopy.get(AnrealCopy.ATTACH_PHOTOS_BODY),

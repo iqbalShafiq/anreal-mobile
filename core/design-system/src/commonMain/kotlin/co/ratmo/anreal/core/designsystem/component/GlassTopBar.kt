@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -57,11 +58,13 @@ fun rememberFrostedTopBar(scrollState: ScrollState): Boolean {
 fun GlassTopBar(
     modifier: Modifier = Modifier,
     frosted: Boolean = false,
+    surfaceTinted: Boolean = frosted,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val reduceMotion = LocalAnrealReduceMotion.current
+    val showChrome = frosted || surfaceTinted
     val frostAlpha by animateFloatAsState(
-        targetValue = if (frosted) 1f else 0f,
+        targetValue = if (showChrome) 1f else 0f,
         animationSpec = if (reduceMotion) {
             snap()
         } else {
@@ -79,6 +82,8 @@ fun GlassTopBar(
         tone = GlassTone.Thin,
         borderColor = glassDrawerBorderColor(),
         fallbackColor = glassDrawerFallbackColor(),
+        tintColor = MaterialTheme.colorScheme.surface,
+        opaqueTintColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
         effectAlpha = frostAlpha,
     ) {
         Box(content = content)

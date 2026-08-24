@@ -29,6 +29,7 @@ internal fun RenameSessionDialog(
                 value = state.renameDraft,
                 onValueChange = { onAction(ChatAction.OnRenameDraftChange(it)) },
                 label = AnrealCopy.get(AnrealCopy.LABEL_SESSION_TITLE),
+                placeholder = AnrealCopy.get(AnrealCopy.PLACEHOLDER_SESSION_TITLE),
                 error = state.renameError?.asString(),
                 enabled = !state.sessionBusy,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

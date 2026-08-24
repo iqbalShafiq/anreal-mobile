@@ -159,8 +159,8 @@ Read `DESIGN.md` before writing UI.
 - **Chat → Workspace** is a horizontal push. Opening a project pops Workspace and enters project-workspace on the existing Chat (drawer auto-opens). All chats leaves the project.
 - **Boarding → Login / Register** is a one-way vertical **pager**: boarding is replaced by the form and both move **up**. Login and Register have no back affordance and system back must not reveal boarding. **Login ↔ Register** is the same replace-current strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
 - **Auth → Chat** slides forward (right → left). Logout / pop to **boarding** is the reverse.
-- **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). The Account screen uses a compact section switcher with 160ms directional content motion; Logout is fixed in a floating bottom dock on that screen, never in the drawer menu.
-- One `AnrealAtmosphere` wraps the `NavHost`. Nested `AnrealAtmosphere` calls are passthrough so aurora does not remount mid-transition.
+- **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). The Account root follows the Pen design's drill-down menu: grouped account, preference, support, and danger surfaces lead to full-width detail sections with 160ms directional content motion. Logout stays as a destructive row in the Account content, never in the drawer menu.
+- One `AnrealAtmosphere` wraps the `NavHost`. Nested calls do not remount aurora: `Aurora` is passthrough, while Workspace and Account request a solid dynamic `surface`; Chat crossfades from aurora to surface after the new-chat draft receives its first message.
 
 ---
 

@@ -29,7 +29,7 @@ fun AnrealPasswordField(
     onValueChange: (String) -> Unit,
     label: String,
     modifier: Modifier = Modifier,
-    placeholder: String = "",
+    placeholder: String,
     error: String? = null,
     enabled: Boolean = true,
     initiallyVisible: Boolean = false,
@@ -108,6 +108,7 @@ private fun AnrealPasswordFieldVisiblePreview() {
                 onValueChange = {},
                 label = "Password",
                 initiallyVisible = true,
+                placeholder = "Your password",
                 modifier = Modifier.padding(AnrealSpacing.md),
             )
         }
@@ -123,6 +124,7 @@ private fun AnrealPasswordFieldErrorPreview() {
                 value = "123",
                 onValueChange = {},
                 label = "Password",
+                placeholder = "Your password",
                 error = "Password must be at least 8 characters.",
                 modifier = Modifier.padding(AnrealSpacing.md),
             )
@@ -139,6 +141,7 @@ private fun AnrealPasswordFieldDisabledPreview() {
                 value = "password1",
                 onValueChange = {},
                 label = "Password",
+                placeholder = "Your password",
                 enabled = false,
                 modifier = Modifier.padding(AnrealSpacing.md),
             )

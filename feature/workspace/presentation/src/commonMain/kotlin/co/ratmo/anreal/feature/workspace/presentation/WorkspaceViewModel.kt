@@ -31,6 +31,8 @@ private const val LOAD_WAIT_INTERVAL_MS = 25L
 @Serializable
 enum class WorkspaceSection { Projects, Documents, Images }
 
+enum class WorkspaceViewMode { List, Grid }
+
 data class ProjectUi(
     val id: String,
     val name: String,
@@ -73,9 +75,23 @@ sealed interface WorkspaceDeleteTarget {
     data class Document(override val id: String, override val label: String) : WorkspaceDeleteTarget
 }
 
+sealed interface WorkspaceCardSheetTarget {
+    val id: String
+    val label: String
+
+    data class Project(
+        override val id: String,
+        override val label: String,
+        val description: String = "",
+        val documentCount: Int = 0,
+    ) : WorkspaceCardSheetTarget
+    data class Document(override val id: String, override val label: String) : WorkspaceCardSheetTarget
+}
+
 @Stable
 data class WorkspaceState(
     val section: WorkspaceSection = WorkspaceSection.Projects,
+    val viewMode: WorkspaceViewMode = WorkspaceViewMode.List,
     val projects: List<ProjectUi> = emptyList(),
     val documents: List<DocumentUi> = emptyList(),
     val images: List<ImageUi> = emptyList(),
@@ -92,6 +108,7 @@ data class WorkspaceState(
     val mutationError: UiText? = null,
     val isMutating: Boolean = false,
     val deleteTarget: WorkspaceDeleteTarget? = null,
+    val cardSheetTarget: WorkspaceCardSheetTarget? = null,
     val previewDocumentId: String? = null,
     val preview: DocumentPreviewUi? = null,
     val previewLoading: Boolean = false,
@@ -100,9 +117,12 @@ data class WorkspaceState(
 
 sealed interface WorkspaceAction {
     data class SelectSection(val section: WorkspaceSection) : WorkspaceAction
+    data class SetViewMode(val mode: WorkspaceViewMode) : WorkspaceAction
     data object Retry : WorkspaceAction
     data class ChangeQuery(val value: String) : WorkspaceAction
     data object LoadMore : WorkspaceAction
+    data class ShowCardSheet(val target: WorkspaceCardSheetTarget) : WorkspaceAction
+    data object DismissCardSheet : WorkspaceAction
     data object ShowCreateProject : WorkspaceAction
     data object DismissCreateProject : WorkspaceAction
     data class ChangeProjectName(val value: String) : WorkspaceAction
@@ -141,11 +161,16 @@ class WorkspaceViewModel(
     fun onAction(action: WorkspaceAction) {
         when (action) {
             is WorkspaceAction.SelectSection -> {
-                _state.update { it.copy(section = action.section, error = null) }
+                val defaultMode = when (action.section) {
+                    WorkspaceSection.Images -> WorkspaceViewMode.Grid
+                    else -> WorkspaceViewMode.List
+                }
+                _state.update { it.copy(section = action.section, viewMode = defaultMode, error = null) }
                 if (action.section !in _state.value.loadedSections) {
                     viewModelScope.launch { awaitThenLoad(action.section) }
                 }
             }
+            is WorkspaceAction.SetViewMode -> _state.update { it.copy(viewMode = action.mode) }
             WorkspaceAction.Retry -> viewModelScope.launch { awaitThenLoad(_state.value.section) }
             is WorkspaceAction.ChangeQuery -> {
                 _state.update { it.copy(query = action.value) }
@@ -156,6 +181,8 @@ class WorkspaceViewModel(
                 }
             }
             WorkspaceAction.LoadMore -> viewModelScope.launch { loadMore() }
+            is WorkspaceAction.ShowCardSheet -> _state.update { it.copy(cardSheetTarget = action.target) }
+            WorkspaceAction.DismissCardSheet -> _state.update { it.copy(cardSheetTarget = null) }
             WorkspaceAction.ShowCreateProject -> _state.update {
                 it.copy(
                     showCreateProject = true,
@@ -454,7 +481,7 @@ private fun WorkspaceDocument.toUi(): DocumentUi = DocumentUi(
     id = id,
     filename = filename,
     summary = summary,
-    detail = "$pageCount pages · ${sizeBytes.toFileSize()}",
+    detail = "$pageCount pages",
     projectName = projectName,
 )
 
@@ -475,10 +502,4 @@ private fun DocumentPreview.toUi(images: List<ByteArray>): DocumentPreviewUi {
         markdown = page?.markdown.orEmpty(),
         images = images,
     )
-}
-
-private fun Long.toFileSize(): String = if (this >= 1_048_576) {
-    "${(this / 104_857.6).toLong() / 10.0} MB"
-} else {
-    "${this / 1_024} KB"
 }

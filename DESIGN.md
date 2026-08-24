@@ -88,6 +88,8 @@ Always `sp`. Layout must survive font scale 1.3 and 2.0. Body reading width ~40�
 - Medium+: 24.dp
 - Minimum touch target: **48.dp** (icon-only controls get a 48.dp hit box even if the glyph is 24.dp)
 - Single-line text fields: **56.dp** (`AnrealSpacing.field`). Password uses a 48.dp trailing `IconButton` (visibility), not a TextButton — the field height must match Name / Email.
+- Workspace search is the deliberate compact exception: **44.dp** (`AnrealSpacing.search`), no floating label, and a leading search glyph. It is not used for auth or mutation forms.
+- Project filter chips use a centered 48.dp hit surface with an **88.dp minimum width** (`AnrealSpacing.chipMinWidth`) so short labels remain optically balanced.
 - Icon glyph: 24.dp, tint `LocalContentColor`
 
 **Shape:** M3 scale (`extraSmall` 4 → `extraLarge` 28). Composer and fields use `large` / `extraLarge`. Sheets use the platform sheet shape. Pills/chips use full rounding.
@@ -155,7 +157,7 @@ Compose has no CSS `backdrop-filter`. These are **wrong**:
 - `GlassSheet` / `GlassDialog`
 - `GlassDrawer` — left workspace (start radii), right documents (end radii, `fromEnd = true`)
 
-`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls are a passthrough so transitions do not remount aurora. The aurora is the single haze source; chrome and bubbles apply the thin Haze material directly over it. Do **not** wrap scrollable content in a nested `hazeSource` — a glass element inside a nested source samples the nested source (itself excluded) instead of the aurora, so its frost silently disappears. Top bars use the same thin Haze material, tint composition, hairline, and fallback color as the left drawer so app chrome reads as one glass layer. Dark drawer frost is black-led (`canvas` `#050505` family at low alpha), not a muddy `surface` tint. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
+`AnrealAtmosphere` owns aurora + the Haze source. The root `NavHost` sits in **one** atmosphere. Nested calls do not remount aurora: `Aurora` remains a passthrough, while `Surface` adds a semantic `MaterialTheme.colorScheme.surface` cover for Workspace, Account, and the settled Chat state. Chat transitions that cover with a 220ms alpha fade; Workspace and Account enter as solid surface. The aurora is the single haze source; chrome and bubbles apply the thin Haze material directly over it. Do **not** wrap scrollable content in a nested `hazeSource` — a glass element inside a nested source samples the nested source (itself excluded) instead of the aurora, so its frost silently disappears. Top bars and both side drawers use the same dynamic `surface` as their Haze tint, with `surfaceContainer` as the reduced-transparency fallback; scrolled chat chrome therefore stays in the same tonal family as the settled chat canvas. Selected tiles use `glassHighlightColor()`, muted drawer text uses `glassMutedTextColor()` / `glassFaintTextColor()` — do not rely on `onSurfaceVariant` alone in dark previews.
 
 **Scroll-aware top chrome:** `GlassTopBar` is clear over the status bar and app bar until the scrolling surface *under it* has left the start (`rememberFrostedTopBar`). Frost then fades in at `durationFast` / `easeOut` via Haze `alpha` (not `graphicsLayer` on the glass ancestor). Reduced motion snaps. Account / Settings and Workspace keep `frosted = false` because only the pane below the segmented tabs scrolls — the top bar never has content sliding under it.
 
@@ -305,7 +307,7 @@ A PR that adds a screen must include previews or robots for: **populated, loadin
 | Documents | “Upload a PDF or image” | Library skeletons + upload progress | Quota / failed ingest | Status → ready |
 | Projects | “Create a project” | Skeletons | Retry | Open project |
 | Gallery | “No images yet” | Grid skeletons | Retry | New image at start |
-| Settings / account | Profile summary + name + email + fixed glass extended-FAB Log out dock | Health check | Retry API status | Persist appearance locally; sign out → boarding |
+| Settings / account | Profile summary + name + email + grouped menu surfaces + destructive Log out row | Health check | Retry API status from the relevant detail section | Persist appearance locally; sign out → boarding |
 | Settings / usage | Zero-state usage | Section shimmer | Retry section with server-safe message | Storage and request/token breakdowns |
 | Settings / personalization | “No profile yet…” | Section shimmer | Retry section | Reset profile confirm |
 | Workspace / projects | “Create a project” | Project skeletons | Retry section | Create, edit, open, and delete projects |
@@ -406,8 +408,8 @@ Every Screen preview file includes at minimum:
 
 - Compact: left **workspace** `ModalNavigationDrawer` (All chats / Projects / Documents / Images, recent projects, date-grouped sessions, account footer) + `TopAppBar` (context ring, documents icon + badge) + right **session documents** drawer + thread + floating glass composer above IME + nav bar insets. Thread content draws behind both chrome surfaces; list content padding keeps the first/last bubble reachable. The top bar (status + app bar) is clear until the thread can scroll backward, then the thin frost fades in. Opening a project is a Chat **scope**, not a new destination: the session list filters to that project, the matching recent-project row is selected, the drawer auto-opens, and the top bar reads `{project} · {chat}`. All chats (or system back with the drawer closed) leaves the project and restores the last standalone session. Cold start stays a standalone New chat draft.
 
-- Account / Settings is a **full screen** (not a web-style modal): Account, Usage, Personalization. Use the same reusable fixed glass segmented tabs as Workspace, grouped settings surfaces, and 160ms directional fade/8.dp translation between sections. Open it from the left-drawer account row. Log out is a glass extended FAB fixed in a floating bottom dock across this screen.
-- Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses the shared fixed glass segmented tabs and section-local loading, empty, error, and populated states; uploads stay session-scoped in the chat composer because the backend requires a session id.
+- Account / Settings is a **full screen** (not a web-style modal). The root is a Pen-style drill-down menu with a profile hero, grouped Account / Preferences, Support, and destructive surfaces. Tapping Appearance, Usage, or Personalization replaces the menu content with a focused detail section; transitions use 160ms directional fade/8.dp translation. Open it from the left-drawer account row. Log out remains a destructive row in the Account content so it stays discoverable in the same scroll order as the design.
+- Projects / Documents / Images open the type-safe **Workspace** destination from the left drawer. Compact uses the shared fixed glass segmented tabs, a 44.dp search surface where search is available, a 2-column image grid, and section-local loading, empty, error, and populated states. Project rows show only name and counts; their description appears in the project actions sheet. Document rows show filename, source, and page count only — never summary excerpts or file size. Documents remain list-only on compact screens; only Images exposes the list/grid switcher, while the Documents loaded counter sits left-aligned beneath search. Control-to-list spacing reuses the same vertical rhythm on both edges. Uploads stay session-scoped in the chat composer because the backend requires a session id.
 - Thread opens at the latest message. It follows appended stream content only while the user is at the bottom; scrolling up suspends follow and reveals a smooth scroll-to-latest control. Sending a message snaps the thread to the bottom and resumes follow even if the user had scrolled up, and the composer dismisses the keyboard on send. Consecutive collapsible items (thought/tool) stay flush — no gap — even across message boundaries; content (text) keeps the 16.dp rhythm.
 - Medium: `NavigationRail`.
 - Expanded: permanent drawer; optional documents pane. Do not force a 3-column phone layout.
@@ -445,7 +447,7 @@ Every Screen preview file includes at minimum:
 | Motion | `AnrealMotion` + `MotionScheme.standard()` + `anrealEnter` / `anrealExit` |
 | Auth IME | `adjustNothing` + `rememberImeFocusShift` — never centered `imePadding()` |
 | Glass | Haze wrappers in `:core:design-system` |
-| Space | `AnrealSpacing` |
+| Space | `AnrealSpacing` (`field`, `search`, `menuRow`, `chipMinWidth`) |
 | States | `AnrealEmpty`, `AnrealError`, `AnrealSkeleton`, `AnrealBanner` |
 | A11y | string resources + semantics helpers |
 

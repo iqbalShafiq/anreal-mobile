@@ -23,6 +23,11 @@ class AnrealMotionTest {
     }
 
     @Test
+    fun background_transition_uses_medium_motion_token() {
+        assertThat(AnrealMotion.durationMed.inWholeMilliseconds).isEqualTo(220)
+    }
+
+    @Test
     fun daily_stream_and_send_do_not_animate() {
         assertThat(AnrealMotion.shouldAnimate(AnrealMotion.Frequency.Continuous)).isFalse()
         assertThat(AnrealMotion.shouldAnimate(AnrealMotion.Frequency.High)).isFalse()

@@ -8,6 +8,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,14 +20,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -47,11 +51,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
-import co.ratmo.anreal.core.designsystem.component.AnrealSegmentedTabs
-import co.ratmo.anreal.core.designsystem.component.GlassExtendedFloatingActionButton
-import co.ratmo.anreal.core.designsystem.component.GlassSurface
-import co.ratmo.anreal.core.designsystem.component.GlassTone
-import co.ratmo.anreal.core.designsystem.component.GlassTopBar
+import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphereBackground
+import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
 import co.ratmo.anreal.core.designsystem.component.glassFaintTextColor
 import co.ratmo.anreal.core.designsystem.component.glassMutedTextColor
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -69,15 +70,38 @@ import co.ratmo.anreal.feature.chat.presentation.account.AccountUsageUi
 import co.ratmo.anreal.feature.chat.presentation.account.ProfileUi
 import co.ratmo.anreal.feature.chat.presentation.account.ProjectProfileUi
 import co.ratmo.anreal.feature.chat.presentation.account.UsageBreakdownUi
+import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonCard
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Arrow_back
 import com.composables.icons.materialsymbols.rounded.Auto_awesome
 import com.composables.icons.materialsymbols.rounded.Bolt
+import com.composables.icons.materialsymbols.rounded.Chevron_right
+import com.composables.icons.materialsymbols.rounded.Help
+import androidx.compose.foundation.shape.CircleShape
+import com.composables.icons.materialsymbols.rounded.Edit
+import com.composables.icons.materialsymbols.rounded.Info
 import com.composables.icons.materialsymbols.rounded.Logout
+import com.composables.icons.materialsymbols.rounded.Palette
 import com.composables.icons.materialsymbols.rounded.Person
 
 private val SettingsContentMaxWidth = 640.dp
-private val LogoutFabClearance = 92.dp
+
+@Composable
+private fun SettingsCard(
+    modifier: Modifier = Modifier,
+    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.large,
+    borderColor: Color? = null,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = borderColor?.let { BorderStroke(1.dp, it) },
+        content = content,
+    )
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,7 +110,6 @@ internal fun AccountSettingsLayout(
     onBack: () -> Unit,
     onSelectSection: (AccountSection) -> Unit,
     onRetryUsage: () -> Unit = {},
-    onRetryHealth: () -> Unit = {},
     onRetryPersonalization: () -> Unit = {},
     onRequestResetUserProfile: () -> Unit = {},
     onRequestResetProjectProfile: (String, String) -> Unit = { _, _ -> },
@@ -100,17 +123,33 @@ internal fun AccountSettingsLayout(
     onToggleReduceTransparency: () -> Unit = {},
     onSignOut: () -> Unit,
 ) {
-    AnrealAtmosphere {
+    AnrealAtmosphere(
+        background = AnrealAtmosphereBackground.Surface,
+        animateBackground = false,
+    ) {
         Scaffold(
             containerColor = Color.Transparent,
             topBar = {
-                GlassTopBar(frosted = false) {
-                    TopAppBar(
+                TopAppBar(
                         title = {
-                            Text(
-                                text = AnrealCopy.get(AnrealCopy.ACTION_SETTINGS),
-                                style = MaterialTheme.typography.titleMedium,
-                            )
+                            Column {
+                                Text(
+                                    text = when (state.section) {
+                                        AccountSection.Account -> AnrealCopy.get(AnrealCopy.ACTION_SETTINGS)
+                                        AccountSection.Appearance -> AnrealCopy.get(AnrealCopy.LABEL_APPEARANCE)
+                                        AccountSection.Usage -> AnrealCopy.get(AnrealCopy.LABEL_USAGE)
+                                        AccountSection.Personalization -> AnrealCopy.get(AnrealCopy.LABEL_PERSONALIZATION)
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                if (state.section != AccountSection.Account) {
+                                    Text(
+                                        text = AnrealCopy.get(AnrealCopy.ACTION_SETTINGS),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = glassMutedTextColor(),
+                                    )
+                                }
+                            }
                         },
                         navigationIcon = {
                             IconButton(
@@ -124,86 +163,47 @@ internal fun AccountSettingsLayout(
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = Color.Transparent,
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surface,
                         ),
-                    )
-                }
+                )
             },
         ) { scaffoldPadding ->
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(scaffoldPadding),
             ) {
-                AnrealSegmentedTabs(
-                    items = AccountSection.entries,
-                    selected = state.section,
-                    label = AccountSection::label,
-                    enabled = !state.isSigningOut,
-                    onSelect = onSelectSection,
+                LazyColumn(
                     modifier = Modifier
+                        .align(Alignment.TopCenter)
                         .widthIn(max = SettingsContentMaxWidth)
                         .fillMaxWidth()
-                        .align(Alignment.CenterHorizontally)
-                        .padding(
-                            start = AnrealSpacing.screenCompact,
-                            end = AnrealSpacing.screenCompact,
-                            top = AnrealSpacing.lg,
-                            bottom = AnrealSpacing.xs,
-                        ),
-                )
-                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .widthIn(max = SettingsContentMaxWidth)
-                            .fillMaxHeight()
-                            .fillMaxWidth(),
-                        contentPadding = PaddingValues(
-                            start = AnrealSpacing.screenCompact,
-                            top = AnrealSpacing.md,
-                            end = AnrealSpacing.screenCompact,
-                            bottom = LogoutFabClearance,
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
-                    ) {
-                        item {
-                            AnimatedAccountSection(
-                                state = state,
-                                onRetryUsage = onRetryUsage,
-                                onRetryHealth = onRetryHealth,
-                                onRetryPersonalization = onRetryPersonalization,
-                                onRequestResetUserProfile = onRequestResetUserProfile,
-                                onRequestResetProjectProfile = onRequestResetProjectProfile,
-                                onThemeModeChange = onThemeModeChange,
-                                onToggleDynamicColor = onToggleDynamicColor,
-                                onToggleReduceMotion = onToggleReduceMotion,
-                                onToggleReduceTransparency = onToggleReduceTransparency,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
+                        .fillMaxHeight(),
+                    contentPadding = PaddingValues(
+                        start = AnrealSpacing.screenCompact,
+                        top = AnrealSpacing.md,
+                        end = AnrealSpacing.screenCompact,
+                        bottom = AnrealSpacing.xl,
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
+                ) {
+                    item {
+                        AnimatedAccountSection(
+                            state = state,
+                            onRetryUsage = onRetryUsage,
+                            onRetryPersonalization = onRetryPersonalization,
+                            onRequestResetUserProfile = onRequestResetUserProfile,
+                            onRequestResetProjectProfile = onRequestResetProjectProfile,
+                            onSelectSection = onSelectSection,
+                            onRequestSignOut = onRequestSignOut,
+                            onThemeModeChange = onThemeModeChange,
+                            onToggleDynamicColor = onToggleDynamicColor,
+                            onToggleReduceMotion = onToggleReduceMotion,
+                            onToggleReduceTransparency = onToggleReduceTransparency,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
-
-                    GlassExtendedFloatingActionButton(
-                        label = AnrealCopy.get(
-                            if (state.isSigningOut) {
-                                AnrealCopy.ACTION_LOGGING_OUT
-                            } else {
-                                AnrealCopy.ACTION_LOG_OUT
-                            },
-                        ),
-                        icon = MaterialSymbols.Rounded.Logout,
-                        onClick = onRequestSignOut,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(
-                                end = AnrealSpacing.screenCompact,
-                                bottom = AnrealSpacing.sm,
-                            ),
-                        loading = state.isSigningOut,
-                        destructive = true,
-                    )
                 }
             }
         }
@@ -221,7 +221,7 @@ internal fun AccountSettingsLayout(
             confirmButton = {
                 TextButton(onClick = onConfirmResetProfile, enabled = !state.isResettingProfile) {
                     if (state.isResettingProfile) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        AnrealLoadingIndicator(modifier = Modifier.size(18.dp), size = 18.dp)
                         Spacer(modifier = Modifier.size(AnrealSpacing.xs))
                     }
                     Text(
@@ -263,10 +263,11 @@ internal fun AccountSettingsLayout(
 private fun AnimatedAccountSection(
     state: AccountState,
     onRetryUsage: () -> Unit,
-    onRetryHealth: () -> Unit,
     onRetryPersonalization: () -> Unit,
     onRequestResetUserProfile: () -> Unit,
     onRequestResetProjectProfile: (String, String) -> Unit,
+    onSelectSection: (AccountSection) -> Unit,
+    onRequestSignOut: () -> Unit,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onToggleDynamicColor: () -> Unit,
     onToggleReduceMotion: () -> Unit,
@@ -299,13 +300,17 @@ private fun AnimatedAccountSection(
         label = "accountSection",
     ) { section ->
         when (section) {
-            AccountSection.Account -> AccountDetails(
-                state,
-                onRetryHealth,
-                onThemeModeChange,
-                onToggleDynamicColor,
-                onToggleReduceMotion,
-                onToggleReduceTransparency,
+            AccountSection.Account -> AccountMenu(
+                state = state,
+                onSelectSection = onSelectSection,
+                onRequestSignOut = onRequestSignOut,
+            )
+            AccountSection.Appearance -> AppearanceSection(
+                state = state,
+                onThemeModeChange = onThemeModeChange,
+                onToggleDynamicColor = onToggleDynamicColor,
+                onToggleReduceMotion = onToggleReduceMotion,
+                onToggleReduceTransparency = onToggleReduceTransparency,
             )
             AccountSection.Usage -> UsageSection(
                 usage = state.usage,
@@ -327,27 +332,24 @@ private fun AnimatedAccountSection(
 }
 
 @Composable
-private fun AccountDetails(
+private fun AccountMenu(
     state: AccountState,
-    onRetryHealth: () -> Unit,
-    onThemeModeChange: (AppThemeMode) -> Unit,
-    onToggleDynamicColor: () -> Unit,
-    onToggleReduceMotion: () -> Unit,
-    onToggleReduceTransparency: () -> Unit,
+    onSelectSection: (AccountSection) -> Unit,
+    onRequestSignOut: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
     ) {
-        GlassSurface(
+        SettingsCard(
             modifier = Modifier.fillMaxWidth(),
-            tone = GlassTone.Pane,
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(AnrealSpacing.lg),
-                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
+                    .padding(AnrealSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Surface(
@@ -370,7 +372,7 @@ private fun AccountDetails(
                 ) {
                     Text(
                         text = state.resolvedName(),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -382,75 +384,186 @@ private fun AccountDetails(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
+                    Text(
+                        text = "● " + AnrealCopy.get(
+                            when {
+                                state.isApiHealthy == true -> AnrealCopy.STATUS_CONNECTED
+                                state.isHealthLoading -> AnrealCopy.STATUS_CHECKING
+                                else -> AnrealCopy.STATUS_UNAVAILABLE
+                            }
+                        ) + " · " + state.themeMode.label(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = glassFaintTextColor(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                Surface(
+                    modifier = Modifier.size(28.dp),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Edit,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = glassMutedTextColor(),
+                        )
+                    }
                 }
             }
         }
 
-        SettingsSectionHeader(
-            title = AnrealCopy.get(AnrealCopy.LABEL_ACCOUNT),
-            body = AnrealCopy.get(AnrealCopy.ACCOUNT_SECTION_BODY),
+        Text(
+            text = AnrealCopy.get(AnrealCopy.LABEL_ACCOUNT_PREFERENCES),
+            style = MaterialTheme.typography.labelSmall,
+            color = glassFaintTextColor(),
+            modifier = Modifier.padding(start = AnrealSpacing.xxs, top = AnrealSpacing.xxs),
         )
 
-        GlassSurface(
+        SettingsCard(
             modifier = Modifier.fillMaxWidth(),
-            tone = GlassTone.Regular,
+            shape = MaterialTheme.shapes.large,
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                AccountValueRow(
-                    label = AnrealCopy.get(AnrealCopy.LABEL_NAME),
-                    value = state.resolvedName(),
+                MenuRow(
+                    icon = MaterialSymbols.Rounded.Palette,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_APPEARANCE),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_APPEARANCE_DESCRIPTION),
+                    value = state.themeMode.label(),
+                    onClick = { onSelectSection(AccountSection.Appearance) },
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = AnrealSpacing.md),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f),
                 )
-                AccountValueRow(
-                    label = AnrealCopy.get(AnrealCopy.LABEL_EMAIL),
-                    value = state.resolvedEmail(),
+                MenuRow(
+                    icon = MaterialSymbols.Rounded.Bolt,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_USAGE),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_USAGE_DESCRIPTION),
+                    value = state.usage?.let { "${(it.storageFraction * 100).toInt()}% used" } ?: "",
+                    onClick = { onSelectSection(AccountSection.Usage) },
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = AnrealSpacing.md),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f),
                 )
-                AccountValueRow(
-                    label = AnrealCopy.get(AnrealCopy.LABEL_API_STATUS),
-                    value = AnrealCopy.get(
-                        when {
-                            state.isHealthLoading -> AnrealCopy.STATUS_CHECKING
-                            state.isApiHealthy == true -> AnrealCopy.STATUS_CONNECTED
-                            else -> AnrealCopy.STATUS_UNAVAILABLE
-                        },
-                    ),
-                    actionLabel = if (!state.isHealthLoading && state.isApiHealthy != true) {
-                        AnrealCopy.get(AnrealCopy.ACTION_RETRY)
-                    } else {
-                        null
-                    },
-                    onAction = onRetryHealth,
+                MenuRow(
+                    icon = MaterialSymbols.Rounded.Auto_awesome,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_PERSONALIZATION),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_PERSONALIZATION_DESCRIPTION),
+                    value = if (state.projectProfiles.isNotEmpty()) "${state.projectProfiles.size} profiles" else "",
+                    onClick = { onSelectSection(AccountSection.Personalization) },
                 )
             }
         }
 
+        SettingsCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                MenuRow(
+                    icon = MaterialSymbols.Rounded.Help,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_HELP_FEEDBACK),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_HELP_FEEDBACK_DESCRIPTION),
+                    onClick = {},
+                    showChevron = false,
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = AnrealSpacing.md),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.32f),
+                )
+                MenuRow(
+                    icon = MaterialSymbols.Rounded.Info,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_ABOUT),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_ABOUT_DESCRIPTION),
+                    onClick = {},
+                    showChevron = false,
+                )
+            }
+        }
+
+        SettingsCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.22f),
+        ) {
+            MenuRow(
+                icon = MaterialSymbols.Rounded.Logout,
+                label = AnrealCopy.get(AnrealCopy.ACTION_LOG_OUT),
+                description = AnrealCopy.get(AnrealCopy.DIALOG_SIGN_OUT_BODY),
+                onClick = onRequestSignOut,
+                isDestructive = true,
+            )
+        }
+
+        Text(
+            text = AnrealCopy.get(AnrealCopy.LABEL_ACCOUNT_FOOTER),
+            style = MaterialTheme.typography.labelSmall,
+            color = glassFaintTextColor(),
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun AppearanceSection(
+    state: AccountState,
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    onToggleDynamicColor: () -> Unit,
+    onToggleReduceMotion: () -> Unit,
+    onToggleReduceTransparency: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.lg),
+    ) {
         SettingsSectionHeader(
             title = AnrealCopy.get(AnrealCopy.LABEL_APPEARANCE),
             body = AnrealCopy.get(AnrealCopy.APPEARANCE_SECTION_BODY),
         )
-        GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
-            Column(modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md)) {
+        SettingsCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            ) {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+            ) {
                 Text(
                     AnrealCopy.get(AnrealCopy.LABEL_THEME),
                     style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.extraLarge)
+                        .background(MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.9f))
+                        .padding(AnrealSpacing.xxs),
+                    horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+                ) {
                     AppThemeMode.entries.forEach { mode ->
-                        TextButton(
-                            onClick = { onThemeModeChange(mode) },
-                            modifier = Modifier.weight(1f),
+                        val selected = mode == state.themeMode
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(MaterialTheme.shapes.extraLarge)
+                                .background(
+                                    if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+                                )
+                                .clickable { onThemeModeChange(mode) }
+                                .padding(vertical = AnrealSpacing.xs),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                mode.label(),
-                                color = if (mode == state.themeMode) {
-                                    MaterialTheme.colorScheme.primary
+                                text = mode.label(),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.onSecondaryContainer
                                 } else {
                                     MaterialTheme.colorScheme.onSurfaceVariant
                                 },
@@ -458,22 +571,166 @@ private fun AccountDetails(
                         }
                     }
                 }
-                PreferenceSwitchRow(
-                    AnrealCopy.get(AnrealCopy.LABEL_DYNAMIC_COLOR),
-                    state.dynamicColor,
-                    onToggleDynamicColor,
+                Text(
+                    text = AnrealCopy.get(AnrealCopy.LABEL_THEME_CURRENT)
+                        .replace("{0}", state.themeMode.label()),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = glassFaintTextColor(),
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 PreferenceSwitchRow(
-                    AnrealCopy.get(AnrealCopy.LABEL_REDUCE_MOTION),
-                    state.reduceMotion,
-                    onToggleReduceMotion,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_DYNAMIC_COLOR),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_DYNAMIC_COLOR_DESCRIPTION),
+                    helper = AnrealCopy.get(AnrealCopy.LABEL_DYNAMIC_COLOR_HELPER),
+                    checked = state.dynamicColor,
+                    onToggle = onToggleDynamicColor,
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 PreferenceSwitchRow(
-                    AnrealCopy.get(AnrealCopy.LABEL_REDUCE_TRANSPARENCY),
-                    state.reduceTransparency,
-                    onToggleReduceTransparency,
+                    label = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_MOTION),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_MOTION_DESCRIPTION),
+                    helper = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_MOTION_HELPER),
+                    checked = state.reduceMotion,
+                    onToggle = onToggleReduceMotion,
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                PreferenceSwitchRow(
+                    label = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_TRANSPARENCY),
+                    description = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_TRANSPARENCY_DESCRIPTION),
+                    helper = AnrealCopy.get(AnrealCopy.LABEL_REDUCE_TRANSPARENCY_HELPER),
+                    checked = state.reduceTransparency,
+                    onToggle = onToggleReduceTransparency,
                 )
             }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+        ) {
+            SettingsCard(
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Column(
+                    modifier = Modifier.padding(AnrealSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+                ) {
+                    Text(
+                        text = AnrealCopy.get(AnrealCopy.LABEL_PREVIEW_WITH_FROST),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = glassFaintTextColor(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AnrealSpacing.search)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.72f)),
+                    )
+                    Text(
+                        text = AnrealCopy.get(AnrealCopy.LABEL_PREVIEW_GLASS_TOP_BAR),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = glassMutedTextColor(),
+                    )
+                }
+            }
+            SettingsCard(
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.large,
+            ) {
+                Column(
+                    modifier = Modifier.padding(AnrealSpacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+                ) {
+                    Text(
+                        text = AnrealCopy.get(AnrealCopy.LABEL_PREVIEW_REDUCED),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = glassFaintTextColor(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(AnrealSpacing.search)
+                            .clip(MaterialTheme.shapes.medium)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                    )
+                    Text(
+                        text = AnrealCopy.get(AnrealCopy.LABEL_PREVIEW_SURFACE_CONTAINER),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = glassMutedTextColor(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuRow(
+    icon: ImageVector,
+    label: String,
+    description: String,
+    value: String = "",
+    onClick: () -> Unit,
+    isDestructive: Boolean = false,
+    showChevron: Boolean = true,
+) {
+    val contentColor = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    val mutedColor = if (isDestructive) MaterialTheme.colorScheme.error.copy(alpha = 0.72f) else glassMutedTextColor()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = AnrealSpacing.menuRow)
+            .clickable(onClick = onClick)
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            modifier = Modifier.size(40.dp),
+            shape = MaterialTheme.shapes.large,
+            color = if (isDestructive) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.22f) else MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = if (isDestructive) MaterialTheme.colorScheme.error else glassMutedTextColor(),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = contentColor,
+                maxLines = 1,
+            )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = mutedColor,
+                maxLines = 1,
+            )
+        }
+        if (value.isNotBlank()) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.labelMedium,
+                color = glassFaintTextColor(),
+            )
+        }
+        if (showChevron) {
+            Icon(
+                imageVector = MaterialSymbols.Rounded.Chevron_right,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = if (isDestructive) MaterialTheme.colorScheme.error else glassFaintTextColor(),
+            )
         }
     }
 }
@@ -483,9 +740,8 @@ private fun SettingsStatus(
     icon: ImageVector,
     emptyMessage: String,
 ) {
-    GlassSurface(
+    SettingsCard(
         modifier = Modifier.fillMaxWidth(),
-        tone = GlassTone.Regular,
     ) {
         Row(
             modifier = Modifier
@@ -520,13 +776,35 @@ private fun SettingsStatus(
 }
 
 @Composable
-private fun PreferenceSwitchRow(label: String, checked: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = AnrealSpacing.touch),
-        verticalAlignment = Alignment.CenterVertically,
+private fun PreferenceSwitchRow(
+    label: String,
+    description: String = "",
+    helper: String = "",
+    checked: Boolean,
+    onToggle: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
     ) {
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        Switch(checked = checked, onCheckedChange = { onToggle() })
+        Row(
+            modifier = Modifier.fillMaxWidth().heightIn(min = AnrealSpacing.touch),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xxs),
+            ) {
+                Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                if (description.isNotBlank()) {
+                    Text(description, style = MaterialTheme.typography.bodySmall, color = glassMutedTextColor())
+                }
+                if (helper.isNotBlank()) {
+                    Text(helper, style = MaterialTheme.typography.labelSmall, color = glassFaintTextColor())
+                }
+            }
+            Switch(checked = checked, onCheckedChange = { onToggle() })
+        }
     }
 }
 
@@ -555,7 +833,7 @@ private fun UsageSection(
                 emptyMessage = AnrealCopy.get(AnrealCopy.USAGE_EMPTY),
             )
             else -> {
-                GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+                SettingsCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md),
                         verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
@@ -595,7 +873,7 @@ private fun UsageSection(
 
 @Composable
 private fun MetricGrid(usage: AccountUsageUi) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+    SettingsCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             listOf(
                 AnrealCopy.get(AnrealCopy.LABEL_REQUESTS) to usage.requestCount,
@@ -622,7 +900,7 @@ private fun UsageBreakdownCard(title: String, rows: List<UsageBreakdownUi>) {
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+        SettingsCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 rows.forEachIndexed { index, row ->
                     AccountValueRow(row.label, "${row.requests} requests · ${row.tokens} tokens")
@@ -684,7 +962,7 @@ private fun PersonalizationSection(
 
 @Composable
 private fun ProfileCard(title: String, profile: ProfileUi?, onReset: () -> Unit) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+    SettingsCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md),
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
@@ -733,21 +1011,18 @@ private fun SettingsSectionContainer(
 
 @Composable
 private fun LoadingSettingsCard() {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-            Text(AnrealCopy.get(AnrealCopy.STATUS_LOADING))
-        }
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+    ) {
+        AnrealSkeletonCard()
+        AnrealSkeletonCard()
     }
 }
 
 @Composable
 private fun ErrorSettingsCard(error: UiText, onRetry: () -> Unit) {
-    GlassSurface(modifier = Modifier.fillMaxWidth(), tone = GlassTone.Regular) {
+    SettingsCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.lg),
             verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
@@ -813,6 +1088,7 @@ private fun AccountValueRow(
 
 private fun AccountSection.label(): String = when (this) {
     AccountSection.Account -> AnrealCopy.get(AnrealCopy.LABEL_ACCOUNT)
+    AccountSection.Appearance -> AnrealCopy.get(AnrealCopy.LABEL_APPEARANCE)
     AccountSection.Usage -> AnrealCopy.get(AnrealCopy.LABEL_USAGE)
     AccountSection.Personalization -> AnrealCopy.get(AnrealCopy.LABEL_PERSONALIZATION)
 }

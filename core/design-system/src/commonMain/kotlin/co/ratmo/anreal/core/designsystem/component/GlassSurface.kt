@@ -80,6 +80,7 @@ fun GlassSurface(
     borderColor: Color? = null,
     fallbackColor: Color? = null,
     tintColor: Color? = null,
+    opaqueTintColor: Color? = null,
     emphasized: Boolean = false,
     error: Boolean = false,
     effectAlpha: Float = 1f,
@@ -122,7 +123,7 @@ fun GlassSurface(
         // HazeMaterials already provides tint and noise. Drawing another
         // translucent Surface tint here makes the material look opaque.
         color = if (useHaze) {
-            Color.Transparent
+            opaqueTintColor ?: Color.Transparent
         } else {
             fallback.copy(alpha = fallback.alpha * clampedAlpha)
         },

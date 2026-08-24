@@ -18,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import co.ratmo.anreal.core.designsystem.component.AnrealBottomSheet
 import co.ratmo.anreal.core.designsystem.component.AnrealLoadingIndicator
+import co.ratmo.anreal.core.designsystem.component.AnrealSheetTitle
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
@@ -64,7 +66,7 @@ internal fun ContextUsageSheet(
     error: Boolean,
     onDismiss: () -> Unit,
 ) {
-    ChatBottomSheet(onDismiss = onDismiss) {
+    AnrealBottomSheet(onDismiss = onDismiss) {
         ContextUsageContent(usage = usage, error = error)
     }
 }
@@ -75,7 +77,7 @@ private fun ContextUsageContent(
     error: Boolean,
 ) {
     Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
-        SheetTitle(AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE))
+        AnrealSheetTitle(AnrealCopy.get(AnrealCopy.LABEL_CONTEXT_USAGE))
         when {
             usage == null && error -> {
                 Text(

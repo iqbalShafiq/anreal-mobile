@@ -28,12 +28,10 @@ fun <T> AnrealSegmentedTabs(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    glass: Boolean = true,
+    containerColor: Color? = null,
 ) {
-    GlassSurface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge,
-        tone = GlassTone.Thin,
-    ) {
+    val tabsContent: @Composable () -> Unit = {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -46,7 +44,16 @@ fun <T> AnrealSegmentedTabs(
                 Surface(
                     modifier = Modifier.weight(1f),
                     shape = if (isSelected) MaterialTheme.shapes.extraLarge else MaterialTheme.shapes.large,
-                    color = if (isSelected) glassHighlightColor() else Color.Transparent,
+                    color = if (isSelected) {
+                        if (glass) glassHighlightColor() else MaterialTheme.colorScheme.secondaryContainer
+                    } else {
+                        Color.Transparent
+                    },
+                    contentColor = if (isSelected) {
+                        if (glass) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSecondaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
                 ) {
                     Box(
                         modifier = Modifier
@@ -66,9 +73,10 @@ fun <T> AnrealSegmentedTabs(
                             text = label(item),
                             style = MaterialTheme.typography.labelMedium,
                             color = if (isSelected) {
-                                MaterialTheme.colorScheme.onSurface
+                                if (glass) MaterialTheme.colorScheme.onSurface
+                                else MaterialTheme.colorScheme.onSecondaryContainer
                             } else {
-                                glassMutedTextColor()
+                                MaterialTheme.colorScheme.onSurfaceVariant
                             },
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -77,5 +85,19 @@ fun <T> AnrealSegmentedTabs(
                 }
             }
         }
+    }
+    if (glass) {
+        GlassSurface(
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            tone = GlassTone.Thin,
+        ) { tabsContent() }
+    } else {
+        Surface(
+            modifier = modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge,
+            color = containerColor ?: MaterialTheme.colorScheme.surfaceContainer,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ) { tabsContent() }
     }
 }

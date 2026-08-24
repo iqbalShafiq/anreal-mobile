@@ -59,7 +59,6 @@ fun AccountScreen(
         onBack = { onAction(AccountAction.OnBack) },
         onSelectSection = { onAction(AccountAction.OnSelectSection(it)) },
         onRetryUsage = { onAction(AccountAction.OnRetryUsage) },
-        onRetryHealth = { onAction(AccountAction.OnRetryHealth) },
         onRetryPersonalization = { onAction(AccountAction.OnRetryPersonalization) },
         onRequestResetUserProfile = { onAction(AccountAction.OnRequestResetUserProfile) },
         onRequestResetProjectProfile = { id, name ->

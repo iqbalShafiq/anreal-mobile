@@ -1,4 +1,4 @@
-package co.ratmo.anreal.feature.chat.presentation.component
+package co.ratmo.anreal.core.designsystem.component
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +19,7 @@ import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ChatBottomSheet(
+fun AnrealBottomSheet(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -59,7 +59,7 @@ private fun InspectionBottomSheet(content: @Composable () -> Unit) {
 }
 
 @Composable
-internal fun SheetTitle(text: String) {
+fun AnrealSheetTitle(text: String) {
     Text(
         text = text,
         modifier = Modifier

@@ -20,7 +20,7 @@ fun AnrealComposerField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "",
+    placeholder: String,
     enabled: Boolean = true,
     maxLines: Int = 6,
 ) {

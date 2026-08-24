@@ -1,5 +1,6 @@
 package co.ratmo.anreal.core.designsystem.component
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.withInfiniteAnimationFrameNanos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
@@ -37,25 +39,81 @@ internal val LocalAnrealHazeState = staticCompositionLocalOf<HazeState?> { null 
 private const val TwoPi = (PI * 2.0).toFloat()
 private const val AuroraPulseFloor = 0.62f
 
+enum class AnrealAtmosphereBackground {
+    Aurora,
+    Surface,
+}
+
 @Composable
 fun AnrealAtmosphere(
     modifier: Modifier = Modifier,
+    background: AnrealAtmosphereBackground = AnrealAtmosphereBackground.Aurora,
+    animateBackground: Boolean = true,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    if (LocalAnrealHazeState.current != null) {
-        Box(modifier = modifier.fillMaxSize(), content = content)
+    val parentHazeState = LocalAnrealHazeState.current
+    if (parentHazeState != null) {
+        AnrealAtmosphereSurfaceLayer(
+            background = background,
+            animateBackground = animateBackground,
+            hazeState = parentHazeState,
+            modifier = modifier,
+            content = content,
+        )
         return
     }
     val hazeState = remember { HazeState() }
     CompositionLocalProvider(LocalAnrealHazeState provides hazeState) {
         Box(modifier = modifier.fillMaxSize()) {
-            AnrealAurora(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .hazeSource(state = hazeState),
-            )
+            if (background == AnrealAtmosphereBackground.Aurora) {
+                AnrealAurora(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .hazeSource(state = hazeState),
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface)
+                        .hazeSource(state = hazeState),
+                )
+            }
             content()
         }
+    }
+}
+
+@Composable
+private fun AnrealAtmosphereSurfaceLayer(
+    background: AnrealAtmosphereBackground,
+    animateBackground: Boolean,
+    hazeState: HazeState,
+    modifier: Modifier,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val targetAlpha = if (background == AnrealAtmosphereBackground.Surface) 1f else 0f
+    val surfaceAlpha = animateFloatAsState(
+        targetValue = targetAlpha,
+        animationSpec = if (animateBackground && !LocalAnrealReduceMotion.current) {
+            AnrealMotion.backgroundSpec()
+        } else {
+            androidx.compose.animation.core.snap()
+        },
+        label = "atmosphere_surface_alpha",
+    ).value
+    Box(modifier = modifier.fillMaxSize()) {
+        if (surfaceAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = surfaceAlpha }
+                    .background(MaterialTheme.colorScheme.surface)
+                    .hazeSource(state = hazeState)
+                    .semantics { hideFromAccessibility() },
+            )
+        }
+        content()
     }
 }
 
@@ -189,6 +247,19 @@ private fun DrawScope.drawAuroraOrb(
 private fun AnrealAtmospherePreview() {
     AnrealPreview {
         AnrealAtmosphere {
+            Box(modifier = Modifier.fillMaxSize())
+        }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun AnrealAtmosphereSurfacePreview() {
+    AnrealPreview {
+        AnrealAtmosphere(
+            background = AnrealAtmosphereBackground.Surface,
+            animateBackground = false,
+        ) {
             Box(modifier = Modifier.fillMaxSize())
         }
     }

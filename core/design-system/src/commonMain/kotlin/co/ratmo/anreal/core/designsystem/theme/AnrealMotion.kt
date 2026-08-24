@@ -46,6 +46,11 @@ object AnrealMotion {
         easing = easeOut,
     )
 
+    fun <T> backgroundSpec(): FiniteAnimationSpec<T> = tween(
+        durationMillis = durationMed.inWholeMilliseconds.toInt(),
+        easing = easeOut,
+    )
+
     fun <T> selectionSpec(): FiniteAnimationSpec<T> = tween(
         durationMillis = durationFast.inWholeMilliseconds.toInt(),
         easing = easeInOut,

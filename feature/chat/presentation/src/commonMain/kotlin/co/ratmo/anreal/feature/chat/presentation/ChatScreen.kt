@@ -35,6 +35,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
+import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphereBackground
 import co.ratmo.anreal.core.designsystem.component.AnrealBackHandler
 import co.ratmo.anreal.core.designsystem.component.GlassDrawer
 import co.ratmo.anreal.core.designsystem.component.GlassTopBar
@@ -211,7 +212,13 @@ fun ChatScreen(
         onScreenAction(ChatAction.OnOpenAllChats)
     }
 
-    AnrealAtmosphere {
+    AnrealAtmosphere(
+        background = if (state.shouldShowAurora) {
+            AnrealAtmosphereBackground.Aurora
+        } else {
+            AnrealAtmosphereBackground.Surface
+        },
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             ModalNavigationDrawer(
                 drawerState = drawerState,
@@ -228,7 +235,10 @@ fun ChatScreen(
                 Scaffold(
                     containerColor = Color.Transparent,
                     topBar = {
-                        GlassTopBar(frosted = frostedTopBar.value) {
+                        GlassTopBar(
+                            frosted = frostedTopBar.value,
+                            surfaceTinted = !state.shouldShowAurora,
+                        ) {
                             TopAppBar(
                                 title = {
                                     Text(
@@ -347,6 +357,14 @@ private fun chatBarTitle(state: ChatState): String {
         UiText.StringResource(AnrealCopy.LABEL_PROJECT_CHAT_TITLE, listOf(project, sessionTitle)).asString()
     }
 }
+
+private val ChatState.shouldShowAurora: Boolean
+    get() {
+        if (thread.messages.isNotEmpty()) return false
+        val newChatTitle = AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT)
+        val selectedTitle = sessions.firstOrNull { it.id == selectedSessionId }?.title
+        return selectedSessionId == null || selectedTitle == newChatTitle
+    }
 
 @AnrealPreviews
 @Composable
