@@ -216,7 +216,7 @@ fun ChatScreen(
     }
 
     AnrealAtmosphere(
-        background = if (state.shouldShowAurora) {
+        background = if (shouldShowChatAurora(state)) {
             AnrealAtmosphereBackground.Aurora
         } else {
             AnrealAtmosphereBackground.Surface
@@ -240,7 +240,7 @@ fun ChatScreen(
                     topBar = {
                         GlassTopBar(
                             frosted = frostedTopBar.value,
-                            surfaceTinted = !state.shouldShowAurora,
+                            surfaceTinted = !shouldShowChatAurora(state),
                         ) {
                             TopAppBar(
                                 title = {
@@ -370,13 +370,11 @@ private fun chatBarTitle(state: ChatState): String {
     }
 }
 
-private val ChatState.shouldShowAurora: Boolean
-    get() {
-        if (thread.messages.isNotEmpty()) return false
-        val newChatTitle = AnrealCopy.get(AnrealCopy.ACTION_NEW_CHAT)
-        val selectedTitle = sessions.firstOrNull { it.id == selectedSessionId }?.title
-        return selectedSessionId == null || selectedTitle == newChatTitle
-    }
+/**
+ * The chat backdrop follows thread content, not asynchronous session/catalog state.
+ * An empty thread must keep the aurora visible until the first message arrives.
+ */
+internal fun shouldShowChatAurora(state: ChatState): Boolean = state.thread.messages.isEmpty()
 
 @AnrealPreviews
 @Composable
