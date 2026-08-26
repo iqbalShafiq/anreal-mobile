@@ -37,6 +37,7 @@ fun reconcileCatalogSelection(
     catalog: ModelCatalog,
     requestedModelId: String?,
     requestedReasoningEffort: String?,
+    requestedModelLabel: String? = null,
 ): CatalogSelectionResolution {
     val selectedModel = if (requestedModelId == null) {
         catalog.models.firstOrNull()
@@ -50,7 +51,7 @@ fun reconcileCatalogSelection(
             selectedReasoningEffort = null,
             modelUnavailable = true,
             unavailableModelId = requestedModelId,
-            unavailableModelLabel = requestedModelId,
+            unavailableModelLabel = requestedModelLabel ?: requestedModelId,
         )
     }
 

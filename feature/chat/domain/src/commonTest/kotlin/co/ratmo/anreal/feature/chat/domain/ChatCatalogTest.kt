@@ -54,6 +54,7 @@ class ChatCatalogTest {
             catalog = catalog(model(id = "current", reasoningEfforts = listOf("low"))),
             requestedModelId = "removed",
             requestedReasoningEffort = "high",
+            requestedModelLabel = "Old model",
         )
 
         assertThat(resolution).isEqualTo(
@@ -62,7 +63,7 @@ class ChatCatalogTest {
                 selectedReasoningEffort = null,
                 modelUnavailable = true,
                 unavailableModelId = "removed",
-                unavailableModelLabel = "removed",
+                unavailableModelLabel = "Old model",
             ),
         )
     }
