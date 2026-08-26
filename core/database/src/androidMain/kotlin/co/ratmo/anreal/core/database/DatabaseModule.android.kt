@@ -9,4 +9,5 @@ actual val databaseModule: Module = module {
     single { get<AnrealDatabase>().sessionDao() }
     single { get<AnrealDatabase>().messageDao() }
     single { get<AnrealDatabase>().queuedItemDao() }
+    single { get<AnrealDatabase>().modelCatalogDao() }
 }

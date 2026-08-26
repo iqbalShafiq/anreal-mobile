@@ -25,6 +25,13 @@ kotlin {
         implementation(libs.androidx.room3.runtime)
         implementation(libs.androidx.sqlite.bundled)
     }
+    sourceSets.commonTest.dependencies {
+        implementation(libs.kotlinx.coroutines.test)
+    }
+    sourceSets.getByName("androidHostTest").dependencies {
+        implementation(libs.junit)
+        implementation(libs.robolectric)
+    }
 }
 
 dependencies {
