@@ -69,7 +69,7 @@ Reconciliation is a pure domain function with a testable result:
 - Resolve the requested model from the persisted Room selection, falling back to the legacy preference only during migration.
 - If the requested model id is not in the server catalog, set both selected model and selected effort to `null`, persist both nulls, and return `modelUnavailable = true` with the removed id/label for dialog copy.
 - If the model exists, preserve its effort when the effort is supported by that model.
-- If the effort is not supported, select the greatest available effort whose canonical rank is lower than the requested rank. If no lower effort exists, select the model’s lowest available effort only when the requested effort was non-null; otherwise leave effort null. The canonical rank is `none < minimal < low < medium < high < xhigh < max`; unknown keys fall back to catalog order and never outrank a known key.
+- If the effort is not supported, select the greatest available effort whose canonical rank is lower than the requested rank. If no lower effort exists, leave effort null rather than silently moving upward. The canonical rank is `none < minimal < low < medium < high < xhigh < max`; unknown keys fall back to catalog order and never outrank a known key.
 - The global reasoning-effort list shown in the sheet remains the server catalog list; the selected model’s allowed keys filter the actual choices.
 
 The unavailable-model dialog is shown only for a removed model. An effort downgrade is silent but reflected in the selected chip and persisted selection. If the server model has no reasoning options, the selected effort is null.
