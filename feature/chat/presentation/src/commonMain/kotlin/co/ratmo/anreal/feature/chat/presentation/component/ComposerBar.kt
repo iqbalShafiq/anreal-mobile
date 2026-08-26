@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,8 +58,16 @@ internal fun ComposerBar(
     onAction: (ChatAction) -> Unit,
     modifier: Modifier = Modifier,
     initialSheet: ComposerSheet? = null,
+    modelSheetOpenRequest: Boolean = false,
+    onModelSheetOpenRequestConsumed: () -> Unit = {},
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
+    LaunchedEffect(modelSheetOpenRequest) {
+        if (modelSheetOpenRequest) {
+            sheet = ComposerSheet.Model
+            onModelSheetOpenRequestConsumed()
+        }
+    }
     val streaming = state.isSending || state.thread.status == RunStatus.Streaming
     val canSubmit = state.draft.isNotBlank()
     val modelTriggerLabel = modelAndReasoningLabel(state)

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.presentation.AnrealCopy
+import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -108,13 +109,47 @@ class ChatScreensScreenshotTest {
     }
 
     @Test
-    fun modelUnavailableDialogLight() {
+    fun cachedCatalogErrorInModelSheetOffersRetry() {
         val actions = mutableListOf<ChatAction>()
         composeTestRule.setContent {
             AnrealPreview(dark = false) {
                 ChatScreen(
-                    state = chatModelUnavailablePreviewState(),
+                    state = chatComposerCatalogPreviewState().copy(
+                        catalogLoading = false,
+                        catalogError = UiText.DynamicString("Cached refresh failed"),
+                    ),
                     onAction = { actions += it },
+                )
+            }
+        }
+
+        composeTestRule
+            .onNodeWithContentDescription(AnrealCopy.get(AnrealCopy.CD_MODEL))
+            .performClick()
+        composeTestRule.onNodeWithText("Cached refresh failed").assertIsDisplayed()
+        composeTestRule
+            .onNodeWithText(AnrealCopy.get(AnrealCopy.ACTION_RETRY))
+            .performClick()
+        assertTrue(actions.lastOrNull() == ChatAction.OnRetryCatalog)
+        captureScreenRoboImage()
+    }
+
+    @Test
+    fun modelUnavailableDialogLight() {
+        val actions = mutableListOf<ChatAction>()
+        val screenState = mutableStateOf(
+            chatModelUnavailablePreviewState().copy(catalogLoading = false),
+        )
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                ChatScreen(
+                    state = screenState.value,
+                    onAction = {
+                        actions += it
+                        if (it == ChatAction.OnDismissModelUnavailable) {
+                            screenState.value = screenState.value.copy(modelUnavailable = null)
+                        }
+                    },
                 )
             }
         }
@@ -134,6 +169,7 @@ class ChatScreensScreenshotTest {
             AnrealCopy.get(AnrealCopy.ACTION_CHOOSE_MODEL),
         ).performClick()
         assertTrue(actions.lastOrNull() == ChatAction.OnDismissModelUnavailable)
+        composeTestRule.onNodeWithText(AnrealCopy.get(AnrealCopy.MODELS_EMPTY)).assertIsDisplayed()
     }
 
     @Test

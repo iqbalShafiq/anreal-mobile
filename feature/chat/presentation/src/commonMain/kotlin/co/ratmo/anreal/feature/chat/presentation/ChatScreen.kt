@@ -47,6 +47,7 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
+import co.ratmo.anreal.feature.chat.presentation.component.ComposerSheet
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageButton
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageSheet
 import co.ratmo.anreal.feature.chat.presentation.component.ApprovalDialog
@@ -192,6 +193,7 @@ fun ChatScreen(
     val drawerState = rememberDrawerState(initialValue = initialChatsDrawer)
     var documentsOpen by remember { mutableStateOf(initialDocumentsDrawer) }
     var contextUsageOpen by remember { mutableStateOf(false) }
+    var modelSheetOpenRequest by remember { mutableStateOf(false) }
     var composerHeightPx by remember { mutableIntStateOf(0) }
     val frostedTopBar = remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -303,6 +305,8 @@ fun ChatScreen(
                         ComposerBar(
                             state = state,
                             onAction = onAction,
+                            modelSheetOpenRequest = modelSheetOpenRequest,
+                            onModelSheetOpenRequestConsumed = { modelSheetOpenRequest = false },
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .onSizeChanged { composerHeightPx = it.height },
@@ -348,7 +352,11 @@ fun ChatScreen(
         DocumentLibraryDialog(state, onAction)
     }
     state.modelUnavailable?.let { model ->
-        ModelUnavailableDialog(model = model, onAction = onAction)
+        ModelUnavailableDialog(
+            model = model,
+            onAction = onAction,
+            onChooseModel = { modelSheetOpenRequest = true },
+        )
     }
 }
 

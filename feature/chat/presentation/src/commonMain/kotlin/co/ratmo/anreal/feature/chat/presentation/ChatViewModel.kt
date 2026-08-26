@@ -52,6 +52,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -319,6 +320,7 @@ class ChatViewModel(
     private var catalogSelectionInvalidated: Boolean = false
     private var latestCachedCatalog: CachedModelCatalog? = null
     private var roomSelectionEstablished: Boolean = false
+    private val catalogCacheReady = CompletableDeferred<Unit>()
 
     init {
         viewModelScope.launch {
@@ -1281,6 +1283,9 @@ class ChatViewModel(
     private suspend fun observeCatalogCache() {
         chatRepository.observeCachedCatalog().collect { cached ->
             latestCachedCatalog = cached
+            if (!catalogCacheReady.isCompleted) {
+                catalogCacheReady.complete(Unit)
+            }
             if (cached == null) {
                 roomSelectionEstablished = false
                 return@collect
@@ -1335,6 +1340,7 @@ class ChatViewModel(
     }
 
     private suspend fun refreshCatalog() {
+        catalogCacheReady.await()
         val cachedBeforeRefresh = latestCachedCatalog
         val preferences = preferencesRepository.preferences.first()
         val roomSelection = cachedBeforeRefresh?.takeIf {

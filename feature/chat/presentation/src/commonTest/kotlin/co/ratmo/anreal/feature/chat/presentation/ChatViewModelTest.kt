@@ -30,13 +30,16 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withTimeout
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -744,6 +747,70 @@ class ChatViewModelTest {
         assertThat(invalidViewModel.state.value.selectedModelId).isEqualTo("m1")
         assertThat(invalidPreferences.current.chatModelId).isEqualTo("m1")
         assertThat(invalidPreferences.current.chatReasoningEffort).isEqualTo("high")
+    }
+
+    @Test
+    fun startup_catalog_refresh_waits_for_delayed_room_selection_before_using_legacy_preferences() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("room", "Room", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+                selectedModelId = "room",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(
+                        ChatModel("room", "Room", listOf("high")),
+                        ChatModel("legacy", "Legacy", listOf("high")),
+                    ),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+            holdCatalogRefresh = true
+            allowCatalogCacheInitialEmission = CompletableDeferred()
+        }
+        val preferences = FakeChatPreferencesRepository(
+            AppPreferences(chatModelId = "legacy", chatReasoningEffort = "high"),
+        )
+        val viewModel = ChatViewModel(SavedStateHandle(), fake, preferences)
+
+        fake.catalogCacheObservationStarted.await()
+        runCurrent()
+        fake.allowCatalogCacheInitialEmission?.complete(Unit)
+        withTimeout(1_000) { fake.catalogRefreshStarted.await() }
+        fake.allowCatalogRefreshToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedModelId).isEqualTo("room")
+        assertThat(viewModel.state.value.selectedReasoning).isEqualTo("high")
+        assertThat(fake.persistedCatalogSelection).isEqualTo("room" to "high")
+        assertThat(preferences.current.chatModelId).isEqualTo("room")
+    }
+
+    @Test
+    fun startup_catalog_refresh_releases_after_delayed_null_room_cache_emission() = runTest {
+        val fake = populatedRepo().apply {
+            catalogResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("live", "Live", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+            allowCatalogCacheInitialEmission = CompletableDeferred()
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+
+        fake.catalogCacheObservationStarted.await()
+        fake.allowCatalogCacheInitialEmission?.complete(Unit)
+        withTimeout(1_000) { fake.catalogRefreshStarted.await() }
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.models.single().id).isEqualTo("live")
+        assertThat(viewModel.state.value.catalogError).isNull()
     }
 
     @Test

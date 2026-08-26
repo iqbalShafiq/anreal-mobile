@@ -31,6 +31,8 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
@@ -63,6 +65,8 @@ class FakeChatRepository : ChatRepository {
     var holdCatalogRefresh: Boolean = false
     var catalogRefreshStarted: CompletableDeferred<Unit> = CompletableDeferred()
     var allowCatalogRefreshToFinish: CompletableDeferred<Unit> = CompletableDeferred()
+    var catalogCacheObservationStarted: CompletableDeferred<Unit> = CompletableDeferred()
+    var allowCatalogCacheInitialEmission: CompletableDeferred<Unit>? = null
     var catalogRefreshCalls: Int = 0
     var persistedCatalogSelection: Pair<String?, String?>? = null
     var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
@@ -230,7 +234,14 @@ class FakeChatRepository : ChatRepository {
         queues[sessionId] = items
     }
 
-    override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = cachedCatalog
+    override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = flow {
+        if (!catalogCacheObservationStarted.isCompleted) {
+            catalogCacheObservationStarted.complete(Unit)
+        }
+        allowCatalogCacheInitialEmission?.await()
+        emit(cachedCatalog.value)
+        emitAll(cachedCatalog)
+    }
 
     override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
         catalogRefreshCalls += 1

@@ -16,6 +16,7 @@ import co.ratmo.anreal.feature.chat.presentation.ModelUnavailableUi
 internal fun ModelUnavailableDialog(
     model: ModelUnavailableUi,
     onAction: (ChatAction) -> Unit,
+    onChooseModel: () -> Unit = {},
 ) {
     AlertDialog(
         onDismissRequest = { onAction(ChatAction.OnDismissModelUnavailable) },
@@ -29,7 +30,12 @@ internal fun ModelUnavailableDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onAction(ChatAction.OnDismissModelUnavailable) }) {
+            TextButton(
+                onClick = {
+                    onAction(ChatAction.OnDismissModelUnavailable)
+                    onChooseModel()
+                },
+            ) {
                 Text(AnrealCopy.get(AnrealCopy.ACTION_CHOOSE_MODEL))
             }
         },

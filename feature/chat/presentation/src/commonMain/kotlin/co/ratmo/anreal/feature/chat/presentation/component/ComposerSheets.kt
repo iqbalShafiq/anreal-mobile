@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -166,6 +167,12 @@ private fun ModelAndReasoningSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             else -> {
+                state.catalogError?.let { error ->
+                    CachedCatalogError(
+                        error = error.asString(),
+                        onRetry = { onAction(ChatAction.OnRetryCatalog) },
+                    )
+                }
                 AnrealSheetTitle(AnrealCopy.get(AnrealCopy.LABEL_MODEL))
                 state.models.forEach { model ->
                     SheetOption(
@@ -194,6 +201,37 @@ private fun ModelAndReasoningSheet(
                         onClick = { onAction(ChatAction.OnSelectReasoning(effort.key)) },
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CachedCatalogError(
+    error: String,
+    onRetry: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = AnrealSpacing.md, end = AnrealSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = error,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
+            TextButton(onClick = onRetry) {
+                Text(AnrealCopy.get(AnrealCopy.ACTION_RETRY))
             }
         }
     }
