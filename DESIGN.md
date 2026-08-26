@@ -131,7 +131,10 @@ We do **not** port `@anvia/react-ui`. On web that package is headless (structure
 - Do not add a separate unstyled chat-ui module until a second feature needs the same primitives.
 - Composer field stays enabled during a run. Stop replaces Send. Queue uses the same field.
 - Model + reasoning is **one** composer trigger and **one** sheet. Concatenate the effort onto the model label when it is not None. The add control and model trigger are matching tonal capsules; the model pill wraps its label and ellipsizes between add and send.
-- Persist the last valid model + reasoning choice in app preferences. Revalidate both against the live catalog and clear a removed model or unsupported effort.
+- The catalog and last valid selection are installation-local Room 3 cache data, not account-scoped. DataStore model/effort keys are a legacy migration fallback and are synchronized after Room selection is established.
+- Cached options and selection render immediately while `/api/models` refreshes in the background; cached data is display-only until a live refresh succeeds before a new send.
+- A removed persisted model clears model/effort and shows the explicit unavailable-model dialog; no arbitrary replacement is selected until the user chooses one.
+- An unavailable reasoning effort may only downgrade to the nearest lower available effort; if none exists, it becomes null.
 - The model sheet always exposes catalog loading, empty, and retryable error states; its trigger and option content are left-aligned.
 - Context usage is a compact circular indicator immediately before Documents in the top bar. Its detail (model, tokens, ratio, thresholds, and reasoning) lives in a bottom sheet, never in the composer.
 - Attachments are entered from the composer `+` feature sheet; do not spend a second composer action slot on a standalone attachment icon.
