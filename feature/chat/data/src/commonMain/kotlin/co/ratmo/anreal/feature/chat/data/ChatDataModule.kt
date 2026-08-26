@@ -8,11 +8,12 @@ import org.koin.dsl.module
 val chatDataModule = module {
     single { KtorChatRemoteDataSource(get()) }
     single { RoomChatLocalDataSource(get(), get(), get()) }
+    single { RoomModelCatalogLocalDataSource(get()) }
     single<ChatRepository> {
         if (get<AppConfig>().environment.stubApi) {
             StubChatRepository()
         } else {
-            OfflineFirstChatRepository(get(), get())
+            OfflineFirstChatRepository(get(), get(), get())
         }
     }
     single<AccountSettingsDataSource> {

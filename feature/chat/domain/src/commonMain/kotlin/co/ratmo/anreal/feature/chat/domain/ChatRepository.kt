@@ -141,7 +141,9 @@ interface ChatRepository {
         memoryPosition: Int?,
     ): EmptyResult<ChatError>
     suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int)
-    suspend fun loadCatalog(): Result<ModelCatalog, ChatError>
+    fun observeCachedCatalog(): Flow<CachedModelCatalog?>
+    suspend fun refreshCatalog(): Result<ModelCatalog, ChatError>
+    suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?)
     suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError>
     suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError>
     suspend fun unlinkSessionDocument(sessionId: String, documentId: String): EmptyResult<ChatError>

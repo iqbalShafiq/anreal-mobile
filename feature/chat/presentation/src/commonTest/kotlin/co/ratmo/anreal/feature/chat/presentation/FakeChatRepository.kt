@@ -9,6 +9,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
@@ -29,6 +30,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 
 class FakeChatRepository : ChatRepository {
     val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
@@ -44,7 +46,17 @@ class FakeChatRepository : ChatRepository {
     var sentClientMessageId: String? = null
     var sentOptions: ChatRunOptions? = null
     var streamLines: List<String> = emptyList()
-    var catalogResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
+    val cachedCatalog = MutableStateFlow<CachedModelCatalog?>(null)
+    var refreshResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
+    var catalogResult: Result<ModelCatalog, ChatError>
+        get() = refreshResult
+        set(value) {
+            refreshResult = value
+        }
+    var holdCatalogRefresh: Boolean = false
+    var catalogRefreshStarted: CompletableDeferred<Unit> = CompletableDeferred()
+    var allowCatalogRefreshToFinish: CompletableDeferred<Unit> = CompletableDeferred()
+    var persistedCatalogSelection: Pair<String?, String?>? = null
     var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
     var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
     var steered: List<QueuedItem> = emptyList()
@@ -210,7 +222,37 @@ class FakeChatRepository : ChatRepository {
         queues[sessionId] = items
     }
 
-    override suspend fun loadCatalog(): Result<ModelCatalog, ChatError> = catalogResult
+    override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = cachedCatalog
+
+    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
+        if (holdCatalogRefresh) {
+            if (!catalogRefreshStarted.isCompleted) catalogRefreshStarted.complete(Unit)
+            allowCatalogRefreshToFinish.await()
+        }
+        when (val result = refreshResult) {
+            is Result.Success -> {
+                val current = cachedCatalog.value
+                cachedCatalog.value = CachedModelCatalog(
+                    catalog = result.data,
+                    selectedModelId = current?.selectedModelId,
+                    selectedReasoningEffort = current?.selectedReasoningEffort,
+                    lastSuccessfulRefreshEpochMillis = current?.lastSuccessfulRefreshEpochMillis,
+                )
+            }
+            is Result.Error -> Unit
+        }
+        return refreshResult
+    }
+
+    override suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?) {
+        persistedCatalogSelection = modelId to reasoningEffort
+        cachedCatalog.update { cached ->
+            cached?.copy(
+                selectedModelId = modelId,
+                selectedReasoningEffort = reasoningEffort,
+            )
+        }
+    }
 
     override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> = capabilitiesResult
 

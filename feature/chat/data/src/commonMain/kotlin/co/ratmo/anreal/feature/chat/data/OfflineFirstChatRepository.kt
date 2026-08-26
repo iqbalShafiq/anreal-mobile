@@ -10,6 +10,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
@@ -31,6 +32,7 @@ import kotlinx.coroutines.flow.Flow
 class OfflineFirstChatRepository(
     private val remote: KtorChatRemoteDataSource,
     private val local: RoomChatLocalDataSource,
+    private val catalogLocal: RoomModelCatalogLocalDataSource,
 ) : ChatRepository {
 
     override fun observeSessions(projectId: String?): Flow<List<ChatSession>> =
@@ -123,7 +125,14 @@ class OfflineFirstChatRepository(
         )
     }
 
-    override suspend fun loadCatalog(): Result<ModelCatalog, ChatError> = remote.loadCatalog()
+    override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = catalogLocal.observeCachedCatalog()
+
+    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> =
+        remote.loadCatalog().onSuccess { catalogLocal.replaceCatalog(it) }
+
+    override suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?) {
+        catalogLocal.persistSelection(modelId, reasoningEffort)
+    }
 
     override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
         return remote.loadCapabilities()

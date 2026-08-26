@@ -7,6 +7,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
@@ -38,6 +39,30 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 class StubChatRepository : ChatRepository {
+
+    private val builtInCatalog = ModelCatalog(
+        models = listOf(
+            ChatModel(
+                id = "luna",
+                label = "GPT Luna 5.6",
+                reasoningEfforts = listOf("low", "high", "xhigh"),
+                contextWindowTokens = 200_000,
+            ),
+        ),
+        efforts = listOf(
+            ReasoningEffort(key = "low", label = "Low"),
+            ReasoningEffort(key = "high", label = "High"),
+            ReasoningEffort(key = "xhigh", label = "Xhigh"),
+        ),
+    )
+    private val cachedCatalog = MutableStateFlow<CachedModelCatalog?>(
+        CachedModelCatalog(
+            catalog = builtInCatalog,
+            selectedModelId = null,
+            selectedReasoningEffort = null,
+            lastSuccessfulRefreshEpochMillis = null,
+        ),
+    )
 
     private val sessions = MutableStateFlow(
         listOf(
@@ -247,23 +272,27 @@ class StubChatRepository : ChatRepository {
 
     override suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int) = Unit
 
-    override suspend fun loadCatalog(): Result<ModelCatalog, ChatError> {
-        return Result.Success(
-            ModelCatalog(
-                models = listOf(
-                    ChatModel(
-                        id = "luna",
-                        label = "GPT Luna 5.6",
-                        reasoningEfforts = listOf("low", "high", "xhigh"),
-                        contextWindowTokens = 200_000,
-                    ),
-                ),
-                efforts = listOf(
-                    ReasoningEffort(key = "low", label = "Low"),
-                    ReasoningEffort(key = "high", label = "High"),
-                    ReasoningEffort(key = "xhigh", label = "Xhigh"),
-                ),
-            ),
+    override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = cachedCatalog
+
+    @OptIn(ExperimentalTime::class)
+    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
+        val refreshedCatalog = cachedCatalog.value?.copy(
+            catalog = builtInCatalog,
+            lastSuccessfulRefreshEpochMillis = Clock.System.now().toEpochMilliseconds(),
+        ) ?: CachedModelCatalog(
+            catalog = builtInCatalog,
+            selectedModelId = null,
+            selectedReasoningEffort = null,
+            lastSuccessfulRefreshEpochMillis = Clock.System.now().toEpochMilliseconds(),
+        )
+        cachedCatalog.value = refreshedCatalog
+        return Result.Success(builtInCatalog)
+    }
+
+    override suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?) {
+        cachedCatalog.value = cachedCatalog.value?.copy(
+            selectedModelId = modelId,
+            selectedReasoningEffort = reasoningEffort,
         )
     }
 
