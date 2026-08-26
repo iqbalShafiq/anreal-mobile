@@ -6,6 +6,7 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
@@ -20,6 +21,7 @@ import co.ratmo.anreal.feature.chat.domain.toLatestHistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
+import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionImage
@@ -47,7 +49,12 @@ class FakeChatRepository : ChatRepository {
     var sentOptions: ChatRunOptions? = null
     var streamLines: List<String> = emptyList()
     val cachedCatalog = MutableStateFlow<CachedModelCatalog?>(null)
-    var catalogRefreshResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
+    var catalogRefreshResult: Result<ModelCatalog, ChatError> = Result.Success(
+        ModelCatalog(
+            models = listOf(ChatModel("default", "Default", listOf("high"))),
+            efforts = listOf(ReasoningEffort("high", "High")),
+        ),
+    )
     var catalogResult: Result<ModelCatalog, ChatError>
         get() = catalogRefreshResult
         set(value) {

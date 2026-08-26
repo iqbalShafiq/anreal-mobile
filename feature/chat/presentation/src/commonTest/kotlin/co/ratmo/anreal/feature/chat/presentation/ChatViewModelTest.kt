@@ -1003,6 +1003,123 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun removed_model_stays_unselected_after_a_later_successful_refresh() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("removed", "Old", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+                selectedModelId = "removed",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("current", "Current", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.modelUnavailable).isEqualTo(ModelUnavailableUi("removed", "Old"))
+
+        viewModel.onAction(ChatAction.OnRetryCatalog)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedModelId).isNull()
+        assertThat(viewModel.state.value.selectedReasoning).isNull()
+        assertThat(viewModel.state.value.modelUnavailable).isEqualTo(ModelUnavailableUi("removed", "Old"))
+    }
+
+    @Test
+    fun dismissing_removed_model_still_blocks_send_until_a_model_is_selected() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("removed", "Old", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+                selectedModelId = "removed",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("current", "Current", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDismissModelUnavailable)
+        viewModel.onAction(ChatAction.OnDraftChange("Keep this draft"))
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnSend)
+            assertThat(awaitItem()).isEqualTo(
+                ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_MODEL_CATALOG_UNAVAILABLE)),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.draft).isEqualTo("Keep this draft")
+        assertThat(fake.sentOptions).isNull()
+    }
+
+    @Test
+    fun no_active_run_catalog_failure_preserves_queue_item() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        viewModel.onAction(ChatAction.OnStop)
+        fake.allowSendToFinish.complete(Unit)
+        fake.holdSend = false
+        advanceUntilIdle()
+
+        fake.sentOptions = null
+        fake.catalogRefreshResult = Result.Error(ChatError.Network(DataError.Network.NO_INTERNET))
+        viewModel.onAction(ChatAction.OnRetryCatalog)
+        advanceUntilIdle()
+        fake.steerResult = Result.Error(ChatError.NoActiveRun)
+        viewModel.onAction(ChatAction.OnSendNow)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.queue.map { it.text }).isEqualTo(listOf("Queued"))
+        assertThat(fake.sentOptions).isNull()
+    }
+
+    @Test
+    fun auto_flush_catalog_failure_preserves_queue_item() = runTest {
+        val fake = populatedRepo().apply { holdSend = true }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Queued"))
+        viewModel.onAction(ChatAction.OnSend)
+        viewModel.onAction(ChatAction.OnStop)
+
+        fake.catalogRefreshResult = Result.Error(ChatError.Network(DataError.Network.NO_INTERNET))
+        viewModel.onAction(ChatAction.OnRetryCatalog)
+        advanceUntilIdle()
+        fake.allowSendToFinish.complete(Unit)
+        fake.holdSend = false
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.queue.map { it.text }).isEqualTo(listOf("Queued"))
+    }
+
+    @Test
     fun message_copy_edit_context_and_regenerate_actions_reach_their_owners() = runTest {
         val user = ChatMessage(
             id = "user-1",

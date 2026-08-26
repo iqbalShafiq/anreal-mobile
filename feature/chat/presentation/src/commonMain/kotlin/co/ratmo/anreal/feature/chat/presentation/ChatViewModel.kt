@@ -316,6 +316,7 @@ class ChatViewModel(
     private val catalogRefreshMutex = Mutex()
     private var catalogRefreshDeferred: Deferred<Unit>? = null
     private var liveCatalogReady: Boolean = false
+    private var catalogSelectionInvalidated: Boolean = false
     private var latestCachedCatalog: CachedModelCatalog? = null
     private var roomSelectionEstablished: Boolean = false
 
@@ -1009,6 +1010,10 @@ class ChatViewModel(
 
     private suspend fun sendText(text: String, clientMessageId: String) {
         if (!ensureCatalogReadyForSend()) return
+        sendTextReady(text, clientMessageId)
+    }
+
+    private suspend fun sendTextReady(text: String, clientMessageId: String) {
         val sessionId = _state.value.selectedSessionId ?: return
         val userMessage = ChatMessage(
             id = clientMessageId,
@@ -1082,8 +1087,10 @@ class ChatViewModel(
                 updateQueue(revertInflight(_state.value.queue))
                 if (error is ChatError.NoActiveRun) {
                     val first = flushable.first()
-                    updateQueue(removeItem(_state.value.queue, first.id))
-                    sendText(first.text, first.id)
+                    if (ensureCatalogReadyForSend()) {
+                        updateQueue(removeItem(_state.value.queue, first.id))
+                        sendTextReady(first.text, first.id)
+                    }
                 } else {
                     _events.send(ChatEvent.ShowMessage(error.toUiText()))
                 }
@@ -1155,8 +1162,9 @@ class ChatViewModel(
                 }
         }
         val next = nextFlushable(_state.value.queue) ?: return
+        if (!ensureCatalogReadyForSend()) return
         updateQueue(removeItem(_state.value.queue, next.id))
-        sendText(next.text, next.id)
+        sendTextReady(next.text, next.id)
     }
 
     private fun ackQueued(event: ChatStreamEvent.QueuedMessageApplied) {
@@ -1254,13 +1262,12 @@ class ChatViewModel(
     }
 
     private suspend fun ensureCatalogReadyForSend(): Boolean {
-        if (_state.value.modelUnavailable != null) return false
         if (!liveCatalogReady) {
             _state.update { it.copy(catalogLoading = true, catalogError = null) }
             requestCatalogRefresh(force = false)
         }
-        if (_state.value.modelUnavailable != null) return false
-        if (!liveCatalogReady) {
+        val current = _state.value
+        if (!liveCatalogReady || current.modelUnavailable != null || current.selectedModelId == null) {
             _events.send(
                 ChatEvent.ShowMessage(
                     UiText.StringResource(AnrealCopy.ERROR_MODEL_CATALOG_UNAVAILABLE),
@@ -1356,32 +1363,46 @@ class ChatViewModel(
                     requestedReasoningEffort = requestedReasoning,
                     requestedModelLabel = requestedModelLabel,
                 )
+                val removedModel = if (resolution.modelUnavailable) {
+                    ModelUnavailableUi(
+                        modelId = resolution.unavailableModelId ?: requestedModelId.orEmpty(),
+                        label = resolution.unavailableModelLabel
+                            ?: requestedModelLabel
+                            ?: requestedModelId.orEmpty(),
+                    )
+                } else {
+                    null
+                }
+                if (resolution.modelUnavailable) catalogSelectionInvalidated = true
+                val selectionInvalidated = catalogSelectionInvalidated
+                val selectedModelId = if (selectionInvalidated) null else resolution.selectedModelId
+                val selectedReasoning = if (selectionInvalidated) {
+                    null
+                } else {
+                    resolution.selectedReasoningEffort
+                }
+                val modelUnavailable = removedModel ?: if (selectionInvalidated) {
+                    _state.value.modelUnavailable
+                } else {
+                    null
+                }
                 chatRepository.persistCatalogSelection(
-                    modelId = resolution.selectedModelId,
-                    reasoningEffort = resolution.selectedReasoningEffort,
+                    modelId = selectedModelId,
+                    reasoningEffort = selectedReasoning,
                 )
-                preferencesRepository.setChatModel(resolution.selectedModelId)
-                preferencesRepository.setChatReasoningEffort(resolution.selectedReasoningEffort)
+                preferencesRepository.setChatModel(selectedModelId)
+                preferencesRepository.setChatReasoningEffort(selectedReasoning)
                 liveCatalogReady = true
                 _state.update {
                     it.copy(
                         models = catalog.models,
                         reasoningEfforts = catalog.efforts,
-                        selectedModelId = resolution.selectedModelId,
-                        selectedReasoning = resolution.selectedReasoningEffort,
+                        selectedModelId = selectedModelId,
+                        selectedReasoning = selectedReasoning,
                         catalogLoading = false,
                         catalogError = null,
                         catalogFromCache = false,
-                        modelUnavailable = if (resolution.modelUnavailable) {
-                            ModelUnavailableUi(
-                                modelId = resolution.unavailableModelId ?: requestedModelId.orEmpty(),
-                                label = resolution.unavailableModelLabel
-                                    ?: requestedModelLabel
-                                    ?: requestedModelId.orEmpty(),
-                            )
-                        } else {
-                            null
-                        },
+                        modelUnavailable = modelUnavailable,
                     )
                 }
                 _state.value.selectedSessionId?.let { loadContextUsage(it) }
@@ -1402,6 +1423,7 @@ class ChatViewModel(
     private fun selectModel(modelId: String) {
         val current = _state.value
         if (current.models.none { it.id == modelId }) return
+        catalogSelectionInvalidated = false
         val resolution = reconcileCatalogSelection(
             catalog = ModelCatalog(current.models, current.reasoningEfforts),
             requestedModelId = modelId,
