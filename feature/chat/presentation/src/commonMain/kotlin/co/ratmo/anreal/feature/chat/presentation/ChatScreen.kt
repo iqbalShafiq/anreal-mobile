@@ -47,7 +47,6 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
-import co.ratmo.anreal.feature.chat.presentation.component.ComposerSheet
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageButton
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageSheet
 import co.ratmo.anreal.feature.chat.presentation.component.ApprovalDialog
