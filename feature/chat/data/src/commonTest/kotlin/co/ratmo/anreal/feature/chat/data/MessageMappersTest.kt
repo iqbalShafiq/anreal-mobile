@@ -126,6 +126,21 @@ class MessageMappersTest {
     }
 
     @Test
+    fun catalog_uses_name_for_model_display_label() {
+        val catalog = ModelCatalogDto(
+            models = listOf(
+                ModelInfoDto(
+                    modelId = "deepseek/deepseek-v4-flash-0731",
+                    label = "V4 Flash 0731",
+                    name = "DeepSeek V4 Flash 0731",
+                ),
+            ),
+        ).toCatalog()
+
+        assertThat(catalog.models.single().label).isEqualTo("DeepSeek V4 Flash 0731")
+    }
+
+    @Test
     fun history_dto_maps_tool_content() {
         val dto = historyMessageDto(
             role = "assistant",

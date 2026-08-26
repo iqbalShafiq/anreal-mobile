@@ -108,6 +108,7 @@ data class ModelCatalogDto(
 data class ModelInfoDto(
     val modelId: String,
     val label: String,
+    val name: String? = null,
     val reasoningEfforts: List<String> = emptyList(),
     val contextWindowTokens: Int = 0,
     val outputType: String = "text",
@@ -353,7 +354,7 @@ fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(
         .map { dto ->
             ChatModel(
                 id = dto.modelId,
-                label = dto.label,
+                label = dto.name?.trim()?.takeIf { it.isNotEmpty() } ?: dto.label,
                 reasoningEfforts = dto.reasoningEfforts,
                 contextWindowTokens = dto.contextWindowTokens,
             )
