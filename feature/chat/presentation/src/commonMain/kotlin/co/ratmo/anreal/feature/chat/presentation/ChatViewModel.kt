@@ -17,6 +17,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
@@ -24,6 +25,7 @@ import co.ratmo.anreal.feature.chat.domain.LibraryDocument
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
+import co.ratmo.anreal.feature.chat.domain.reconcileCatalogSelection
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
@@ -49,12 +51,16 @@ import co.ratmo.anreal.feature.chat.domain.stream.StreamEnvelope
 import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
@@ -62,6 +68,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 private const val MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 private const val STREAM_LINE_PACE_MILLIS = 16L
@@ -126,6 +134,11 @@ data class ContextUsageUi(
     val label: String get() = "$estimatedTokens / $contextWindowTokens tokens"
 }
 
+data class ModelUnavailableUi(
+    val modelId: String,
+    val label: String,
+)
+
 data class CitedDocumentUi(
     val id: String,
     val filename: String,
@@ -170,6 +183,8 @@ data class ChatState(
     val contextSnippetId: String? = null,
     val catalogLoading: Boolean = true,
     val catalogError: UiText? = null,
+    val catalogFromCache: Boolean = false,
+    val modelUnavailable: ModelUnavailableUi? = null,
     val recentProjects: List<RecentProjectUi> = emptyList(),
     val activeDocuments: List<SessionDocumentUi> = emptyList(),
     val libraryOpen: Boolean = false,
@@ -232,6 +247,7 @@ sealed interface ChatAction {
     data object OnToggleWebSearch : ChatAction
     data object OnToggleImageGeneration : ChatAction
     data object OnRetryCatalog : ChatAction
+    data object OnDismissModelUnavailable : ChatAction
     data class OnCopyMessage(val text: String) : ChatAction
     data class OnAddContext(val text: String, val sourceRole: ChatRole) : ChatAction
     data object OnClearContext : ChatAction
@@ -297,6 +313,11 @@ class ChatViewModel(
     private var librarySearchJob: Job? = null
     private var lastStandaloneSessionId: String? = null
     private var historyOldestPosition: Int = 0
+    private val catalogRefreshMutex = Mutex()
+    private var catalogRefreshDeferred: Deferred<Unit>? = null
+    private var liveCatalogReady: Boolean = false
+    private var latestCachedCatalog: CachedModelCatalog? = null
+    private var roomSelectionEstablished: Boolean = false
 
     init {
         viewModelScope.launch {
@@ -308,8 +329,9 @@ class ChatViewModel(
                     _state.update { it.copy(sessions = sessions.map { session -> session.toUi() }) }
                 }
         }
+        viewModelScope.launch { observeCatalogCache() }
         viewModelScope.launch { bootstrap() }
-        viewModelScope.launch { loadCatalog() }
+        viewModelScope.launch { loadCatalog(force = true) }
         viewModelScope.launch { loadRecentProjects() }
     }
 
@@ -353,23 +375,13 @@ class ChatViewModel(
             }
             ChatAction.OnLoadOlderHistory -> viewModelScope.launch { loadOlderHistory() }
             is ChatAction.OnSelectModel -> selectModel(action.modelId)
-            is ChatAction.OnSelectReasoning -> {
-                val allowed = _state.value.models
-                    .firstOrNull { it.id == _state.value.selectedModelId }
-                    ?.reasoningEfforts
-                    .orEmpty()
-                val effort = action.effort?.takeIf { it in allowed }
-                _state.update { it.copy(selectedReasoning = effort) }
-                viewModelScope.launch {
-                    preferencesRepository.setChatReasoningEffort(effort)
-                    _state.value.selectedSessionId?.let { loadContextUsage(it) }
-                }
-            }
+            is ChatAction.OnSelectReasoning -> selectReasoning(action.effort)
             ChatAction.OnToggleWebSearch -> _state.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
             ChatAction.OnToggleImageGeneration -> _state.update {
                 it.copy(imageGenerationEnabled = !it.imageGenerationEnabled)
             }
-            ChatAction.OnRetryCatalog -> viewModelScope.launch { loadCatalog() }
+            ChatAction.OnRetryCatalog -> viewModelScope.launch { loadCatalog(force = true) }
+            ChatAction.OnDismissModelUnavailable -> _state.update { it.copy(modelUnavailable = null) }
             is ChatAction.OnCopyMessage -> viewModelScope.launch {
                 _events.send(ChatEvent.CopyText(action.text))
             }
@@ -996,6 +1008,7 @@ class ChatViewModel(
     }
 
     private suspend fun sendText(text: String, clientMessageId: String) {
+        if (!ensureCatalogReadyForSend()) return
         val sessionId = _state.value.selectedSessionId ?: return
         val userMessage = ChatMessage(
             id = clientMessageId,
@@ -1240,63 +1253,191 @@ class ChatViewModel(
         }
     }
 
-    private suspend fun loadCatalog() {
+    private suspend fun ensureCatalogReadyForSend(): Boolean {
+        if (_state.value.modelUnavailable != null) return false
+        if (!liveCatalogReady) {
+            _state.update { it.copy(catalogLoading = true, catalogError = null) }
+            requestCatalogRefresh(force = false)
+        }
+        if (_state.value.modelUnavailable != null) return false
+        if (!liveCatalogReady) {
+            _events.send(
+                ChatEvent.ShowMessage(
+                    UiText.StringResource(AnrealCopy.ERROR_MODEL_CATALOG_UNAVAILABLE),
+                ),
+            )
+            return false
+        }
+        return true
+    }
+
+    private suspend fun observeCatalogCache() {
+        chatRepository.observeCachedCatalog().collect { cached ->
+            latestCachedCatalog = cached
+            if (cached == null) {
+                roomSelectionEstablished = false
+                return@collect
+            }
+            val hasRoomSelection = cached.selectedModelId != null || cached.selectedReasoningEffort != null
+            if (hasRoomSelection) roomSelectionEstablished = true
+            val legacyPreferences = if (!hasRoomSelection && !roomSelectionEstablished) {
+                preferencesRepository.preferences.first()
+            } else {
+                null
+            }
+            val selectedModelId = cached.selectedModelId ?: legacyPreferences?.chatModelId
+            val requestedReasoning = cached.selectedReasoningEffort
+                ?: legacyPreferences?.chatReasoningEffort
+            val selectedModel = cached.catalog.models.firstOrNull { it.id == selectedModelId }
+            val selectedReasoning = requestedReasoning?.takeIf {
+                it in selectedModel?.reasoningEfforts.orEmpty()
+            }
+            _state.update {
+                it.copy(
+                    models = cached.catalog.models,
+                    reasoningEfforts = cached.catalog.efforts,
+                    selectedModelId = selectedModelId,
+                    selectedReasoning = selectedReasoning,
+                    catalogFromCache = !liveCatalogReady,
+                )
+            }
+        }
+    }
+
+    private suspend fun loadCatalog(force: Boolean) {
         _state.update { it.copy(catalogLoading = true, catalogError = null) }
-        chatRepository.loadCatalog()
-            .onSuccess { catalog ->
-                val preferences = preferencesRepository.preferences.first()
-                val requestedModel = _state.value.selectedModelId ?: preferences.chatModelId
-                val selectedModel = catalog.models.firstOrNull { it.id == requestedModel }
-                    ?: catalog.models.firstOrNull()
-                val selected = selectedModel?.id
-                val requestedReasoning = _state.value.selectedReasoning
-                    ?: preferences.chatReasoningEffort
-                val reasoning = requestedReasoning?.takeIf {
-                    it in selectedModel?.reasoningEfforts.orEmpty()
-                }
-                if (preferences.chatModelId != null && preferences.chatModelId != selected) {
-                    preferencesRepository.setChatModel(null)
-                }
-                if (preferences.chatReasoningEffort != null && reasoning == null) {
-                    preferencesRepository.setChatReasoningEffort(null)
-                }
-                _state.update {
-                    it.copy(
-                        models = catalog.models,
-                        reasoningEfforts = catalog.efforts,
-                        selectedModelId = selected,
-                        selectedReasoning = reasoning,
-                        catalogLoading = false,
-                        catalogError = null,
-                    )
-                }
-                _state.value.selectedSessionId?.let { loadContextUsage(it) }
-            }
-            .onFailure { error ->
-                _state.update { it.copy(catalogLoading = false, catalogError = error.toUiText()) }
-            }
+        requestCatalogRefresh(force)
         chatRepository.loadCapabilities()
             .onSuccess { capabilities ->
                 _state.update { it.copy(capabilities = capabilities) }
             }
     }
 
+    private suspend fun requestCatalogRefresh(force: Boolean) {
+        val deferred: Deferred<Unit>? = catalogRefreshMutex.withLock {
+            if (!force && liveCatalogReady) return@withLock null
+            catalogRefreshDeferred?.takeIf { it.isActive }
+                ?: viewModelScope.async(start = CoroutineStart.LAZY) {
+                    refreshCatalog()
+                }.also { created ->
+                    catalogRefreshDeferred = created
+                    created.start()
+                }
+        }
+        deferred?.await()
+    }
+
+    private suspend fun refreshCatalog() {
+        val cachedBeforeRefresh = latestCachedCatalog
+        val preferences = preferencesRepository.preferences.first()
+        val roomSelection = cachedBeforeRefresh?.takeIf {
+            it.selectedModelId != null || it.selectedReasoningEffort != null
+        }
+        val requestedModelId = if (roomSelection != null) {
+            roomSelection.selectedModelId
+        } else {
+            _state.value.selectedModelId ?: preferences.chatModelId
+        }
+        val requestedReasoning = if (roomSelection != null) {
+            roomSelection.selectedReasoningEffort
+        } else {
+            _state.value.selectedReasoning ?: preferences.chatReasoningEffort
+        }
+        val requestedModelLabel = cachedBeforeRefresh?.catalog?.models
+            ?.firstOrNull { it.id == requestedModelId }
+            ?.label
+
+        when (val result = chatRepository.refreshCatalog()) {
+            is Result.Success -> {
+                val catalog = result.data
+                val resolution = reconcileCatalogSelection(
+                    catalog = catalog,
+                    requestedModelId = requestedModelId,
+                    requestedReasoningEffort = requestedReasoning,
+                    requestedModelLabel = requestedModelLabel,
+                )
+                chatRepository.persistCatalogSelection(
+                    modelId = resolution.selectedModelId,
+                    reasoningEffort = resolution.selectedReasoningEffort,
+                )
+                preferencesRepository.setChatModel(resolution.selectedModelId)
+                preferencesRepository.setChatReasoningEffort(resolution.selectedReasoningEffort)
+                liveCatalogReady = true
+                _state.update {
+                    it.copy(
+                        models = catalog.models,
+                        reasoningEfforts = catalog.efforts,
+                        selectedModelId = resolution.selectedModelId,
+                        selectedReasoning = resolution.selectedReasoningEffort,
+                        catalogLoading = false,
+                        catalogError = null,
+                        catalogFromCache = false,
+                        modelUnavailable = if (resolution.modelUnavailable) {
+                            ModelUnavailableUi(
+                                modelId = resolution.unavailableModelId ?: requestedModelId.orEmpty(),
+                                label = resolution.unavailableModelLabel
+                                    ?: requestedModelLabel
+                                    ?: requestedModelId.orEmpty(),
+                            )
+                        } else {
+                            null
+                        },
+                    )
+                }
+                _state.value.selectedSessionId?.let { loadContextUsage(it) }
+            }
+            is Result.Error -> {
+                liveCatalogReady = false
+                _state.update {
+                    it.copy(
+                        catalogLoading = false,
+                        catalogError = result.error.toUiText(),
+                        catalogFromCache = latestCachedCatalog != null,
+                    )
+                }
+            }
+        }
+    }
+
     private fun selectModel(modelId: String) {
-        val model = _state.value.models.firstOrNull { it.id == modelId } ?: return
-        val allowed = model.reasoningEfforts
-        val previousReasoning = _state.value.selectedReasoning
-        val reasoning = previousReasoning?.takeIf { it in allowed }
+        val current = _state.value
+        if (current.models.none { it.id == modelId }) return
+        val resolution = reconcileCatalogSelection(
+            catalog = ModelCatalog(current.models, current.reasoningEfforts),
+            requestedModelId = modelId,
+            requestedReasoningEffort = current.selectedReasoning,
+        )
         _state.update {
-            it.copy(selectedModelId = modelId, selectedReasoning = reasoning)
+            it.copy(
+                selectedModelId = modelId,
+                selectedReasoning = resolution.selectedReasoningEffort,
+                modelUnavailable = null,
+            )
         }
         viewModelScope.launch {
+            chatRepository.persistCatalogSelection(modelId, resolution.selectedReasoningEffort)
             preferencesRepository.setChatModel(modelId)
-            if (reasoning != previousReasoning) {
-                preferencesRepository.setChatReasoningEffort(reasoning)
-            }
+            preferencesRepository.setChatReasoningEffort(resolution.selectedReasoningEffort)
         }
         _state.value.selectedSessionId?.let { sessionId ->
             viewModelScope.launch { loadContextUsage(sessionId) }
+        }
+    }
+
+    private fun selectReasoning(effort: String?) {
+        val current = _state.value
+        val modelId = current.selectedModelId ?: return
+        val resolution = reconcileCatalogSelection(
+            catalog = ModelCatalog(current.models, current.reasoningEfforts),
+            requestedModelId = modelId,
+            requestedReasoningEffort = effort,
+        )
+        _state.update { it.copy(selectedReasoning = resolution.selectedReasoningEffort) }
+        viewModelScope.launch {
+            chatRepository.persistCatalogSelection(modelId, resolution.selectedReasoningEffort)
+            preferencesRepository.setChatModel(modelId)
+            preferencesRepository.setChatReasoningEffort(resolution.selectedReasoningEffort)
+            _state.value.selectedSessionId?.let { loadContextUsage(it) }
         }
     }
 

@@ -18,6 +18,7 @@ import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
+import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
@@ -716,7 +717,7 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun catalog_restores_valid_model_preferences_and_clears_invalid_values() = runTest {
+    fun catalog_prefers_room_selection_over_legacy_preferences() = runTest {
         val fake = populatedRepo().apply {
             catalogResult = Result.Success(
                 ModelCatalog(
@@ -741,8 +742,8 @@ class ChatViewModelTest {
         advanceUntilIdle()
 
         assertThat(invalidViewModel.state.value.selectedModelId).isEqualTo("m1")
-        assertThat(invalidPreferences.current.chatModelId).isNull()
-        assertThat(invalidPreferences.current.chatReasoningEffort).isNull()
+        assertThat(invalidPreferences.current.chatModelId).isEqualTo("m1")
+        assertThat(invalidPreferences.current.chatReasoningEffort).isEqualTo("high")
     }
 
     @Test
@@ -769,6 +770,236 @@ class ChatViewModelTest {
         assertThat(viewModel.state.value.catalogLoading).isFalse()
         assertThat(viewModel.state.value.catalogError).isNull()
         assertThat(viewModel.state.value.models.single().id).isEqualTo("m1")
+    }
+
+    @Test
+    fun cached_catalog_appears_before_startup_refresh_completes_and_live_success_clears_cache_marker() = runTest {
+        val cached = ModelCatalog(
+            models = listOf(ChatModel("cached", "Cached Luna", listOf("high"))),
+            efforts = listOf(ReasoningEffort("high", "High")),
+        )
+        val live = ModelCatalog(
+            models = listOf(ChatModel("live", "Live Luna", listOf("high"))),
+            efforts = listOf(ReasoningEffort("high", "High")),
+        )
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = cached,
+                selectedModelId = "cached",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(live)
+            holdCatalogRefresh = true
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+
+        fake.catalogRefreshStarted.await()
+        assertThat(viewModel.state.value.models.single().id).isEqualTo("cached")
+        assertThat(viewModel.state.value.catalogFromCache).isTrue()
+
+        fake.allowCatalogRefreshToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.models.single().id).isEqualTo("live")
+        assertThat(viewModel.state.value.catalogFromCache).isFalse()
+    }
+
+    @Test
+    fun live_refresh_removed_model_clears_selection_and_exposes_cached_human_label() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("removed", "Human readable model", listOf("xhigh"))),
+                    efforts = listOf(ReasoningEffort("xhigh", "Xhigh")),
+                ),
+                selectedModelId = "removed",
+                selectedReasoningEffort = "xhigh",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("current", "Current", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+        }
+        val preferences = FakeChatPreferencesRepository(
+            AppPreferences(chatModelId = "removed", chatReasoningEffort = "xhigh"),
+        )
+        val viewModel = ChatViewModel(SavedStateHandle(), fake, preferences)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedModelId).isNull()
+        assertThat(viewModel.state.value.selectedReasoning).isNull()
+        assertThat(viewModel.state.value.modelUnavailable)
+            .isEqualTo(ModelUnavailableUi("removed", "Human readable model"))
+        assertThat(fake.persistedCatalogSelection).isEqualTo(null to null)
+        assertThat(preferences.current.chatModelId).isNull()
+        assertThat(preferences.current.chatReasoningEffort).isNull()
+    }
+
+    @Test
+    fun live_refresh_downgrades_unsupported_xhigh_to_nearest_lower_high() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("m1", "Luna", listOf("xhigh"))),
+                    efforts = listOf(ReasoningEffort("xhigh", "Xhigh")),
+                ),
+                selectedModelId = "m1",
+                selectedReasoningEffort = "xhigh",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("m1", "Luna", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedModelId).isEqualTo("m1")
+        assertThat(viewModel.state.value.selectedReasoning).isEqualTo("high")
+        assertThat(viewModel.state.value.modelUnavailable).isNull()
+    }
+
+    @Test
+    fun send_waits_for_startup_refresh_then_sends_with_reconciled_options() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("cached", "Cached", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+                selectedModelId = "cached",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("live", "Live", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+            holdCatalogRefresh = true
+            holdSend = true
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        fake.catalogRefreshStarted.await()
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.sentOptions).isNull()
+        fake.allowCatalogRefreshToFinish.complete(Unit)
+        fake.sendStarted.await()
+        assertThat(fake.sentOptions?.model).isEqualTo("live")
+
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun failed_startup_refresh_is_retried_once_by_send_and_successful_retry_sends() = runTest {
+        val fake = populatedRepo().apply {
+            catalogRefreshResult = Result.Error(ChatError.Network(DataError.Network.NO_INTERNET))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        fake.catalogRefreshResult = Result.Success(
+            ModelCatalog(
+                models = listOf(ChatModel("m1", "Luna", listOf("high"))),
+                efforts = listOf(ReasoningEffort("high", "High")),
+            ),
+        )
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.catalogRefreshCalls).isEqualTo(2)
+        assertThat(fake.sentText).isEqualTo("Hello")
+    }
+
+    @Test
+    fun failed_startup_and_send_retry_emit_dedicated_error_without_mutating_draft() = runTest {
+        val fake = populatedRepo().apply {
+            catalogRefreshResult = Result.Error(ChatError.Network(DataError.Network.NO_INTERNET))
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnDraftChange("Keep this draft"))
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnSend)
+            assertThat(awaitItem()).isEqualTo(
+                ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_MODEL_CATALOG_UNAVAILABLE)),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+
+        assertThat(fake.catalogRefreshCalls).isEqualTo(2)
+        assertThat(viewModel.state.value.draft).isEqualTo("Keep this draft")
+        assertThat(fake.sentOptions).isNull()
+    }
+
+    @Test
+    fun concurrent_startup_retry_and_send_share_one_catalog_refresh() = runTest {
+        val fake = populatedRepo().apply {
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("m1", "Luna", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+            holdCatalogRefresh = true
+            holdSend = true
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        fake.catalogRefreshStarted.await()
+        viewModel.onAction(ChatAction.OnRetryCatalog)
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.catalogRefreshCalls).isEqualTo(1)
+        assertThat(fake.sentOptions).isNull()
+        fake.allowCatalogRefreshToFinish.complete(Unit)
+        fake.sendStarted.await()
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun dismissing_or_choosing_a_model_clears_model_unavailable() = runTest {
+        val fake = populatedRepo().apply {
+            cachedCatalog.value = CachedModelCatalog(
+                catalog = ModelCatalog(
+                    models = listOf(ChatModel("removed", "Old", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+                selectedModelId = "removed",
+                selectedReasoningEffort = "high",
+                lastSuccessfulRefreshEpochMillis = 1L,
+            )
+            catalogRefreshResult = Result.Success(
+                ModelCatalog(
+                    models = listOf(ChatModel("current", "Current", listOf("high"))),
+                    efforts = listOf(ReasoningEffort("high", "High")),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.modelUnavailable).isEqualTo(ModelUnavailableUi("removed", "Old"))
+
+        viewModel.onAction(ChatAction.OnDismissModelUnavailable)
+        assertThat(viewModel.state.value.modelUnavailable).isNull()
+
+        viewModel.onAction(ChatAction.OnSelectModel("current"))
+        assertThat(viewModel.state.value.modelUnavailable).isNull()
     }
 
     @Test

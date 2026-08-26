@@ -24,6 +24,7 @@ object AnrealCopy {
     const val ERROR_IMAGE_LOAD = "error_image_load"
     const val ERROR_REGENERATE_UNAVAILABLE = "error_regenerate_unavailable"
     const val ERROR_SESSION_STALE = "error_session_stale"
+    const val ERROR_MODEL_CATALOG_UNAVAILABLE = "error_model_catalog_unavailable"
 
     const val LABEL_EMAIL = "label_email"
     const val LABEL_PASSWORD = "label_password"
@@ -417,6 +418,7 @@ object AnrealCopy {
             ERROR_IMAGE_LOAD -> "The image could not be loaded."
             ERROR_REGENERATE_UNAVAILABLE -> "This message cannot be regenerated yet. Reload the conversation and try again."
             ERROR_SESSION_STALE -> "This conversation changed elsewhere. The latest messages have been reloaded."
+            ERROR_MODEL_CATALOG_UNAVAILABLE -> "The model list could not be loaded. Retry before sending."
             CHAT_EMPTY_TITLE -> "Ask anything about your documents"
             CHAT_EMPTY_BODY -> "Upload a PDF or image, then ask questions."
             CHAT_SESSIONS_EMPTY_TITLE -> "No chats yet"

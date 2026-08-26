@@ -56,6 +56,7 @@ class FakeChatRepository : ChatRepository {
     var holdCatalogRefresh: Boolean = false
     var catalogRefreshStarted: CompletableDeferred<Unit> = CompletableDeferred()
     var allowCatalogRefreshToFinish: CompletableDeferred<Unit> = CompletableDeferred()
+    var catalogRefreshCalls: Int = 0
     var persistedCatalogSelection: Pair<String?, String?>? = null
     var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
     var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
@@ -225,6 +226,7 @@ class FakeChatRepository : ChatRepository {
     override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = cachedCatalog
 
     override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
+        catalogRefreshCalls += 1
         if (holdCatalogRefresh) {
             if (!catalogRefreshStarted.isCompleted) catalogRefreshStarted.complete(Unit)
             allowCatalogRefreshToFinish.await()
