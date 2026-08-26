@@ -1,5 +1,8 @@
 package co.ratmo.anreal.core.designsystem.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -14,6 +17,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +27,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceTransparency
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -36,6 +42,101 @@ enum class GlassTone {
     Thin,
     Regular,
     Pane,
+}
+
+enum class GlassChromeMode {
+    Aurora,
+    Surface,
+}
+
+internal data class GlassChromeTargets(
+    val effectAlpha: Float,
+    val opaqueTintAlpha: Float,
+    val fallbackAlpha: Float,
+    val borderAlpha: Float,
+)
+
+internal fun glassChromeTargets(
+    mode: GlassChromeMode,
+    emphasized: Boolean,
+): GlassChromeTargets = when (mode) {
+    GlassChromeMode.Aurora -> GlassChromeTargets(
+        effectAlpha = if (emphasized) 0.78f else 0.58f,
+        opaqueTintAlpha = if (emphasized) 0.58f else 0.42f,
+        fallbackAlpha = if (emphasized) 0.66f else 0.50f,
+        borderAlpha = if (emphasized) 0.36f else 0.26f,
+    )
+    GlassChromeMode.Surface -> GlassChromeTargets(
+        effectAlpha = 0.96f,
+        opaqueTintAlpha = 0.88f,
+        fallbackAlpha = 1f,
+        borderAlpha = 0.46f,
+    )
+}
+
+@Composable
+fun GlassChrome(
+    mode: GlassChromeMode,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+    shape: Shape = MaterialTheme.shapes.extraLarge,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val reduceMotion = LocalAnrealReduceMotion.current
+    val targets = glassChromeTargets(mode = mode, emphasized = emphasized)
+    val colorAnimationSpec = if (reduceMotion) {
+        snap<Color>()
+    } else {
+        AnrealMotion.backgroundSpec<Color>()
+    }
+    val floatAnimationSpec = if (reduceMotion) {
+        snap<Float>()
+    } else {
+        AnrealMotion.backgroundSpec<Float>()
+    }
+    val tintTarget = if (mode == GlassChromeMode.Surface) {
+        scheme.surfaceContainer
+    } else {
+        scheme.surfaceContainerLow
+    }
+    val tint by animateColorAsState(
+        targetValue = tintTarget,
+        animationSpec = colorAnimationSpec,
+        label = "glassChromeTint",
+    )
+    val effectAlpha by animateFloatAsState(
+        targetValue = targets.effectAlpha,
+        animationSpec = floatAnimationSpec,
+        label = "glassChromeEffectAlpha",
+    )
+    val opaqueTintAlpha by animateFloatAsState(
+        targetValue = targets.opaqueTintAlpha,
+        animationSpec = floatAnimationSpec,
+        label = "glassChromeOpaqueTintAlpha",
+    )
+    val fallbackAlpha by animateFloatAsState(
+        targetValue = targets.fallbackAlpha,
+        animationSpec = floatAnimationSpec,
+        label = "glassChromeFallbackAlpha",
+    )
+    val borderAlpha by animateFloatAsState(
+        targetValue = targets.borderAlpha,
+        animationSpec = floatAnimationSpec,
+        label = "glassChromeBorderAlpha",
+    )
+    GlassSurface(
+        modifier = modifier,
+        shape = shape,
+        tone = GlassTone.Thin,
+        borderColor = scheme.outlineVariant.copy(alpha = borderAlpha),
+        fallbackColor = tint.copy(alpha = fallbackAlpha),
+        tintColor = tint,
+        opaqueTintColor = tint.copy(alpha = opaqueTintAlpha),
+        effectAlpha = effectAlpha,
+    ) {
+        Box(content = content)
+    }
 }
 
 @Composable

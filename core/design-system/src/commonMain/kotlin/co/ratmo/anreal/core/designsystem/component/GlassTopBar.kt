@@ -1,26 +1,19 @@
 package co.ratmo.anreal.core.designsystem.component
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
-import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
-import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 
 internal const val FrostedTopBarSlopPx = 8
 
@@ -61,41 +54,21 @@ fun GlassTopBar(
     surfaceTinted: Boolean = frosted,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val reduceMotion = LocalAnrealReduceMotion.current
-    val showChrome = frosted || surfaceTinted
-    val frostAlpha by animateFloatAsState(
-        targetValue = if (showChrome) 1f else 0f,
-        animationSpec = if (reduceMotion) {
-            snap()
-        } else {
-            AnrealMotion.fadeSpec()
-        },
-        label = "glassTopBarFrost",
-    )
-    if (frostAlpha <= 0f) {
-        Box(modifier = modifier.fillMaxWidth(), content = content)
-        return
-    }
-    GlassSurface(
+    GlassChrome(
         modifier = modifier.fillMaxWidth(),
+        mode = if (surfaceTinted) GlassChromeMode.Surface else GlassChromeMode.Aurora,
+        emphasized = frosted,
         shape = RectangleShape,
-        tone = GlassTone.Thin,
-        borderColor = glassDrawerBorderColor(),
-        fallbackColor = glassDrawerFallbackColor(),
-        tintColor = MaterialTheme.colorScheme.surface,
-        opaqueTintColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
-        effectAlpha = frostAlpha,
-    ) {
-        Box(content = content)
-    }
+        content = content,
+    )
 }
 
 @AnrealPreviews
 @Composable
-private fun GlassTopBarClearPreview() {
+private fun GlassTopBarAuroraPreview() {
     AnrealPreview {
         GlassTopBar(frosted = false) {
-            Text("Clear chrome", modifier = Modifier.padding(AnrealSpacing.md))
+            Text("Aurora chrome", modifier = Modifier.padding(AnrealSpacing.md))
         }
     }
 }

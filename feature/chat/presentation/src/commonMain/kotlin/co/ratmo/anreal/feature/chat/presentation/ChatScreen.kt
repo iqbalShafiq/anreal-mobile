@@ -306,6 +306,7 @@ fun ChatScreen(
                             onAction = onAction,
                             modelSheetOpenRequest = modelSheetOpenRequest,
                             onModelSheetOpenRequestConsumed = { modelSheetOpenRequest = false },
+                            surfaceTinted = !shouldShowChatAurora(state),
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .onSizeChanged { composerHeightPx = it.height },

@@ -1,5 +1,7 @@
 package co.ratmo.anreal.feature.chat.presentation.component
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,17 +29,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
-import co.ratmo.anreal.core.designsystem.component.GlassSurface
-import co.ratmo.anreal.core.designsystem.component.GlassTone
+import co.ratmo.anreal.core.designsystem.component.GlassChrome
+import co.ratmo.anreal.core.designsystem.component.GlassChromeMode
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
@@ -60,6 +65,7 @@ internal fun ComposerBar(
     initialSheet: ComposerSheet? = null,
     modelSheetOpenRequest: Boolean = false,
     onModelSheetOpenRequestConsumed: () -> Unit = {},
+    surfaceTinted: Boolean = false,
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
     LaunchedEffect(modelSheetOpenRequest) {
@@ -79,9 +85,9 @@ internal fun ComposerBar(
             .imePadding()
             .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
     ) {
-        GlassSurface(
+        GlassChrome(
             modifier = Modifier.fillMaxWidth(),
-            tone = GlassTone.Thin,
+            mode = if (surfaceTinted) GlassChromeMode.Surface else GlassChromeMode.Aurora,
             emphasized = canSubmit || streaming,
         ) {
             Column(
@@ -151,6 +157,7 @@ internal fun ComposerBar(
                         ComposerModelTrigger(
                             label = modelTriggerLabel,
                             contentDescription = modelTriggerDescription,
+                            surfaceTinted = surfaceTinted,
                             onClick = {
                                 if (state.models.isEmpty() && !state.catalogLoading) {
                                     onAction(ChatAction.OnRetryCatalog)
@@ -217,17 +224,41 @@ private fun ComposerAddButton(
 private fun ComposerModelTrigger(
     label: String,
     contentDescription: String,
+    surfaceTinted: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colorAnimation = if (LocalAnrealReduceMotion.current) {
+        snap<Color>()
+    } else {
+        AnrealMotion.backgroundSpec<Color>()
+    }
+    val containerColor by animateColorAsState(
+        targetValue = if (surfaceTinted) {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        },
+        animationSpec = colorAnimation,
+        label = "composerModelTriggerContainer",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (surfaceTinted) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        },
+        animationSpec = colorAnimation,
+        label = "composerModelTriggerContent",
+    )
     Surface(
         onClick = onClick,
         modifier = modifier
             .heightIn(min = AnrealSpacing.touch)
             .semantics { this.contentDescription = contentDescription },
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        color = containerColor,
+        contentColor = contentColor,
     ) {
         Row(
             modifier = Modifier.padding(
