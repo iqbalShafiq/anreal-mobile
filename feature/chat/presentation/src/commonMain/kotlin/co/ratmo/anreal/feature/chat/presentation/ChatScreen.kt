@@ -54,6 +54,7 @@ import co.ratmo.anreal.feature.chat.presentation.component.ClarificationDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DocumentLibraryDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DocumentsEndDrawer
+import co.ratmo.anreal.feature.chat.presentation.component.ModelUnavailableDialog
 import co.ratmo.anreal.feature.chat.presentation.component.QueueConflictDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RenameSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RunActiveDialog
@@ -64,6 +65,7 @@ import co.ratmo.anreal.feature.chat.presentation.preview.chatConflictPreviewStat
 import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatModelUnavailablePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatProjectWorkspacePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatDeletePreviewState
@@ -345,6 +347,9 @@ fun ChatScreen(
     if (state.libraryOpen) {
         DocumentLibraryDialog(state, onAction)
     }
+    state.modelUnavailable?.let { model ->
+        ModelUnavailableDialog(model = model, onAction = onAction)
+    }
 }
 
 private fun chatBarTitle(state: ChatState): String {
@@ -395,6 +400,14 @@ private fun ChatErrorPreview() {
 private fun ChatPopulatedPreview() {
     AnrealPreview {
         ChatScreen(state = chatPopulatedPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatModelUnavailablePreview() {
+    AnrealPreview {
+        ChatScreen(state = chatModelUnavailablePreviewState(), onAction = {})
     }
 }
 

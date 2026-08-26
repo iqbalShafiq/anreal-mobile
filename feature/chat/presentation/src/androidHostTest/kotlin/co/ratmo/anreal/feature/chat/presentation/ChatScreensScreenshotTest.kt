@@ -18,6 +18,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatModelUnavailablePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatStreamingPreviewState
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -104,6 +105,35 @@ class ChatScreensScreenshotTest {
         composeTestRule.onNodeWithText("GPT Luna 5.6").assertIsDisplayed()
         composeTestRule.onNodeWithText(AnrealCopy.get(AnrealCopy.LABEL_REASONING)).assertIsDisplayed()
         captureScreenRoboImage()
+    }
+
+    @Test
+    fun modelUnavailableDialogLight() {
+        val actions = mutableListOf<ChatAction>()
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                ChatScreen(
+                    state = chatModelUnavailablePreviewState(),
+                    onAction = { actions += it },
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.DIALOG_MODEL_UNAVAILABLE_TITLE),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            "The model “Old model” is no longer available. Choose another model to continue.",
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_CHOOSE_MODEL),
+        ).assertIsDisplayed()
+        captureScreenRoboImage()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_CHOOSE_MODEL),
+        ).performClick()
+        assertTrue(actions.lastOrNull() == ChatAction.OnDismissModelUnavailable)
     }
 
     @Test

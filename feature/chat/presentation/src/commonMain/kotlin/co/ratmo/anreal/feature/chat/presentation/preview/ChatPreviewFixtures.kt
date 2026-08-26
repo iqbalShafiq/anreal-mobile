@@ -16,6 +16,7 @@ import co.ratmo.anreal.feature.chat.presentation.ChatSessionUi
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.presentation.CitedDocumentUi
 import co.ratmo.anreal.feature.chat.presentation.ContextUsageUi
+import co.ratmo.anreal.feature.chat.presentation.ModelUnavailableUi
 import co.ratmo.anreal.feature.chat.presentation.RecentProjectUi
 import co.ratmo.anreal.feature.chat.presentation.SessionDocumentUi
 
@@ -136,6 +137,11 @@ internal fun chatPopulatedPreviewState(
         nearThreshold = false,
     ),
 )
+
+internal fun chatModelUnavailablePreviewState(): ChatState =
+    chatPopulatedPreviewState().copy(
+        modelUnavailable = ModelUnavailableUi("removed", "Old model"),
+    )
 
 internal fun chatStreamingPreviewState(): ChatState = chatPopulatedPreviewState(
     isSending = true,
