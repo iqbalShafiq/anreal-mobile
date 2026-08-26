@@ -47,11 +47,11 @@ class FakeChatRepository : ChatRepository {
     var sentOptions: ChatRunOptions? = null
     var streamLines: List<String> = emptyList()
     val cachedCatalog = MutableStateFlow<CachedModelCatalog?>(null)
-    var refreshResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
+    var catalogRefreshResult: Result<ModelCatalog, ChatError> = Result.Success(ModelCatalog())
     var catalogResult: Result<ModelCatalog, ChatError>
-        get() = refreshResult
+        get() = catalogRefreshResult
         set(value) {
-            refreshResult = value
+            catalogRefreshResult = value
         }
     var holdCatalogRefresh: Boolean = false
     var catalogRefreshStarted: CompletableDeferred<Unit> = CompletableDeferred()
@@ -229,7 +229,7 @@ class FakeChatRepository : ChatRepository {
             if (!catalogRefreshStarted.isCompleted) catalogRefreshStarted.complete(Unit)
             allowCatalogRefreshToFinish.await()
         }
-        when (val result = refreshResult) {
+        when (val result = catalogRefreshResult) {
             is Result.Success -> {
                 val current = cachedCatalog.value
                 cachedCatalog.value = CachedModelCatalog(
@@ -241,7 +241,7 @@ class FakeChatRepository : ChatRepository {
             }
             is Result.Error -> Unit
         }
-        return refreshResult
+        return catalogRefreshResult
     }
 
     override suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?) {
