@@ -1,6 +1,7 @@
 package co.ratmo.anreal.feature.auth.presentation.component
 
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -26,16 +26,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
+import co.ratmo.anreal.core.designsystem.component.AnrealAtmosphere
 import co.ratmo.anreal.core.designsystem.component.AnrealMark
 import co.ratmo.anreal.core.designsystem.component.GlassSurface
 import co.ratmo.anreal.core.designsystem.component.GlassTone
@@ -54,7 +57,7 @@ import com.composables.icons.materialsymbols.rounded.Format_quote
 import com.composables.icons.materialsymbols.rounded.Image
 import com.composables.icons.materialsymbols.rounded.Language
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
+import kotlin.math.abs
 
 enum class BoardingSlideKind {
     Documents,
@@ -214,6 +217,7 @@ private fun DocumentsStoryVisual() {
                 .height(152.dp),
             shape = MaterialTheme.shapes.extraLarge,
             tone = GlassTone.Regular,
+            sourceZIndex = IllustrationBackZIndex,
         ) {
             Column(
                 modifier = Modifier.padding(AnrealSpacing.md),
@@ -231,8 +235,9 @@ private fun DocumentsStoryVisual() {
                 .align(Alignment.BottomEnd)
                 .width(248.dp),
             shape = MaterialTheme.shapes.extraLarge,
-            tone = GlassTone.Thin,
+            tone = GlassTone.Regular,
             emphasized = true,
+            sourceZIndex = IllustrationFrontZIndex,
         ) {
             Column(
                 modifier = Modifier.padding(AnrealSpacing.md),
@@ -271,6 +276,7 @@ private fun ResearchStoryVisual() {
                 .width(244.dp),
             shape = MaterialTheme.shapes.extraLarge,
             tone = GlassTone.Regular,
+            sourceZIndex = IllustrationBackZIndex,
         ) {
             Column(
                 modifier = Modifier.padding(AnrealSpacing.md),
@@ -300,8 +306,9 @@ private fun ResearchStoryVisual() {
                 .align(Alignment.BottomStart)
                 .width(236.dp),
             shape = MaterialTheme.shapes.large,
-            tone = GlassTone.Pane,
+            tone = GlassTone.Regular,
             emphasized = true,
+            sourceZIndex = IllustrationFrontZIndex,
         ) {
             Column(
                 modifier = Modifier.padding(AnrealSpacing.sm),
@@ -332,6 +339,7 @@ private fun ImagesStoryVisual() {
                 .height(164.dp),
             shape = MaterialTheme.shapes.extraLarge,
             tone = GlassTone.Regular,
+            sourceZIndex = IllustrationBackZIndex,
         ) {
             Column(
                 modifier = Modifier.padding(AnrealSpacing.sm),
@@ -350,8 +358,9 @@ private fun ImagesStoryVisual() {
                 .align(Alignment.BottomEnd)
                 .width(220.dp),
             shape = MaterialTheme.shapes.large,
-            tone = GlassTone.Thin,
+            tone = GlassTone.Regular,
             emphasized = true,
+            sourceZIndex = IllustrationFrontZIndex,
         ) {
             Row(
                 modifier = Modifier.padding(AnrealSpacing.sm),
@@ -513,46 +522,33 @@ private fun BoardingPageIndicator(
     page: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    val slotPx = with(density) { (IndicatorPill + IndicatorGap).roundToPx() }
-    val trackWidth = IndicatorPill * pageCount + IndicatorGap * (pageCount - 1).coerceAtLeast(0)
-    Box(
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val lastIndex = (pageCount - 1).coerceAtLeast(0).toFloat()
+    val inactiveSlots = (pageCount - 1).coerceAtLeast(0)
+    val trackWidth = IndicatorPill + IndicatorDot * inactiveSlots + IndicatorGap * inactiveSlots
+    Canvas(
         modifier = modifier
             .width(trackWidth)
             .height(IndicatorDot)
             .semantics { hideFromAccessibility() },
-        contentAlignment = Alignment.CenterStart,
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(IndicatorGap),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            repeat(pageCount) {
-                Box(
-                    modifier = Modifier.width(IndicatorPill),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(IndicatorDot)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.22f)),
-                    )
-                }
-            }
+        val pageValue = page().coerceIn(0f, lastIndex)
+        val dot = IndicatorDot.toPx()
+        val pill = IndicatorPill.toPx()
+        val gap = IndicatorGap.toPx()
+        val radius = CornerRadius(size.height / 2f)
+        var x = 0f
+        repeat(pageCount) { index ->
+            val active = (1f - abs(pageValue - index)).coerceIn(0f, 1f)
+            val width = lerp(dot, pill, active)
+            drawRoundRect(
+                color = onSurface.copy(alpha = lerp(IndicatorInactiveAlpha, 1f, active)),
+                topLeft = Offset(x, 0f),
+                size = Size(width, size.height),
+                cornerRadius = radius,
+            )
+            x += width + gap
         }
-        Box(
-            modifier = Modifier
-                .offset {
-                    IntOffset(
-                        x = (page().coerceIn(0f, (pageCount - 1).toFloat()) * slotPx).roundToInt(),
-                        y = 0,
-                    )
-                }
-                .size(width = IndicatorPill, height = IndicatorDot)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.onSurface),
-        )
     }
 }
 
@@ -560,6 +556,9 @@ private val BoardingStageHeight = 212.dp
 private val IndicatorDot = 6.dp
 private val IndicatorPill = 16.dp
 private val IndicatorGap = 8.dp
+private const val IndicatorInactiveAlpha = 0.22f
+private const val IllustrationBackZIndex = 1f
+private const val IllustrationFrontZIndex = 2f
 
 @AnrealPreviews
 @Composable
@@ -573,11 +572,13 @@ private fun BoardingBrandHeaderPreview() {
 @Composable
 private fun BoardingCarouselDocumentsPreview() {
     AnrealPreview {
-        Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
-            BoardingCarousel(
-                paused = true,
-                pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 }),
-            )
+        AnrealAtmosphere {
+            Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
+                BoardingCarousel(
+                    paused = true,
+                    pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 }),
+                )
+            }
         }
     }
 }
@@ -586,11 +587,13 @@ private fun BoardingCarouselDocumentsPreview() {
 @Composable
 private fun BoardingCarouselResearchPreview() {
     AnrealPreview {
-        Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
-            BoardingCarousel(
-                paused = true,
-                pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 }),
-            )
+        AnrealAtmosphere {
+            Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
+                BoardingCarousel(
+                    paused = true,
+                    pagerState = rememberPagerState(initialPage = 1, pageCount = { 3 }),
+                )
+            }
         }
     }
 }
@@ -599,11 +602,29 @@ private fun BoardingCarouselResearchPreview() {
 @Composable
 private fun BoardingCarouselImagesPreview() {
     AnrealPreview {
-        Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
-            BoardingCarousel(
-                paused = true,
-                pagerState = rememberPagerState(initialPage = 2, pageCount = { 3 }),
-            )
+        AnrealAtmosphere {
+            Box(modifier = Modifier.height(380.dp).padding(AnrealSpacing.md)) {
+                BoardingCarousel(
+                    paused = true,
+                    pagerState = rememberPagerState(initialPage = 2, pageCount = { 3 }),
+                )
+            }
+        }
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun BoardingPageIndicatorPreview() {
+    AnrealPreview {
+        Column(
+            modifier = Modifier.padding(AnrealSpacing.md),
+            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+        ) {
+            BoardingPageIndicator(pageCount = 3, page = { 0f })
+            BoardingPageIndicator(pageCount = 3, page = { 0.5f })
+            BoardingPageIndicator(pageCount = 3, page = { 1f })
+            BoardingPageIndicator(pageCount = 3, page = { 2f })
         }
     }
 }

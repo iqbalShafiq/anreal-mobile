@@ -173,11 +173,11 @@ Recipes:
 | Chips, selected row | Ultra-thin / pane | No extra shadow |
 | User bubble | Thin frost (matches top bar chrome) | Same hairline (`glassDrawerBorderColor`) and tint/fallback (`glassDrawerFallbackColor`) as `GlassTopBar`, plus `glassBubbleTintColor()` scrim so the panel reads on a dim aurora (thin haze alone is invisible there) |
 
-Fallback when Haze disables blur (low-end / reliability gate): opaque-enough `surfaceContainer` scrim, same shape, no fake blur.
+Fallback when Haze disables blur (low-end / reliability gate): opaque-enough `surfaceContainer` scrim, same shape, no fake blur. `GlassSurface` sets Haze `fallbackTint` to that scrim so preview and Robolectric still read as panes.
 
-Aurora is the haze **source**. Animate it with independent orb wander (position + opacity) on a 16–32s cycle — slow enough to stay atmospheric, large enough to read through frost. **Disable it** under reduced motion and reduced transparency.
+Aurora is the haze **source** (`zIndex` 0). Animate it with independent orb wander (position + opacity) on a 16–32s cycle — slow enough to stay atmospheric, large enough to read through frost. **Disable it** under reduced motion and reduced transparency.
 
-Never stack a light translucent surface on another light translucent surface.
+Do not stack tint-only translucent surfaces. Overlapping glass (boarding illustration cards) registers each pane as a `hazeSource` with rising `sourceZIndex` so the front card frosts the card behind it, not a hollow overlay.
 
 ---
 
@@ -239,7 +239,7 @@ Animate **`transform` and `opacity` only**, via `graphicsLayer` / `offset { }` /
 | Button / icon / send | Press scale 0.97, 120ms easeOut | Keep scale *or* color flash only |
 | Drawer | Slide from start + fade 280ms easeDrawer | Fade 160ms, no slide |
 | Splash → boarding / chat | System splash hands off to compose splash (aurora + mark + version). Compose splash is **not** a nav destination. After session resolve, hold `durationSplash` then fade 160ms onto the start route. Aurora is already mounted. | Fade 160ms; hold `durationFast` |
-| Boarding carousel | Horizontal pager. Auto-advance after `durationBoardingHold` (`easeInOut` 220ms). User swipe is the same pager. Pause on email focus and reduced motion. Indicator pill uses `offset {}`, not width animation. | Instant page change, no auto-advance |
+| Boarding carousel | Horizontal pager. Auto-advance after `durationBoardingHold` (`easeInOut` 220ms). User swipe is the same pager. Pause on email focus and reduced motion. Indicator morphs on the draw path: one pill + inactive dots share a constant 8.dp gap; width interpolates with the pager offset so neighbors shift left and right. Do not animate `Modifier.width`. | Instant page change, no auto-advance |
 | Boarding → Login / Register | **One-way vertical pager.** Boarding is replaced by the selected form; both move **up**. Forms have no back affordance and system back cannot reveal boarding. 420ms `easeDrawer` (no fade). Hide IME before the navigate. | Fade 160ms, no slide |
 | Login ↔ Register | Same vertical pager with replace-current navigation. Login → Register: both move **up**. Register → Login: both move **down**. Neither form accumulates history. | Fade 160ms, no slide |
 | Auth ↔ Chat / Chat ↔ Account | Horizontal push, full width, no fade. Logout returns to **boarding** (the reverse). | Fade 160ms |

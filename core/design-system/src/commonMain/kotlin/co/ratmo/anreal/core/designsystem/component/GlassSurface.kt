@@ -32,6 +32,7 @@ import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceTransparency
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -185,6 +186,7 @@ fun GlassSurface(
     emphasized: Boolean = false,
     error: Boolean = false,
     effectAlpha: Float = 1f,
+    sourceZIndex: Float? = null,
     content: @Composable () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -202,18 +204,30 @@ fun GlassSurface(
         else -> scheme.outlineVariant.copy(alpha = 0.45f)
     }
     val clampedAlpha = effectAlpha.coerceIn(0f, 1f)
-    val useHaze = hazeState != null && !reduceTransparency && clampedAlpha > 0f
-    val frost = if (useHaze) {
-        Modifier.hazeEffect(state = hazeState, style = style) {
+    val fallback = fallbackColor ?: scheme.surfaceContainer
+    val useHaze: Boolean
+    val source: Modifier
+    val frost: Modifier
+    if (hazeState != null && !reduceTransparency && clampedAlpha > 0f) {
+        useHaze = true
+        source = if (sourceZIndex != null) {
+            Modifier.hazeSource(state = hazeState, zIndex = sourceZIndex)
+        } else {
+            Modifier
+        }
+        frost = Modifier.hazeEffect(state = hazeState, style = style) {
             alpha = clampedAlpha
+            fallbackTint = HazeTint(fallback.copy(alpha = fallback.alpha * clampedAlpha))
         }
     } else {
-        Modifier
+        useHaze = false
+        source = Modifier
+        frost = Modifier
     }
-    val fallback = fallbackColor ?: scheme.surfaceContainer
     Surface(
         modifier = modifier
             .clip(shape)
+            .then(source)
             .then(frost)
             .border(
                 width = 1.dp,
