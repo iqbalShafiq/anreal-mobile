@@ -46,7 +46,14 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatStreamEvent
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
+import co.ratmo.anreal.feature.chat.domain.stream.ImageGenSettings
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionKind
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.QuestionAnswer
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import co.ratmo.anreal.feature.chat.domain.stream.StreamEnvelope
 import co.ratmo.anreal.feature.chat.domain.stream.parseStreamLine
 import co.ratmo.anreal.feature.chat.domain.stream.reduce
@@ -178,7 +185,10 @@ data class ChatState(
     val selectedModelId: String? = null,
     val selectedReasoning: String? = null,
     val webSearchEnabled: Boolean = false,
+    val deepResearchEnabled: Boolean = false,
     val imageGenerationEnabled: Boolean = false,
+    val imageAspectRatio: String? = null,
+    val imageQuality: String? = null,
     val capabilities: ChatCapabilities = ChatCapabilities(),
     val contextSnippet: String? = null,
     val contextSnippetId: String? = null,
@@ -246,7 +256,10 @@ sealed interface ChatAction {
     data class OnSelectModel(val modelId: String) : ChatAction
     data class OnSelectReasoning(val effort: String?) : ChatAction
     data object OnToggleWebSearch : ChatAction
+    data object OnToggleDeepResearch : ChatAction
     data object OnToggleImageGeneration : ChatAction
+    data class OnImageAspectRatioChange(val aspectRatio: String?) : ChatAction
+    data class OnImageQualityChange(val quality: String?) : ChatAction
     data object OnRetryCatalog : ChatAction
     data object OnDismissModelUnavailable : ChatAction
     data class OnCopyMessage(val text: String) : ChatAction
@@ -264,6 +277,19 @@ sealed interface ChatAction {
         val answers: Map<String, List<String>>,
         val skipped: List<String>,
     ) : ChatAction
+    data class OnInteractionAllowOnce(val interactionId: String) : ChatAction
+    data class OnInteractionAllowSession(val interactionId: String) : ChatAction
+    data class OnInteractionReject(val interactionId: String) : ChatAction
+    data class OnInteractionQuestionAnswer(
+        val interactionId: String,
+        val answers: List<QuestionAnswer>,
+    ) : ChatAction
+    data class OnInteractionImageOverride(
+        val interactionId: String,
+        val aspectRatio: String?,
+        val quality: String?,
+    ) : ChatAction
+    data class OnInteractionDismissStale(val interactionId: String) : ChatAction
     data object OnOpenLibrary : ChatAction
     data object OnDismissLibrary : ChatAction
     data class OnLibraryQueryChange(val query: String) : ChatAction
@@ -380,6 +406,9 @@ class ChatViewModel(
             is ChatAction.OnSelectModel -> selectModel(action.modelId)
             is ChatAction.OnSelectReasoning -> selectReasoning(action.effort)
             ChatAction.OnToggleWebSearch -> _state.update { it.copy(webSearchEnabled = !it.webSearchEnabled) }
+            ChatAction.OnToggleDeepResearch -> _state.update {
+                it.copy(deepResearchEnabled = !it.deepResearchEnabled)
+            }
             ChatAction.OnToggleImageGeneration -> _state.update {
                 it.copy(imageGenerationEnabled = !it.imageGenerationEnabled)
             }
@@ -407,10 +436,32 @@ class ChatViewModel(
                 _events.send(ChatEvent.ShowMessage(UiText.DynamicString(action.message)))
             }
             is ChatAction.OnApprovalDecision -> viewModelScope.launch {
-                decideApproval(action.approvalId, action.approved)
+                answerLegacyApproval(action.approvalId, action.approved)
             }
             is ChatAction.OnClarificationResponse -> viewModelScope.launch {
-                respondClarification(action.clarificationId, action.answers, action.skipped)
+                answerLegacyClarification(action.clarificationId, action.answers)
+            }
+            is ChatAction.OnInteractionAllowOnce -> viewModelScope.launch {
+                answerInteractionApproval(action.interactionId, approved = true, grantScope = null)
+            }
+            is ChatAction.OnInteractionAllowSession -> viewModelScope.launch {
+                answerInteractionApproval(action.interactionId, approved = true, grantScope = SessionGrant.Session)
+            }
+            is ChatAction.OnInteractionReject -> viewModelScope.launch {
+                answerInteractionApproval(action.interactionId, approved = false, grantScope = null)
+            }
+            is ChatAction.OnInteractionQuestionAnswer -> viewModelScope.launch {
+                answerInteractionQuestion(action.interactionId, action.answers)
+            }
+            is ChatAction.OnInteractionImageOverride -> viewModelScope.launch {
+                answerInteractionImageOverride(action.interactionId, action.aspectRatio, action.quality)
+            }
+            is ChatAction.OnInteractionDismissStale -> dismissStaleInteraction(action.interactionId)
+            is ChatAction.OnImageAspectRatioChange -> _state.update {
+                it.copy(imageAspectRatio = action.aspectRatio)
+            }
+            is ChatAction.OnImageQualityChange -> _state.update {
+                it.copy(imageQuality = action.quality)
             }
             ChatAction.OnOpenLibrary -> viewModelScope.launch { openLibrary() }
             ChatAction.OnDismissLibrary -> _state.update { it.copy(libraryOpen = false) }
@@ -927,20 +978,15 @@ class ChatViewModel(
             .onFailure { error -> _events.send(ChatEvent.ShowMessage(error.toUiText())) }
     }
 
-    private suspend fun decideApproval(approvalId: String, approved: Boolean) {
+    private suspend fun answerLegacyApproval(approvalId: String, approved: Boolean) {
         if (_state.value.humanInputBusy) return
         _state.update { it.copy(humanInputBusy = true) }
-        chatRepository.decideApproval(approvalId, approved)
-            .onSuccess {
-                _state.update {
-                    it.copy(
-                        humanInputBusy = false,
-                        thread = it.thread.copy(
-                            pendingApprovals = it.thread.pendingApprovals.filterNot { item ->
-                                item.id == approvalId
-                            },
-                        ),
-                    )
+        chatRepository.getInteractionStatus(approvalId)
+            .onSuccess { availability ->
+                if (availability == InteractionAvailability.Unavailable) {
+                    dismissStaleInteraction(approvalId)
+                } else {
+                    answerInteractionApproval(approvalId, approved = approved, grantScope = null)
                 }
             }
             .onFailure { error ->
@@ -949,30 +995,116 @@ class ChatViewModel(
             }
     }
 
-    private suspend fun respondClarification(
+    private suspend fun answerLegacyClarification(
         clarificationId: String,
         answers: Map<String, List<String>>,
-        skipped: List<String>,
+    ) {
+        val mapped = answers.flatMap { (questionId, values) ->
+            values.filter { it.isNotBlank() }.map { QuestionAnswer(questionId, it) }
+        }
+        answerInteractionQuestion(clarificationId, mapped)
+    }
+
+    private suspend fun answerInteractionApproval(
+        interactionId: String,
+        approved: Boolean,
+        grantScope: SessionGrant?,
+        overrideArgs: ImageOverrideArgs? = null,
     ) {
         if (_state.value.humanInputBusy) return
+        val sessionId = _state.value.selectedSessionId ?: return
         _state.update { it.copy(humanInputBusy = true) }
-        chatRepository.respondClarification(clarificationId, answers, skipped)
-            .onSuccess {
-                _state.update {
-                    it.copy(
-                        humanInputBusy = false,
-                        thread = it.thread.copy(
-                            pendingClarifications = it.thread.pendingClarifications.filterNot { item ->
-                                item.id == clarificationId
-                            },
-                        ),
-                    )
-                }
-            }
-            .onFailure { error ->
+        val response = InteractionResponse.ToolApproval(approved = approved)
+        if (approved) {
+            val stage = chatRepository.stageInteractionPolicy(interactionId, response, grantScope, overrideArgs)
+            if (stage is Result.Error && stage.error is ChatError.InteractionHandled) {
+                dismissStaleInteraction(interactionId)
                 _state.update { it.copy(humanInputBusy = false) }
-                _events.send(ChatEvent.ShowMessage(error.toUiText()))
+                return
             }
+            if (stage is Result.Error) {
+                _state.update { it.copy(humanInputBusy = false) }
+                _events.send(ChatEvent.ShowMessage(stage.error.toUiText()))
+                return
+            }
+        }
+        chatRepository.answerInteraction(sessionId, interactionId, response, currentRunOptions()) { line ->
+            applyLine(sessionId, line)
+        }.onSuccess {
+            removePendingInteraction(interactionId)
+            _state.update { it.copy(humanInputBusy = false) }
+        }.onFailure { error ->
+            if (error is ChatError.InteractionHandled || error is ChatError.InteractionExpired) {
+                dismissStaleInteraction(interactionId)
+            }
+            _state.update { it.copy(humanInputBusy = false) }
+            _events.send(ChatEvent.ShowMessage(error.toUiText()))
+        }
+    }
+
+    private suspend fun answerInteractionQuestion(
+        interactionId: String,
+        answers: List<QuestionAnswer>,
+    ) {
+        if (_state.value.humanInputBusy) return
+        val sessionId = _state.value.selectedSessionId ?: return
+        _state.update { it.copy(humanInputBusy = true) }
+        chatRepository.answerInteraction(
+            sessionId,
+            interactionId,
+            InteractionResponse.ToolQuestion(answers),
+            currentRunOptions(),
+        ) { line ->
+            applyLine(sessionId, line)
+        }.onSuccess {
+            removePendingInteraction(interactionId)
+            _state.update { it.copy(humanInputBusy = false) }
+        }.onFailure { error ->
+            if (error is ChatError.InteractionHandled || error is ChatError.InteractionExpired) {
+                dismissStaleInteraction(interactionId)
+            }
+            _state.update { it.copy(humanInputBusy = false) }
+            _events.send(ChatEvent.ShowMessage(error.toUiText()))
+        }
+    }
+
+    private suspend fun answerInteractionImageOverride(
+        interactionId: String,
+        aspectRatio: String?,
+        quality: String?,
+    ) {
+        _state.update { it.copy(imageAspectRatio = aspectRatio, imageQuality = quality) }
+        answerInteractionApproval(
+            interactionId = interactionId,
+            approved = true,
+            grantScope = null,
+            overrideArgs = ImageOverrideArgs(aspectRatio = aspectRatio, quality = quality),
+        )
+    }
+
+    private fun dismissStaleInteraction(interactionId: String) {
+        _state.update { current ->
+            current.copy(
+                humanInputBusy = false,
+                thread = current.thread.copy(
+                    pendingInteractions = current.thread.pendingInteractions
+                        .filterNot { it.id == interactionId },
+                    staleInteractionIds = current.thread.staleInteractionIds + interactionId,
+                ),
+            )
+        }
+    }
+
+    private fun removePendingInteraction(interactionId: String) {
+        _state.update { current ->
+            current.copy(
+                thread = current.thread.copy(
+                    pendingInteractions = current.thread.pendingInteractions
+                        .filterNot { it.id == interactionId },
+                    staleInteractionIds = current.thread.staleInteractionIds - interactionId,
+                ),
+            )
+        }
     }
 
     private fun isStreaming(state: ChatState): Boolean {
@@ -1319,7 +1451,7 @@ class ChatViewModel(
     private suspend fun loadCatalog(force: Boolean) {
         _state.update { it.copy(catalogLoading = true, catalogError = null) }
         requestCatalogRefresh(force)
-        chatRepository.loadCapabilities()
+        chatRepository.loadCapabilities(_state.value.selectedSessionId)
             .onSuccess { capabilities ->
                 _state.update { it.copy(capabilities = capabilities) }
             }
@@ -1360,7 +1492,7 @@ class ChatViewModel(
             ?.firstOrNull { it.id == requestedModelId }
             ?.label
 
-        when (val result = chatRepository.refreshCatalog()) {
+        when (val result = chatRepository.loadCatalog()) {
             is Result.Success -> {
                 val catalog = result.data
                 val resolution = reconcileCatalogSelection(
@@ -1539,11 +1671,23 @@ class ChatViewModel(
 
     private fun currentRunOptions(): ChatRunOptions {
         val current = _state.value
+        val imageSettings = if (current.imageGenerationEnabled) {
+            ImageGenSettings(
+                modelId = current.selectedModelId.orEmpty(),
+                aspectRatio = current.imageAspectRatio,
+                quality = current.imageQuality,
+            )
+        } else {
+            null
+        }
         return ChatRunOptions(
             model = current.selectedModelId,
             reasoningEffort = current.selectedReasoning,
             webSearchEnabled = current.webSearchEnabled,
+            deepResearchEnabled = current.deepResearchEnabled,
             imageGenerationEnabled = current.imageGenerationEnabled,
+            imageGenSettings = imageSettings,
+            documentIds = current.activeDocuments.map { it.id },
         )
     }
 

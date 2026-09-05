@@ -288,6 +288,24 @@ private fun FeaturesSheet(
                 )
             },
         )
+        SheetOption(
+            title = AnrealCopy.get(AnrealCopy.LABEL_DEEP_RESEARCH),
+            subtitle = if (state.capabilities.deepResearchAvailable) {
+                null
+            } else {
+                AnrealCopy.get(AnrealCopy.FEATURE_UNAVAILABLE)
+            },
+            selected = state.deepResearchEnabled,
+            enabled = state.capabilities.deepResearchAvailable,
+            onClick = { onAction(ChatAction.OnToggleDeepResearch) },
+            trailing = {
+                Switch(
+                    checked = state.deepResearchEnabled,
+                    onCheckedChange = { onAction(ChatAction.OnToggleDeepResearch) },
+                    enabled = state.capabilities.deepResearchAvailable,
+                )
+            },
+        )
     }
 }
 

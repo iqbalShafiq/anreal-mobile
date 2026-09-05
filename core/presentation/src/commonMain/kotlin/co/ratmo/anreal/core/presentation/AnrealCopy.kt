@@ -127,6 +127,7 @@ object AnrealCopy {
     const val MODELS_EMPTY = "models_empty"
     const val LABEL_WEB_SEARCH = "label_web_search"
     const val LABEL_IMAGE_GEN = "label_image_gen"
+    const val LABEL_DEEP_RESEARCH = "label_deep_research"
     const val LABEL_ATTACH = "label_attach"
     const val LABEL_ATTACH_PHOTOS = "label_attach_photos"
     const val LABEL_ATTACH_LOCAL = "label_attach_local"
@@ -250,6 +251,11 @@ object AnrealCopy {
     const val TOOL_RESOLVE_LIBRARY = "tool_resolve_library"
     const val TOOL_QUERY_DOCS = "tool_query_docs"
     const val ERROR_NO_ACTIVE_RUN = "error_no_active_run"
+    const val ERROR_INTERACTION_GONE = "error_interaction_gone"
+    const val ERROR_INTERACTION_EXPIRED = "error_interaction_expired"
+    const val ERROR_INTERACTION_HANDLED = "error_interaction_handled"
+    const val ERROR_INTERACTION_UNAVAILABLE = "error_interaction_unavailable"
+    const val ERROR_INTERACTION_INVALID = "error_interaction_invalid"
     const val ACTION_QUEUE = "action_queue"
     const val ACTION_SEND_NOW = "action_send_now"
     const val ACTION_SEND_QUEUE = "action_send_queue"
@@ -329,8 +335,10 @@ object AnrealCopy {
     const val APPROVAL_TITLE = "approval_title"
     const val CLARIFICATION_TITLE = "clarification_title"
     const val ACTION_ALLOW_ONCE = "action_allow_once"
+    const val ACTION_ALLOW_SESSION = "action_allow_session"
     const val ACTION_REJECT = "action_reject"
     const val ACTION_SUBMIT = "action_submit"
+    const val IMAGE_OVERRIDE_TITLE = "image_override_title"
 
     fun get(key: String): String {
         return when (key) {
@@ -465,6 +473,7 @@ object AnrealCopy {
             MODELS_EMPTY -> "No chat models are available."
             LABEL_WEB_SEARCH -> "Web search"
             LABEL_IMAGE_GEN -> "Image generate"
+            LABEL_DEEP_RESEARCH -> "Deep research"
             LABEL_ATTACH -> "Add to this chat"
             LABEL_ATTACH_PHOTOS -> "Photos"
             LABEL_ATTACH_LOCAL -> "Local document"
@@ -587,6 +596,11 @@ object AnrealCopy {
             TOOL_RESOLVE_LIBRARY -> "Looking up library"
             TOOL_QUERY_DOCS -> "Reading library docs"
             ERROR_NO_ACTIVE_RUN -> "That run already finished. Send this as a new message."
+            ERROR_INTERACTION_GONE -> "This interaction is no longer available."
+            ERROR_INTERACTION_EXPIRED -> "This approval expired. Send a new message to continue."
+            ERROR_INTERACTION_HANDLED -> "This interaction was already handled."
+            ERROR_INTERACTION_UNAVAILABLE -> "Interaction policy is temporarily unavailable."
+            ERROR_INTERACTION_INVALID -> "Interaction policy request is invalid."
             ACTION_QUEUE -> "Queue"
             ACTION_SEND_NOW -> "Send now"
             ACTION_SEND_QUEUE -> "Send queue"
@@ -668,8 +682,10 @@ object AnrealCopy {
             APPROVAL_TITLE -> "Approval required"
             CLARIFICATION_TITLE -> "A little more detail"
             ACTION_ALLOW_ONCE -> "Allow once"
+            ACTION_ALLOW_SESSION -> "Allow for session"
             ACTION_REJECT -> "Reject"
             ACTION_SUBMIT -> "Submit"
+            IMAGE_OVERRIDE_TITLE -> "Image options"
             else -> key
         }
     }

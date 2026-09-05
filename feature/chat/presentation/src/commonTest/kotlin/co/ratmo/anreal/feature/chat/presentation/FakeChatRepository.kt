@@ -28,6 +28,10 @@ import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,8 +40,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-class FakeChatRepository : ChatRepository {
-    val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
+class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
     var refreshResult: Result<SessionPage, ChatError> = Result.Success(SessionPage(emptyList()))
     var draft: ChatSession = ChatSession(id = "draft", title = "New chat", updatedAt = "now")
     var cachedHistory: List<ChatMessage> = emptyList()
@@ -70,6 +73,12 @@ class FakeChatRepository : ChatRepository {
     var catalogRefreshCalls: Int = 0
     var persistedCatalogSelection: Pair<String?, String?>? = null
     var capabilitiesResult: Result<ChatCapabilities, ChatError> = Result.Success(ChatCapabilities())
+    var interactionStatus: Result<InteractionAvailability, ChatError> =
+        Result.Success(InteractionAvailability.Pending)
+    var stageCalls: MutableList<StagedPolicy> = mutableListOf()
+    var stageResult: EmptyResult<ChatError> = Result.Success(Unit)
+    var answeredInteractions: MutableList<AnsweredInteraction> = mutableListOf()
+    var answerResult: EmptyResult<ChatError> = Result.Success(Unit)
     var steerResult: EmptyResult<ChatError> = Result.Success(Unit)
     var steered: List<QueuedItem> = emptyList()
     var syncResult: Result<List<String>, ChatError> = Result.Success(emptyList())
@@ -243,10 +252,10 @@ class FakeChatRepository : ChatRepository {
         emitAll(cachedCatalog)
     }
 
-    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
+    override suspend fun loadCatalog(outputType: String?): Result<ModelCatalog, ChatError> {
         catalogRefreshCalls += 1
+        if (!catalogRefreshStarted.isCompleted) catalogRefreshStarted.complete(Unit)
         if (holdCatalogRefresh) {
-            if (!catalogRefreshStarted.isCompleted) catalogRefreshStarted.complete(Unit)
             allowCatalogRefreshToFinish.await()
         }
         when (val result = catalogRefreshResult) {
@@ -274,7 +283,8 @@ class FakeChatRepository : ChatRepository {
         }
     }
 
-    override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> = capabilitiesResult
+    override suspend fun loadCapabilities(sessionId: String?): Result<ChatCapabilities, ChatError> =
+        capabilitiesResult
 
     override suspend fun resume(
         sessionId: String,
@@ -392,16 +402,31 @@ class FakeChatRepository : ChatRepository {
         return Result.Success(Unit)
     }
 
-    override suspend fun decideApproval(
-        approvalId: String,
-        approved: Boolean,
-    ): EmptyResult<ChatError> = Result.Success(Unit)
+    override suspend fun getInteractionStatus(
+        interactionId: String,
+    ): Result<InteractionAvailability, ChatError> = interactionStatus
 
-    override suspend fun respondClarification(
-        clarificationId: String,
-        answers: Map<String, List<String>>,
-        skipped: List<String>,
-    ): EmptyResult<ChatError> = Result.Success(Unit)
+    override suspend fun stageInteractionPolicy(
+        interactionId: String,
+        response: InteractionResponse,
+        grantScope: SessionGrant?,
+        overrideArgs: ImageOverrideArgs?,
+    ): EmptyResult<ChatError> {
+        stageCalls += StagedPolicy(interactionId, response, grantScope, overrideArgs)
+        return stageResult
+    }
+
+    override suspend fun answerInteraction(
+        sessionId: String,
+        interactionId: String,
+        response: InteractionResponse,
+        options: ChatRunOptions,
+        onLine: suspend (String) -> Unit,
+    ): EmptyResult<ChatError> {
+        answeredInteractions += AnsweredInteraction(sessionId, interactionId, response, options)
+        streamLines.forEach { line -> onLine(line) }
+        return answerResult
+    }
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> = recentProjects
 
@@ -414,3 +439,17 @@ class FakeChatRepository : ChatRepository {
         return Result.Success(RecentProject(id = id, name = name))
     }
 }
+
+data class StagedPolicy(
+    val interactionId: String,
+    val response: InteractionResponse,
+    val grantScope: SessionGrant?,
+    val overrideArgs: ImageOverrideArgs?,
+)
+
+data class AnsweredInteraction(
+    val sessionId: String,
+    val interactionId: String,
+    val response: InteractionResponse,
+    val options: ChatRunOptions,
+)

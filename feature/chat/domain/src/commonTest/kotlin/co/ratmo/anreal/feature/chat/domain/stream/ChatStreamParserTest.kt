@@ -94,6 +94,51 @@ class ChatStreamParserTest {
     }
 
     @Test
+    fun parses_native_interaction_event() {
+        val lines = """
+            {"type":"stream_event","streamId":"s1","eventId":10,"event":{"type":"interaction","runId":"r1","turn":1,"interaction":{"id":"i1","type":"tool-approval","toolName":"web_search","toolCallId":"c1","internalCallId":"ic1","input":{"query":"kotlin"},"reason":"Search the web"}}}
+            {"type":"stream_event","streamId":"s1","eventId":11,"event":{"type":"interaction","runId":"r1","turn":1,"interaction":{"id":"i2","type":"tool-question","toolName":"deep_research","toolCallId":"c2","internalCallId":"ic2","questions":[{"id":"q1","text":"Which focus?","choices":[{"label":"Broad","value":"broad"}],"allowCustom":true}]}}}
+            {"type":"stream_event","streamId":"s1","eventId":12,"event":{"type":"data","runId":"r1","turn":1,"name":"deepResearchProgress","data":{"phase":"researching","message":"Reading sources"}}}
+        """.trimIndent()
+
+        val events = parseStreamLines(lines).map { (it as StreamEnvelope.Event).event }
+
+        assertThat(events[0]).isEqualTo(
+            ChatStreamEvent.InteractionRequested(
+                NativeInteraction(
+                    id = "i1",
+                    toolName = "web_search",
+                    kind = InteractionKind.ToolApproval,
+                    reason = "Search the web",
+                    argumentsJson = """{"query":"kotlin"}""",
+                ),
+            ),
+        )
+        assertThat(events[1]).isEqualTo(
+            ChatStreamEvent.InteractionRequested(
+                NativeInteraction(
+                    id = "i2",
+                    toolName = "deep_research",
+                    kind = InteractionKind.ToolQuestion,
+                    questions = listOf(
+                        InteractionQuestion(
+                            id = "q1",
+                            text = "Which focus?",
+                            choices = listOf(InteractionChoice("Broad", "broad")),
+                            allowCustom = true,
+                        ),
+                    ),
+                ),
+            ),
+        )
+        assertThat(events[2]).isEqualTo(
+            ChatStreamEvent.DeepResearchProgress(
+                DeepResearchStatus(phase = DeepResearchPhase.Researching, message = "Reading sources"),
+            ),
+        )
+    }
+
+    @Test
     fun parses_approval_and_clarification_requests() {
         val lines = """
             {"type":"stream_event","streamId":"s1","eventId":10,"event":{"type":"tool_approval_request","approval":{"id":"a1","toolName":"generate_image","args":{"prompt":"cat"},"reason":"Creates an image"}}}

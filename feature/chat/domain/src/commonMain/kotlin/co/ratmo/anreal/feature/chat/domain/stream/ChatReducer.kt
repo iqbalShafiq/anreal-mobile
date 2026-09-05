@@ -47,19 +47,53 @@ private fun ChatThreadState.applyEvent(envelope: StreamEnvelope.Event): ChatThre
             status = RunStatus.Failed,
         )
         is ChatStreamEvent.QueuedMessageApplied -> advanced
+        is ChatStreamEvent.InteractionRequested -> advanced.copy(
+            pendingInteractions = advanced.pendingInteractions
+                .filterNot { it.id == event.interaction.id } + event.interaction,
+            staleInteractionIds = advanced.staleInteractionIds - event.interaction.id,
+        )
+        is ChatStreamEvent.InteractionResolved -> advanced.copy(
+            pendingInteractions = advanced.pendingInteractions.filterNot { it.id == event.id },
+            staleInteractionIds = advanced.staleInteractionIds - event.id,
+        )
+        is ChatStreamEvent.InteractionMarkedStale -> advanced.copy(
+            pendingInteractions = advanced.pendingInteractions.filterNot { it.id == event.id },
+            staleInteractionIds = advanced.staleInteractionIds + event.id,
+        )
+        is ChatStreamEvent.DeepResearchProgress -> advanced.copy(deepResearch = event.status)
         is ChatStreamEvent.ApprovalRequested -> advanced.copy(
-            pendingApprovals = advanced.pendingApprovals.filterNot { it.id == event.approval.id } + event.approval,
+            pendingInteractions = advanced.pendingInteractions + NativeInteraction(
+                id = event.approval.id,
+                toolName = event.approval.toolName,
+                kind = InteractionKind.ToolApproval,
+                reason = event.approval.reason,
+                argumentsJson = event.approval.arguments,
+            ),
         )
         is ChatStreamEvent.ApprovalResolved -> advanced.copy(
-            pendingApprovals = advanced.pendingApprovals.filterNot { it.id == event.id },
+            pendingInteractions = advanced.pendingInteractions.filterNot { it.id == event.id },
+            staleInteractionIds = advanced.staleInteractionIds - event.id,
         )
         is ChatStreamEvent.ClarificationRequested -> advanced.copy(
-            pendingClarifications = advanced.pendingClarifications.filterNot {
-                it.id == event.clarification.id
-            } + event.clarification,
+            pendingInteractions = advanced.pendingInteractions + NativeInteraction(
+                id = event.clarification.id,
+                toolName = "clarification",
+                kind = InteractionKind.ToolQuestion,
+                questions = event.clarification.questions.map { question ->
+                    InteractionQuestion(
+                        id = question.id,
+                        text = question.question,
+                        choices = question.options.map { option ->
+                            InteractionChoice(label = option.label, value = option.id)
+                        },
+                        allowCustom = question.optional,
+                    )
+                },
+            ),
         )
         is ChatStreamEvent.ClarificationResolved -> advanced.copy(
-            pendingClarifications = advanced.pendingClarifications.filterNot { it.id == event.id },
+            pendingInteractions = advanced.pendingInteractions.filterNot { it.id == event.id },
+            staleInteractionIds = advanced.staleInteractionIds - event.id,
         )
         is ChatStreamEvent.Compaction -> advanced
         is ChatStreamEvent.Unknown -> advanced

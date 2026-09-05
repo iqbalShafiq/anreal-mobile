@@ -49,8 +49,7 @@ import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.component.ComposerBar
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageButton
 import co.ratmo.anreal.feature.chat.presentation.component.ContextUsageSheet
-import co.ratmo.anreal.feature.chat.presentation.component.ApprovalDialog
-import co.ratmo.anreal.feature.chat.presentation.component.ClarificationDialog
+import co.ratmo.anreal.feature.chat.presentation.component.InteractionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DeleteSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DocumentLibraryDialog
 import co.ratmo.anreal.feature.chat.presentation.component.DocumentsEndDrawer
@@ -64,10 +63,12 @@ import co.ratmo.anreal.feature.chat.presentation.component.documentsBadgeCount
 import co.ratmo.anreal.feature.chat.presentation.preview.chatConflictPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatEmptyPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatErrorPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatInteractionPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatLoadingPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatModelUnavailablePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatProjectWorkspacePreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatQuestionPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatDeletePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatRenamePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatQueueConflictPreviewState
@@ -238,56 +239,29 @@ fun ChatScreen(
                 Scaffold(
                     containerColor = Color.Transparent,
                     topBar = {
+                        // Empty thread: no glass container so the aurora stays clean.
+                        // The container appears once the first message arrives.
+                        if (state.thread.messages.isEmpty()) {
+                            ChatTopBarContent(
+                                state = state,
+                                documentCount = documentCount,
+                                onOpenDrawer = { scope.launch { drawerState.open() } },
+                                onOpenContextUsage = { contextUsageOpen = true },
+                                onOpenDocuments = { documentsOpen = true },
+                            )
+                        } else {
                         GlassTopBar(
                             frosted = frostedTopBar.value,
                             surfaceTinted = !shouldShowChatAurora(state),
                         ) {
-                            TopAppBar(
-                                title = {
-                                    Text(
-                                        text = chatBarTitle(state),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                },
-                                navigationIcon = {
-                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                        Icon(
-                                            imageVector = MaterialSymbols.Rounded.Menu,
-                                            contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_CHATS),
-                                        )
-                                    }
-                                },
-                                actions = {
-                                    ContextUsageButton(
-                                        usage = state.contextUsage,
-                                        error = state.contextUsageError,
-                                        onClick = { contextUsageOpen = true },
-                                    )
-                                    IconButton(onClick = { documentsOpen = true }) {
-                                        if (documentCount > 0) {
-                                            BadgedBox(
-                                                badge = { Badge { Text(documentCount.toString()) } },
-                                            ) {
-                                                Icon(
-                                                    imageVector = MaterialSymbols.Rounded.Description,
-                                                    contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
-                                                )
-                                            }
-                                        } else {
-                                            Icon(
-                                                imageVector = MaterialSymbols.Rounded.Description,
-                                                contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
-                                            )
-                                        }
-                                    }
-                                },
-                                colors = TopAppBarDefaults.topAppBarColors(
-                                    containerColor = Color.Transparent,
-                                    scrolledContainerColor = Color.Transparent,
-                                ),
+                            ChatTopBarContent(
+                                state = state,
+                                documentCount = documentCount,
+                                onOpenDrawer = { scope.launch { drawerState.open() } },
+                                onOpenContextUsage = { contextUsageOpen = true },
+                                onOpenDocuments = { documentsOpen = true },
                             )
+                        }
                         }
                     },
                 ) { padding ->
@@ -296,7 +270,7 @@ fun ChatScreen(
                             state = state,
                             onAction = onAction,
                             modifier = Modifier.fillMaxSize(),
-                            topContentPadding = padding.calculateTopPadding() + AnrealSpacing.sm,
+                            topContentPadding = padding.calculateTopPadding() + AnrealSpacing.md,
                             bottomContentPadding = with(density) { composerHeightPx.toDp() } + AnrealSpacing.sm,
                             initialScrollReady = composerHeightPx > 0,
                             onFrostedTopBarChange = { frostedTopBar.value = it },
@@ -342,11 +316,8 @@ fun ChatScreen(
     if (state.queueConflict) {
         QueueConflictDialog(onAction = onAction)
     }
-    state.thread.pendingApprovals.firstOrNull()?.let { approval ->
-        ApprovalDialog(approval, state.humanInputBusy, onAction)
-    }
-    state.thread.pendingClarifications.firstOrNull()?.let { clarification ->
-        ClarificationDialog(clarification, state.humanInputBusy, onAction)
+    state.thread.pendingInteractions.firstOrNull()?.let { interaction ->
+        InteractionDialog(interaction, state, onAction)
     }
     if (state.libraryOpen) {
         DocumentLibraryDialog(state, onAction)
@@ -371,11 +342,66 @@ private fun chatBarTitle(state: ChatState): String {
     }
 }
 
+@Composable
+private fun ChatTopBarContent(
+    state: ChatState,
+    documentCount: Int,
+    onOpenDrawer: () -> Unit,
+    onOpenContextUsage: () -> Unit,
+    onOpenDocuments: () -> Unit,
+) {
+    TopAppBar(
+        title = {
+            Text(
+                text = chatBarTitle(state),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        navigationIcon = {
+            IconButton(onClick = onOpenDrawer) {
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.Menu,
+                    contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_CHATS),
+                )
+            }
+        },
+        actions = {
+            ContextUsageButton(
+                usage = state.contextUsage,
+                error = state.contextUsageError,
+                onClick = onOpenContextUsage,
+            )
+            IconButton(onClick = onOpenDocuments) {
+                if (documentCount > 0) {
+                    BadgedBox(
+                        badge = { Badge { Text(documentCount.toString()) } },
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Description,
+                            contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
+                        )
+                    }
+                } else {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Description,
+                        contentDescription = AnrealCopy.get(AnrealCopy.CD_OPEN_DOCUMENTS),
+                    )
+                }
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = Color.Transparent,
+            scrolledContainerColor = Color.Transparent,
+        ),
+    )
+}
+
 /**
  * The chat backdrop follows thread content, not asynchronous session/catalog state.
  * An empty thread must keep the aurora visible until the first message arrives.
- */
-internal fun shouldShowChatAurora(state: ChatState): Boolean = state.thread.messages.isEmpty()
+ */internal fun shouldShowChatAurora(state: ChatState): Boolean = state.thread.messages.isEmpty()
 
 @AnrealPreviews
 @Composable
@@ -406,6 +432,22 @@ private fun ChatErrorPreview() {
 private fun ChatPopulatedPreview() {
     AnrealPreview {
         ChatScreen(state = chatPopulatedPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatInteractionPreview() {
+    AnrealPreview {
+        ChatScreen(state = chatInteractionPreviewState(), onAction = {})
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun ChatQuestionPreview() {
+    AnrealPreview {
+        ChatScreen(state = chatQuestionPreviewState(), onAction = {})
     }
 }
 

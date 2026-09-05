@@ -1,5 +1,6 @@
 package co.ratmo.anreal.core.database
 
+import androidx.room3.ColumnInfo
 import androidx.room3.Dao
 import androidx.room3.Entity
 import androidx.room3.Query
@@ -12,6 +13,12 @@ data class QueuedItemEntity(
     val text: String,
     val status: String,
     val position: Int,
+    @ColumnInfo(defaultValue = "'[]'")
+    val attachmentsJson: String = "[]",
+    @ColumnInfo(defaultValue = "NULL")
+    val snippetText: String? = null,
+    @ColumnInfo(defaultValue = "NULL")
+    val snippetSourceRole: String? = null,
 )
 
 @Dao

@@ -2,13 +2,16 @@ package co.ratmo.anreal.feature.chat.presentation.component
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -106,9 +109,12 @@ internal fun ToolActivityCard(
     }
 }
 
+private val ActivityIconGlyphSize = 24.dp
+private val ActivityButtonShift = (AnrealSpacing.touch - ActivityIconGlyphSize) / -2
+private val ActivityLabelShift = -20.dp
+
 @Composable
-internal fun ActivityToggleRow(
-    expanded: Boolean,
+internal fun ActivityToggleRow(    expanded: Boolean,
     running: Boolean,
     label: String,
     status: String?,
@@ -123,36 +129,58 @@ internal fun ActivityToggleRow(
         animationSpec = AnrealMotion.selectionSpec(),
         label = "activity-chevron",
     )
+    // Height hugs the content: no minimum touch row and no padded ripple box.
+    // The icon keeps a 48.dp ripple target; the label toggles without one.
+    // The glyph aligns flush-left with bubble text: the button is shifted left
+    // by its own visual inset so the 24.dp icon starts at x = 0. The label is
+    // shifted further left so it sits ~4.dp from the glyph. Running rows swap
+    // the chevron for a same-size loading indicator and stay expanded.
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .defaultMinSize(minHeight = AnrealSpacing.touch)
+            .padding(bottom = AnrealSpacing.xxs)
             .semantics {
                 role = Role.Button
                 this.contentDescription = contentDescription
             }
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
     ) {
-        Icon(
-            imageVector = MaterialSymbols.Rounded.Expand_more,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.graphicsLayer {
-                rotationZ = if (reduceMotion) {
-                    if (expanded) 0f else -90f
-                } else {
-                    rotation
-                }
-            },
-        )
-        if (running) {
-            AnrealLoadingIndicator(size = 14.dp)
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(AnrealSpacing.touch)
+                .offset(x = ActivityButtonShift),
+        ) {
+            // While running, the chevron becomes a same-size loading indicator.
+            if (running) {
+                AnrealLoadingIndicator(size = ActivityIconGlyphSize)
+            } else {
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.Expand_more,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .size(ActivityIconGlyphSize)
+                        .graphicsLayer {
+                            rotationZ = if (reduceMotion) {
+                                if (expanded) 0f else -90f
+                            } else {
+                                rotation
+                            }
+                        },
+                )
+            }
         }
         Text(
             text = label,
-            modifier = Modifier.weight(1f, fill = false),
+            modifier = Modifier
+                .weight(1f, fill = false)
+                .offset(x = ActivityLabelShift),
             style = MaterialTheme.typography.labelLarge,
             color = labelColor,
             maxLines = 1,
@@ -160,6 +188,7 @@ internal fun ActivityToggleRow(
         if (status != null) {
             Text(
                 text = "· $status",
+                modifier = Modifier.offset(x = ActivityLabelShift),
                 style = MaterialTheme.typography.labelMedium,
                 color = statusColor,
             )

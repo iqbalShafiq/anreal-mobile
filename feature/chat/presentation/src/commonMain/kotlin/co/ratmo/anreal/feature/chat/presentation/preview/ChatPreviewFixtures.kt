@@ -9,6 +9,10 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionChoice
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionKind
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionQuestion
+import co.ratmo.anreal.feature.chat.domain.stream.NativeInteraction
 import co.ratmo.anreal.feature.chat.domain.stream.RunStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.presentation.AccountUi
@@ -250,6 +254,47 @@ internal fun chatComposerCatalogPreviewState(
     imageGenerationEnabled = imageGenerationEnabled,
     capabilities = ChatCapabilities(
         webSearchAvailable = true,
+        deepResearchAvailable = true,
         imageGenerationAvailable = true,
+    ),
+)
+
+internal fun chatInteractionPreviewState(): ChatState = chatPopulatedPreviewState().copy(
+    thread = ChatThreadState(
+        status = RunStatus.Streaming,
+        messages = listOf(previewUserMessage),
+        pendingInteractions = listOf(
+            NativeInteraction(
+                id = "i1",
+                toolName = "web_search",
+                kind = InteractionKind.ToolApproval,
+                reason = "Search the web for current docs",
+                argumentsJson = """{"query":"kotlin"}""",
+            ),
+        ),
+    ),
+)
+
+internal fun chatQuestionPreviewState(): ChatState = chatPopulatedPreviewState().copy(
+    thread = ChatThreadState(
+        status = RunStatus.Streaming,
+        messages = listOf(previewUserMessage),
+        pendingInteractions = listOf(
+            NativeInteraction(
+                id = "i2",
+                toolName = "deep_research",
+                kind = InteractionKind.ToolQuestion,
+                questions = listOf(
+                    InteractionQuestion(
+                        id = "q1",
+                        text = "Which focus?",
+                        choices = listOf(
+                            InteractionChoice("Broad", "broad"),
+                            InteractionChoice("Deep", "deep"),
+                        ),
+                    ),
+                ),
+            ),
+        ),
     ),
 )

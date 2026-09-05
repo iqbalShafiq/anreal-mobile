@@ -6,10 +6,22 @@ enum class QueueStatus {
     Editing,
 }
 
+data class SteerAttachment(
+    val mediaType: String,
+    val data: String,
+)
+
+data class SteerSnippet(
+    val text: String,
+    val sourceRole: String,
+)
+
 data class QueuedItem(
     val id: String,
     val text: String,
     val status: QueueStatus = QueueStatus.Pending,
+    val attachments: List<SteerAttachment> = emptyList(),
+    val contextSnippet: SteerSnippet? = null,
 )
 
 fun addItem(items: List<QueuedItem>, item: QueuedItem): List<QueuedItem> = items + item

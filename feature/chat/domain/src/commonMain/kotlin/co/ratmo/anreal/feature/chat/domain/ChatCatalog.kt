@@ -1,5 +1,7 @@
 package co.ratmo.anreal.feature.chat.domain
 
+import co.ratmo.anreal.feature.chat.domain.stream.ImageGenSettings
+
 data class ChatModel(
     val id: String,
     val label: String,
@@ -125,12 +127,17 @@ private fun reconcileReasoningEffort(
 
 data class ChatCapabilities(
     val webSearchAvailable: Boolean = false,
+    val deepResearchAvailable: Boolean = false,
     val imageGenerationAvailable: Boolean = false,
+    val context7Configured: Boolean = false,
 )
 
 data class ChatRunOptions(
     val model: String? = null,
     val reasoningEffort: String? = null,
     val webSearchEnabled: Boolean = false,
+    val deepResearchEnabled: Boolean = false,
     val imageGenerationEnabled: Boolean = false,
+    val imageGenSettings: ImageGenSettings? = null,
+    val documentIds: List<String> = emptyList(),
 )

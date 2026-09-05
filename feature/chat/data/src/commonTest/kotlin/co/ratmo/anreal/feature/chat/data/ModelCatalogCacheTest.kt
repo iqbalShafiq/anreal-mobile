@@ -117,7 +117,7 @@ class ModelCatalogCacheTest {
             local = local,
         )
 
-        val result = repository.refreshCatalog()
+        val result = repository.loadCatalog()
 
         assertThat(result).isEqualTo(
             Result.Success(
@@ -146,7 +146,7 @@ class ModelCatalogCacheTest {
             local = local,
         )
 
-        val result = repository.refreshCatalog()
+        val result = repository.loadCatalog()
 
         when (result) {
             is Result.Success -> error("expected catalog refresh to fail")

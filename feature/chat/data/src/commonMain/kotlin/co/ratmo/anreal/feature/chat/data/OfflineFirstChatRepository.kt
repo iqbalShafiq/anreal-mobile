@@ -27,6 +27,10 @@ import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import kotlinx.coroutines.flow.Flow
 
 class OfflineFirstChatRepository(
@@ -127,15 +131,36 @@ class OfflineFirstChatRepository(
 
     override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = catalogLocal.observeCachedCatalog()
 
-    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> =
-        remote.loadCatalog().onSuccess { catalogLocal.replaceCatalog(it) }
+    override suspend fun loadCatalog(outputType: String?): Result<ModelCatalog, ChatError> =
+        remote.loadCatalog(outputType).onSuccess { catalogLocal.replaceCatalog(it) }
 
     override suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?) {
         catalogLocal.persistSelection(modelId, reasoningEffort)
     }
 
-    override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
-        return remote.loadCapabilities()
+    override suspend fun loadCapabilities(sessionId: String?): Result<ChatCapabilities, ChatError> {
+        return remote.loadCapabilities(sessionId)
+    }
+
+    override suspend fun getInteractionStatus(
+        interactionId: String,
+    ): Result<InteractionAvailability, ChatError> = remote.getInteractionStatus(interactionId)
+
+    override suspend fun stageInteractionPolicy(
+        interactionId: String,
+        response: InteractionResponse,
+        grantScope: SessionGrant?,
+        overrideArgs: ImageOverrideArgs?,
+    ): EmptyResult<ChatError> = remote.stageInteractionPolicy(interactionId, response, grantScope, overrideArgs)
+
+    override suspend fun answerInteraction(
+        sessionId: String,
+        interactionId: String,
+        response: InteractionResponse,
+        options: ChatRunOptions,
+        onLine: suspend (String) -> Unit,
+    ): EmptyResult<ChatError> {
+        return remote.answerInteraction(interactionId, response, options, sessionId, onLine)
     }
 
     override suspend fun steer(sessionId: String, items: List<QueuedItem>): EmptyResult<ChatError> {
@@ -266,17 +291,6 @@ class OfflineFirstChatRepository(
         sessionId: String,
         snippetId: String,
     ): EmptyResult<ChatError> = remote.clearContextSnippet(sessionId, snippetId)
-
-    override suspend fun decideApproval(
-        approvalId: String,
-        approved: Boolean,
-    ): EmptyResult<ChatError> = remote.decideApproval(approvalId, approved)
-
-    override suspend fun respondClarification(
-        clarificationId: String,
-        answers: Map<String, List<String>>,
-        skipped: List<String>,
-    ): EmptyResult<ChatError> = remote.respondClarification(clarificationId, answers, skipped)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return remote.listRecentProjects()

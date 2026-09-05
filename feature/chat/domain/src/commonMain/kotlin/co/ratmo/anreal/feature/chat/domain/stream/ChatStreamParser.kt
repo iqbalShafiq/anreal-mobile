@@ -139,7 +139,10 @@ private fun parseInnerEvent(event: JsonObject): ChatStreamEvent {
         "clarification_response" -> parseResolvedId(event, "clarification")?.let {
             ChatStreamEvent.ClarificationResolved(it)
         } ?: ChatStreamEvent.Unknown(type)
+        "interaction" -> parseNativeInteraction(event, type)
+        "data" -> parseDataEvent(event, type)
         "compaction" -> ChatStreamEvent.Compaction(event.string("phase") ?: "unknown")
+        "memory_compaction" -> ChatStreamEvent.Compaction(event.string("status") ?: "unknown")
         else -> ChatStreamEvent.Unknown(type = type ?: "unknown")
     }
 }
@@ -191,6 +194,66 @@ private fun parseClarificationRequest(event: JsonObject, type: String): ChatStre
 private fun parseResolvedId(event: JsonObject, key: String): String? =
     (event[key] as? JsonObject)?.string("id")
 
+private fun parseNativeInteraction(event: JsonObject, type: String): ChatStreamEvent {
+    val request = event["interaction"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+    val id = request.string("id") ?: return ChatStreamEvent.Unknown(type)
+    val toolName = request.string("toolName") ?: return ChatStreamEvent.Unknown(type)
+    return when (request.string("type")) {
+        "tool-approval" -> ChatStreamEvent.InteractionRequested(
+            NativeInteraction(
+                id = id,
+                toolName = toolName,
+                kind = InteractionKind.ToolApproval,
+                reason = request.string("reason"),
+                argumentsJson = request["input"]?.toString().orEmpty(),
+            ),
+        )
+        "tool-question" -> {
+            val questions = (request["questions"] as? JsonArray).orEmpty().mapNotNull { element ->
+                val question = element as? JsonObject ?: return@mapNotNull null
+                InteractionQuestion(
+                    id = question.string("id") ?: return@mapNotNull null,
+                    text = question.string("text") ?: return@mapNotNull null,
+                    choices = (question["choices"] as? JsonArray).orEmpty().mapNotNull { choiceElement ->
+                        val choice = choiceElement as? JsonObject ?: return@mapNotNull null
+                        InteractionChoice(
+                            label = choice.string("label") ?: return@mapNotNull null,
+                            value = choice.string("value") ?: return@mapNotNull null,
+                        )
+                    },
+                    allowCustom = question.boolean("allowCustom") ?: false,
+                )
+            }
+            if (questions.isEmpty()) return ChatStreamEvent.Unknown(type)
+            ChatStreamEvent.InteractionRequested(
+                NativeInteraction(
+                    id = id,
+                    toolName = toolName,
+                    kind = InteractionKind.ToolQuestion,
+                    questions = questions,
+                ),
+            )
+        }
+        else -> ChatStreamEvent.Unknown(type)
+    }
+}
+
+private fun parseDataEvent(event: JsonObject, type: String): ChatStreamEvent {
+    if (event.string("name") != "deepResearchProgress") return ChatStreamEvent.Unknown(type)
+    val data = event["data"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+    val phase = when (data.string("phase")) {
+        "planning" -> DeepResearchPhase.Planning
+        "researching" -> DeepResearchPhase.Researching
+        "synthesizing" -> DeepResearchPhase.Synthesizing
+        "completed" -> DeepResearchPhase.Completed
+        "failed" -> DeepResearchPhase.Failed
+        else -> return ChatStreamEvent.Unknown(type)
+    }
+    return ChatStreamEvent.DeepResearchProgress(
+        DeepResearchStatus(phase = phase, message = data.string("message").orEmpty()),
+    )
+}
+
 private fun turnMessageId(event: JsonObject): String? =
     event.int("turn")?.let { "turn-$it" }
 
@@ -236,6 +299,10 @@ private fun parseEndStatus(raw: String?): StreamEndStatus {
 
 private fun JsonObject.string(key: String): String? {
     return this[key]?.jsonPrimitive?.content
+}
+
+private fun JsonObject.boolean(key: String): Boolean? {
+    return this[key]?.jsonPrimitive?.booleanOrNull
 }
 
 private fun JsonObject.int(key: String): Int? {

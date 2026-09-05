@@ -5,6 +5,10 @@ import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import kotlinx.coroutines.flow.Flow
 
 data class SessionPage(
@@ -142,9 +146,23 @@ interface ChatRepository {
     ): EmptyResult<ChatError>
     suspend fun saveResume(sessionId: String, streamId: String?, lastEventId: Int)
     fun observeCachedCatalog(): Flow<CachedModelCatalog?>
-    suspend fun refreshCatalog(): Result<ModelCatalog, ChatError>
+    suspend fun loadCatalog(outputType: String? = null): Result<ModelCatalog, ChatError>
     suspend fun persistCatalogSelection(modelId: String?, reasoningEffort: String?)
-    suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError>
+    suspend fun loadCapabilities(sessionId: String? = null): Result<ChatCapabilities, ChatError>
+    suspend fun getInteractionStatus(interactionId: String): Result<InteractionAvailability, ChatError>
+    suspend fun stageInteractionPolicy(
+        interactionId: String,
+        response: InteractionResponse,
+        grantScope: SessionGrant? = null,
+        overrideArgs: ImageOverrideArgs? = null,
+    ): EmptyResult<ChatError>
+    suspend fun answerInteraction(
+        sessionId: String,
+        interactionId: String,
+        response: InteractionResponse,
+        options: ChatRunOptions,
+        onLine: suspend (String) -> Unit,
+    ): EmptyResult<ChatError>
     suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError>
     suspend fun unlinkSessionDocument(sessionId: String, documentId: String): EmptyResult<ChatError>
     suspend fun getDocumentStorage(): Result<DocumentStorage, ChatError>
@@ -169,12 +187,6 @@ interface ChatRepository {
         sourceRole: String,
     ): Result<ContextSnippet, ChatError>
     suspend fun clearContextSnippet(sessionId: String, snippetId: String): EmptyResult<ChatError>
-    suspend fun decideApproval(approvalId: String, approved: Boolean): EmptyResult<ChatError>
-    suspend fun respondClarification(
-        clarificationId: String,
-        answers: Map<String, List<String>>,
-        skipped: List<String>,
-    ): EmptyResult<ChatError>
     suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError>
     suspend fun openProject(id: String): Result<RecentProject, ChatError>
 }

@@ -319,9 +319,16 @@ private fun StreamingThreadList(
                     previousEndsActivity && startsActivity -> 0.dp
                     else -> AnrealSpacing.md
                 }
+                // One assistant bubble can span several messages (thinking, text,
+                // thinking, final text). Actions belong only to the last assistant
+                // message of a consecutive assistant run.
+                val nextMessage = state.thread.messages.getOrNull(index + 1)
+                val isLastOfAssistantRun = message.role != ChatRole.Assistant ||
+                    nextMessage?.role != ChatRole.Assistant
                 MessageBubble(
                     message = message,
                     busy = state.isSending || state.thread.status == RunStatus.Streaming,
+                    showActions = isLastOfAssistantRun,
                     onAction = onAction,
                     modifier = Modifier.padding(top = topGap),
                 )
@@ -413,6 +420,7 @@ private fun waitingForFirstAssistantToken(state: ChatState): Boolean {
 private fun MessageBubble(
     message: ChatMessage,
     busy: Boolean,
+    showActions: Boolean = true,
     onAction: (ChatAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -474,9 +482,11 @@ private fun MessageBubble(
             renderedAny = true
             previousIsActivity = isActivity
         }
-        val showActions = message.role == ChatRole.User ||
-            (message.role == ChatRole.Assistant && message.isComplete)
-        if (showActions) {
+        val showActionsBar = showActions && (
+            message.role == ChatRole.User ||
+                (message.role == ChatRole.Assistant && message.isComplete)
+            )
+        if (showActionsBar) {
             MessageActionsBar(
                 message = message,
                 busy = busy,

@@ -27,6 +27,9 @@ import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.QuestionAnswer
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -935,14 +938,16 @@ class ChatViewModelTest {
 
     @Test
     fun send_waits_for_startup_refresh_then_sends_with_reconciled_options() = runTest {
-        val fake = populatedRepo().apply {
-            cachedCatalog.value = CachedModelCatalog(
+        val fake = populatedRepo().apply {            cachedCatalog.value = CachedModelCatalog(
                 catalog = ModelCatalog(
-                    models = listOf(ChatModel("cached", "Cached", listOf("high"))),
-                    efforts = listOf(ReasoningEffort("high", "High")),
+                    models = listOf(ChatModel("live", "Live", listOf("xhigh", "high"))),
+                    efforts = listOf(
+                        ReasoningEffort("xhigh", "Xhigh"),
+                        ReasoningEffort("high", "High"),
+                    ),
                 ),
-                selectedModelId = "cached",
-                selectedReasoningEffort = "high",
+                selectedModelId = "live",
+                selectedReasoningEffort = "xhigh",
                 lastSuccessfulRefreshEpochMillis = 1L,
             )
             catalogRefreshResult = Result.Success(
@@ -958,12 +963,13 @@ class ChatViewModelTest {
         fake.catalogRefreshStarted.await()
         viewModel.onAction(ChatAction.OnDraftChange("Hello"))
         viewModel.onAction(ChatAction.OnSend)
-        advanceUntilIdle()
+        runCurrent()
 
         assertThat(fake.sentOptions).isNull()
         fake.allowCatalogRefreshToFinish.complete(Unit)
         fake.sendStarted.await()
         assertThat(fake.sentOptions?.model).isEqualTo("live")
+        assertThat(fake.sentOptions?.reasoningEffort).isEqualTo("high")
 
         fake.allowSendToFinish.complete(Unit)
         advanceUntilIdle()
@@ -1242,6 +1248,87 @@ class ChatViewModelTest {
         refreshResult = Result.Success(
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
         )
+    }
+
+    @Test
+    fun interaction_allow_once_stages_then_answers() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnInteractionAllowOnce("i1"))
+        advanceUntilIdle()
+
+        assertThat(fake.stageCalls.single().interactionId).isEqualTo("i1")
+        assertThat(fake.stageCalls.single().grantScope).isNull()
+        assertThat(fake.answeredInteractions.single().interactionId).isEqualTo("i1")
+        assertThat(viewModel.state.value.humanInputBusy).isFalse()
+    }
+
+    @Test
+    fun interaction_allow_session_sends_session_grant() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnInteractionAllowSession("i1"))
+        advanceUntilIdle()
+
+        assertThat(fake.stageCalls.single().grantScope).isEqualTo(SessionGrant.Session)
+        assertThat(fake.answeredInteractions).isEqualTo(
+            listOf(
+                AnsweredInteraction(
+                    sessionId = "draft",
+                    interactionId = "i1",
+                    response = InteractionResponse.ToolApproval(approved = true),
+                    options = fake.answeredInteractions.single().options,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun interaction_reject_answers_without_staging() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnInteractionReject("i1"))
+        advanceUntilIdle()
+
+        assertThat(fake.stageCalls).isEqualTo(emptyList())
+        assertThat(fake.answeredInteractions.single().response)
+            .isEqualTo(InteractionResponse.ToolApproval(approved = false))
+    }
+
+    @Test
+    fun stale_interaction_is_dismissed_silently() = runTest {
+        val fake = populatedRepo().apply {
+            answerResult = Result.Error(ChatError.InteractionHandled)
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnInteractionAllowOnce("i1"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.thread.pendingInteractions).isEqualTo(emptyList())
+        assertThat(viewModel.state.value.thread.staleInteractionIds).isEqualTo(setOf("i1"))
+    }
+
+    @Test
+    fun question_answer_sends_tool_question_response() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        val answers = listOf(QuestionAnswer("q1", "broad"))
+        viewModel.onAction(ChatAction.OnInteractionQuestionAnswer("i2", answers))
+        advanceUntilIdle()
+
+        assertThat(fake.stageCalls).isEqualTo(emptyList())
+        assertThat(fake.answeredInteractions.single().response)
+            .isEqualTo(InteractionResponse.ToolQuestion(answers))
     }
 }
 

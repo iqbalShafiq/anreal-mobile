@@ -6,12 +6,19 @@ import co.ratmo.anreal.core.data.auth.InMemorySessionTokenStore
 import co.ratmo.anreal.core.data.network.HttpClientFactory
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
+import co.ratmo.anreal.feature.chat.domain.queue.SteerAttachment
+import co.ratmo.anreal.feature.chat.domain.queue.SteerSnippet
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.engine.mock.toByteArray
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -122,7 +129,11 @@ class KtorChatRemoteDataSourceTest {
             body = """{"code":"RUN_ACTIVE"}""",
         )
 
-        val result = source.send("s1", emptyList()) {}
+        val result = source.send(
+            "s1",
+            emptyList(),
+            options = ChatRunOptions(model = "m1"),
+        ) {}
 
         assertThat(result).isEqualTo(Result.Error(ChatError.RunActive))
     }
@@ -177,6 +188,240 @@ class KtorChatRemoteDataSourceTest {
             }
             is Result.Error -> error("expected success")
         }
+    }
+
+    @Test
+    fun send_posts_canonical_messages_request() = runTest {
+        var captured: String? = null
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/chat")
+            captured = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"type":"stream_end","streamId":"s","eventId":0,"status":"completed"}""" + "\n",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/x-ndjson"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        val result = source.send(
+            sessionId = "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            messages = emptyList(),
+            options = ChatRunOptions(
+                model = "deepseek/deepseek-v4-flash-0731",
+                reasoningEffort = "max",
+                webSearchEnabled = true,
+                deepResearchEnabled = true,
+            ),
+        ) {}
+
+        assertThat(result).isEqualTo(Result.Success(Unit))
+        val body = requireNotNull(captured)
+        assertThat(body.contains("\"type\":\"messages\"")).isEqualTo(true)
+        assertThat(body.contains("\"modelId\":\"deepseek/deepseek-v4-flash-0731\"")).isEqualTo(true)
+        assertThat(body.contains("\"deepResearchEnabled\":true")).isEqualTo(true)
+        assertThat(body.contains("\"model\":")).isEqualTo(false)
+    }
+
+    @Test
+    fun answer_interaction_posts_interaction_response() = runTest {
+        var captured: String? = null
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/chat")
+            captured = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"type":"stream_end","streamId":"s","eventId":0,"status":"completed"}""" + "\n",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/x-ndjson"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        val result = source.answerInteraction(
+            interactionId = "i1",
+            response = InteractionResponse.ToolApproval(approved = true),
+            options = ChatRunOptions(model = "m1"),
+            sessionId = "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        ) {}
+
+        assertThat(result).isEqualTo(Result.Success(Unit))
+        val body = requireNotNull(captured)
+        assertThat(body.contains("\"type\":\"interaction_response\"")).isEqualTo(true)
+        assertThat(body.contains("\"interactionId\":\"i1\"")).isEqualTo(true)
+    }
+
+    @Test
+    fun interaction_status_maps_pending_and_unavailable() = runTest {
+        val pending = source(
+            path = "/api/chat/interactions/i1",
+            body = """{"status":"pending"}""",
+        ).getInteractionStatus("i1")
+        assertThat(pending).isEqualTo(Result.Success(InteractionAvailability.Pending))
+
+        val gone = source(
+            path = "/api/chat/interactions/i1",
+            body = """{"status":"unavailable"}""",
+        ).getInteractionStatus("i1")
+        assertThat(gone).isEqualTo(Result.Success(InteractionAvailability.Unavailable))
+    }
+
+    @Test
+    fun stage_allow_session_posts_grant_scope() = runTest {
+        var captured: String? = null
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/chat/interactions/i1/stage")
+            captured = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"ok":true}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        val result = source.stageInteractionPolicy(
+            interactionId = "i1",
+            response = InteractionResponse.ToolApproval(approved = true),
+            grantScope = SessionGrant.Session,
+        )
+
+        assertThat(result).isEqualTo(Result.Success(Unit))
+        assertThat(requireNotNull(captured).contains("\"grantScope\":\"session\"")).isEqualTo(true)
+    }
+
+    @Test
+    fun stage_maps_interaction_error_codes() = runTest {
+        val codes = mapOf(
+            "INTERACTION_NOT_FOUND" to ChatError.InteractionNotFound,
+            "INTERACTION_EXPIRED" to ChatError.InteractionExpired,
+            "INTERACTION_STATE_CONFLICT" to ChatError.InteractionHandled,
+            "INTERACTION_POLICY_CONFLICT" to ChatError.InteractionHandled,
+            "INTERACTION_REPLAYED" to ChatError.InteractionHandled,
+            "INTERACTION_CLAIMED" to ChatError.InteractionHandled,
+            "INTERACTION_POLICY_UNAVAILABLE" to ChatError.InteractionPolicyUnavailable,
+            "INTERACTION_STAGE_INVALID" to ChatError.InteractionStageInvalid,
+        )
+        codes.forEach { (code, expected) ->
+            val status = if (code == "INTERACTION_POLICY_UNAVAILABLE") {
+                HttpStatusCode.ServiceUnavailable
+            } else if (code == "INTERACTION_NOT_FOUND") {
+                HttpStatusCode.NotFound
+            } else if (code == "INTERACTION_STAGE_INVALID") {
+                HttpStatusCode.BadRequest
+            } else {
+                HttpStatusCode.Conflict
+            }
+            val result = source(
+                path = "/api/chat/interactions/i1/stage",
+                status = status,
+                body = """{"code":"$code"}""",
+            ).stageInteractionPolicy(
+                interactionId = "i1",
+                response = InteractionResponse.ToolApproval(approved = true),
+            )
+            assertThat(result).isEqualTo(Result.Error(expected))
+        }
+    }
+
+    @Test
+    fun capabilities_maps_four_flags() = runTest {
+        val source = source(
+            path = "/api/chat/capabilities",
+            body = """{"webSearchAvailable":true,"deepResearchAvailable":true,"imageGenerationAvailable":false,"context7Configured":true}""",
+        )
+
+        when (val result = source.loadCapabilities("s1")) {
+            is Result.Success -> {
+                assertThat(result.data.webSearchAvailable).isEqualTo(true)
+                assertThat(result.data.deepResearchAvailable).isEqualTo(true)
+                assertThat(result.data.imageGenerationAvailable).isEqualTo(false)
+                assertThat(result.data.context7Configured).isEqualTo(true)
+            }
+            is Result.Error -> error("expected success")
+        }
+    }
+
+    @Test
+    fun catalog_sends_output_type_query() = runTest {
+        var captured: String? = "unset"
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/models")
+            captured = request.url.parameters["outputType"]
+            respond(
+                content = """{"models":[],"reasoningEfforts":[]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        source.loadCatalog(outputType = "text")
+        assertThat(captured).isEqualTo("text")
+
+        source.loadCatalog()
+        assertThat(captured).isEqualTo(null)
+    }
+
+    @Test
+    fun steer_posts_attachments_and_snippet() = runTest {
+        var captured: String? = null
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/chat/steer")
+            captured = request.body.toByteArray().decodeToString()
+            respond(
+                content = """{"ok":true,"streamId":"s","queued":1}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore(),
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        val result = source.steer(
+            "s1",
+            listOf(
+                QueuedItem(
+                    id = "q1",
+                    text = "Follow up",
+                    attachments = listOf(SteerAttachment("image/png", "abc")),
+                    contextSnippet = SteerSnippet("Keep this", "user"),
+                ),
+            ),
+        )
+
+        assertThat(result).isEqualTo(Result.Success(Unit))
+        val body = requireNotNull(captured)
+        assertThat(body.contains("attachments")).isEqualTo(true)
+        assertThat(body.contains("contextSnippet")).isEqualTo(true)
     }
 
     @Test

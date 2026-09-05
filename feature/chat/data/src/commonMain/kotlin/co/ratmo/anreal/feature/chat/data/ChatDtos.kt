@@ -17,7 +17,16 @@ import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
+import co.ratmo.anreal.feature.chat.domain.stream.ImageGenSettings
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.QuestionAnswer
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
+import co.ratmo.anreal.feature.chat.domain.queue.SteerAttachment
+import co.ratmo.anreal.feature.chat.domain.queue.SteerSnippet
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -25,6 +34,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonPrimitive
@@ -87,18 +98,6 @@ data class RunStatusDto(
 )
 
 @Serializable
-data class ChatRequestDto(
-    val sessionId: String,
-    val messages: List<HistoryMessageDto>,
-    val stream: Boolean = true,
-    val resume: ResumeDto? = null,
-    val model: String? = null,
-    val reasoningEffort: String? = null,
-    val webSearchEnabled: Boolean = false,
-    val imageGenerationEnabled: Boolean = false,
-)
-
-@Serializable
 data class ModelCatalogDto(
     val models: List<ModelInfoDto> = emptyList(),
     val reasoningEfforts: List<ReasoningEffortDto> = emptyList(),
@@ -124,7 +123,72 @@ data class ReasoningEffortDto(
 @Serializable
 data class CapabilitiesDto(
     val webSearchAvailable: Boolean = false,
+    val deepResearchAvailable: Boolean = false,
     val imageGenerationAvailable: Boolean = false,
+    val context7Configured: Boolean = false,
+)
+
+@Serializable
+data class ImageGenSettingsDto(
+    val modelId: String,
+    val aspectRatio: String? = null,
+    val quality: String? = null,
+    val background: String? = null,
+    @SerialName("n")
+    val imageCount: Int? = null,
+)
+
+@Serializable
+data class ChatRequestMetadataDto(
+    val sessionId: String,
+    val documentIds: List<String>,
+    val modelId: String,
+    val reasoningEffort: String?,
+    val webSearchEnabled: Boolean,
+    val imageGenerationEnabled: Boolean,
+    val deepResearchEnabled: Boolean,
+    val imageGenSettings: ImageGenSettingsDto?,
+)
+
+@Serializable
+data class SendMessagesRequestDto(
+    val type: String,
+    val metadata: ChatRequestMetadataDto,
+    val messages: List<HistoryMessageDto>,
+    val resume: ResumeDto? = null,
+)
+
+@Serializable
+data class InteractionResponseRequestDto(
+    val type: String,
+    val interactionId: String,
+    val response: JsonObject,
+    val metadata: ChatRequestMetadataDto,
+    val resume: ResumeDto? = null,
+)
+
+@Serializable
+data class InteractionStatusDto(
+    val status: String = "unavailable",
+)
+
+@Serializable
+data class StageInteractionRequestDto(
+    val response: JsonObject,
+    val grantScope: String? = null,
+    val overrideArgs: JsonObject? = null,
+)
+
+@Serializable
+data class SteerAttachmentDto(
+    val mediaType: String,
+    val data: String,
+)
+
+@Serializable
+data class SteerSnippetDto(
+    val text: String,
+    val sourceRole: String,
 )
 
 @Serializable
@@ -154,6 +218,8 @@ data class HistoryMessageDto(
 data class SteerMessageDto(
     val clientMessageId: String,
     val text: String,
+    val attachments: List<SteerAttachmentDto> = emptyList(),
+    val contextSnippet: SteerSnippetDto? = null,
 )
 
 @Serializable
@@ -366,8 +432,67 @@ fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(
 
 fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(
     webSearchAvailable = webSearchAvailable,
+    deepResearchAvailable = deepResearchAvailable,
     imageGenerationAvailable = imageGenerationAvailable,
+    context7Configured = context7Configured,
 )
+
+fun ImageGenSettings.toDto(): ImageGenSettingsDto = ImageGenSettingsDto(
+    modelId = modelId,
+    aspectRatio = aspectRatio,
+    quality = quality,
+    background = background,
+    imageCount = imageCount,
+)
+
+fun ImageOverrideArgs.toJson(): JsonObject = buildJsonObject {
+    modelId?.let { put("modelId", JsonPrimitive(it)) }
+    aspectRatio?.let { put("aspectRatio", JsonPrimitive(it)) }
+    quality?.let { put("quality", JsonPrimitive(it)) }
+    background?.let { put("background", JsonPrimitive(it)) }
+    imageCount?.let { put("n", JsonPrimitive(it)) }
+}
+
+fun InteractionResponse.toJson(): JsonObject = when (this) {
+    is InteractionResponse.ToolApproval -> buildJsonObject {
+        put("type", JsonPrimitive("tool-approval"))
+        put("approved", JsonPrimitive(approved))
+        reason?.let { put("reason", JsonPrimitive(it)) }
+    }
+    is InteractionResponse.ToolQuestion -> buildJsonObject {
+        put("type", JsonPrimitive("tool-question"))
+        put(
+            "answers",
+            buildJsonArray {
+                answers.forEach { answer ->
+                    add(
+                        buildJsonObject {
+                            put("questionId", JsonPrimitive(answer.questionId))
+                            put("value", JsonPrimitive(answer.value))
+                        },
+                    )
+                }
+            },
+        )
+    }
+}
+
+fun SessionGrant.toWire(): String = when (this) {
+    SessionGrant.Session -> "session"
+}
+
+fun InteractionStatusDto.toAvailability(): InteractionAvailability = when (status) {
+    "pending" -> InteractionAvailability.Pending
+    else -> InteractionAvailability.Unavailable
+}
+
+fun SteerAttachment.toDto(): SteerAttachmentDto =
+    SteerAttachmentDto(mediaType = mediaType, data = data)
+
+fun SteerSnippet.toDto(): SteerSnippetDto =
+    SteerSnippetDto(text = text, sourceRole = sourceRole)
+
+fun QuestionAnswer.toDto(): Map<String, String> = mapOf("questionId" to questionId, "value" to value)
 
 @Serializable
 data class SessionDocumentDto(
@@ -507,15 +632,6 @@ data class ContextSnippetDto(
 )
 
 fun ContextSnippetDto.toSnippet(): ContextSnippet = ContextSnippet(id, text, sourceRole)
-
-@Serializable
-data class ApprovalDecisionDto(val approved: Boolean)
-
-@Serializable
-data class ClarificationResponseDto(
-    val answers: Map<String, List<String>>,
-    val skipped: List<String> = emptyList(),
-)
 
 @Serializable
 data class OkResponseDto(val ok: Boolean = true)

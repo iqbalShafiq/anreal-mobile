@@ -35,6 +35,10 @@ import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import io.ktor.client.HttpClient
 
 class KtorChatRemoteDataSource(
@@ -109,29 +113,54 @@ class KtorChatRemoteDataSource(
         options: ChatRunOptions = ChatRunOptions(),
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> {
+        val modelId = options.model
+        if (modelId.isNullOrBlank()) {
+            return Result.Error(ChatError.Network(DataError.Network.BAD_REQUEST))
+        }
         return httpClient.postJsonl(
             route = "/api/chat",
-            body = ChatRequestDto(
-                sessionId = sessionId,
+            body = SendMessagesRequestDto(
+                type = "messages",
+                metadata = options.toMetadataDto(sessionId),
                 messages = messages.map { it.toHistoryDto(clientMessageId) },
                 resume = resume,
-                model = options.model,
-                reasoningEffort = options.reasoningEffort,
-                webSearchEnabled = options.webSearchEnabled,
-                imageGenerationEnabled = options.imageGenerationEnabled,
             ),
             onLine = onLine,
         ).toChatResult()
     }
 
-    suspend fun loadCatalog(): Result<ModelCatalog, ChatError> {
-        return httpClient.get<ModelCatalogDto>(route = "/api/models")
-            .map { it.toCatalog() }
+    suspend fun answerInteraction(
+        interactionId: String,
+        response: InteractionResponse,
+        options: ChatRunOptions,
+        sessionId: String,
+        onLine: suspend (String) -> Unit,
+    ): EmptyResult<ChatError> {
+        return httpClient.postJsonl(
+            route = "/api/chat",
+            body = InteractionResponseRequestDto(
+                type = "interaction_response",
+                interactionId = interactionId,
+                response = response.toJson(),
+                metadata = options.toMetadataDto(sessionId),
+            ),
+            onLine = onLine,
+        ).toChatResult()
+    }
+
+    suspend fun loadCatalog(outputType: String? = null): Result<ModelCatalog, ChatError> {
+        return httpClient.get<ModelCatalogDto>(
+            route = "/api/models",
+            queryParameters = mapOf("outputType" to outputType),
+        ).map { it.toCatalog() }
             .mapNetwork()
     }
 
-    suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
-        return httpClient.get<CapabilitiesDto>(route = "/api/chat/capabilities")
+    suspend fun loadCapabilities(sessionId: String? = null): Result<ChatCapabilities, ChatError> {
+        return httpClient.get<CapabilitiesDto>(
+            route = "/api/chat/capabilities",
+            queryParameters = mapOf("sessionId" to sessionId),
+        )
             .map { it.toCapabilities() }
             .mapNetwork()
     }
@@ -142,7 +171,12 @@ class KtorChatRemoteDataSource(
             body = SteerRequestDto(
                 sessionId = sessionId,
                 messages = items.map { item ->
-                    SteerMessageDto(clientMessageId = item.id, text = item.text)
+                    SteerMessageDto(
+                        clientMessageId = item.id,
+                        text = item.text,
+                        attachments = item.attachments.map { it.toDto() },
+                        contextSnippet = item.contextSnippet?.toDto(),
+                    )
                 },
             ),
         ).mapError { error ->
@@ -331,20 +365,27 @@ class KtorChatRemoteDataSource(
             queryParameters = mapOf("sessionId" to sessionId),
         ).mapNetwork().asEmptyResult()
 
-    suspend fun decideApproval(approvalId: String, approved: Boolean): EmptyResult<ChatError> =
-        httpClient.post<ApprovalDecisionDto, OkResponseDto>(
-            route = "/api/chat/approvals/$approvalId/decision",
-            body = ApprovalDecisionDto(approved),
-        ).mapNetwork().asEmptyResult()
+    suspend fun getInteractionStatus(interactionId: String): Result<InteractionAvailability, ChatError> {
+        return httpClient.get<InteractionStatusDto>(
+            route = "/api/chat/interactions/$interactionId",
+        ).map { it.toAvailability() }.mapNetwork()
+    }
 
-    suspend fun respondClarification(
-        clarificationId: String,
-        answers: Map<String, List<String>>,
-        skipped: List<String>,
-    ): EmptyResult<ChatError> = httpClient.post<ClarificationResponseDto, OkResponseDto>(
-        route = "/api/chat/clarifications/$clarificationId/response",
-        body = ClarificationResponseDto(answers, skipped),
-    ).mapNetwork().asEmptyResult()
+    suspend fun stageInteractionPolicy(
+        interactionId: String,
+        response: InteractionResponse,
+        grantScope: SessionGrant? = null,
+        overrideArgs: ImageOverrideArgs? = null,
+    ): EmptyResult<ChatError> {
+        return httpClient.post<StageInteractionRequestDto, OkResponseDto>(
+            route = "/api/chat/interactions/$interactionId/stage",
+            body = StageInteractionRequestDto(
+                response = response.toJson(),
+                grantScope = grantScope?.toWire(),
+                overrideArgs = overrideArgs?.toJson(),
+            ),
+        ).mapError { it.toInteractionError() }.asEmptyResult()
+    }
 
     suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return httpClient.get<ProjectListPageDto>(
@@ -373,4 +414,33 @@ private fun Result<Unit, DataError.Network>.toChatResult(): EmptyResult<ChatErro
 private fun DataError.Network.toChatError(): ChatError {
     return if (kind == DataError.Network.Kind.CONFLICT && code == "RUN_ACTIVE") ChatError.RunActive
     else ChatError.Network(this)
+}
+
+private fun DataError.Network.toInteractionError(): ChatError {
+    return when (code) {
+        "INTERACTION_NOT_FOUND" -> ChatError.InteractionNotFound
+        "INTERACTION_EXPIRED" -> ChatError.InteractionExpired
+        "INTERACTION_STATE_CONFLICT",
+        "INTERACTION_POLICY_CONFLICT",
+        "INTERACTION_REPLAYED",
+        "INTERACTION_CLAIMED",
+        -> ChatError.InteractionHandled
+        "INTERACTION_POLICY_UNAVAILABLE" -> ChatError.InteractionPolicyUnavailable
+        "INTERACTION_STAGE_INVALID" -> ChatError.InteractionStageInvalid
+        else -> ChatError.Network(this)
+    }
+}
+
+private fun ChatRunOptions.toMetadataDto(sessionId: String): ChatRequestMetadataDto {
+    val imageSettings = imageGenSettings
+    return ChatRequestMetadataDto(
+        sessionId = sessionId,
+        documentIds = documentIds.distinct(),
+        modelId = model.orEmpty(),
+        reasoningEffort = reasoningEffort,
+        webSearchEnabled = webSearchEnabled,
+        imageGenerationEnabled = imageGenerationEnabled,
+        deepResearchEnabled = deepResearchEnabled,
+        imageGenSettings = imageSettings?.takeIf { imageGenerationEnabled }?.toDto(),
+    )
 }

@@ -11,10 +11,14 @@ import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
+import co.ratmo.anreal.feature.chat.domain.queue.SteerAttachment
+import co.ratmo.anreal.feature.chat.domain.queue.SteerSnippet
 import co.ratmo.anreal.feature.chat.domain.queue.restoreQueue
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 class RoomChatLocalDataSource(
     private val sessionDao: SessionDao,
@@ -55,6 +59,10 @@ class RoomChatLocalDataSource(
                         "Editing" -> QueueStatus.Editing
                         else -> QueueStatus.Pending
                     },
+                    attachments = decodeSteerAttachments(entity.attachmentsJson),
+                    contextSnippet = entity.snippetText?.let { text ->
+                        entity.snippetSourceRole?.let { role -> SteerSnippet(text, role) }
+                    },
                 )
             },
         )
@@ -70,6 +78,9 @@ class RoomChatLocalDataSource(
                     text = item.text,
                     status = item.status.name,
                     position = index,
+                    attachmentsJson = encodeSteerAttachments(item.attachments),
+                    snippetText = item.contextSnippet?.text,
+                    snippetSourceRole = item.contextSnippet?.sourceRole,
                 )
             },
         )
@@ -130,4 +141,25 @@ class RoomChatLocalDataSource(
             totalCount = total,
         )
     }
+}
+
+@Serializable
+private data class StoredSteerAttachment(
+    val mediaType: String = "",
+    val data: String = "",
+)
+
+private val queueJson = Json { ignoreUnknownKeys = true }
+
+private fun encodeSteerAttachments(attachments: List<SteerAttachment>): String {
+    return queueJson.encodeToString(
+        attachments.map { StoredSteerAttachment(it.mediaType, it.data) },
+    )
+}
+
+private fun decodeSteerAttachments(raw: String): List<SteerAttachment> {
+    if (raw.isBlank()) return emptyList()
+    return runCatching {
+        queueJson.decodeFromString<List<StoredSteerAttachment>>(raw)
+    }.getOrDefault(emptyList()).map { SteerAttachment(it.mediaType, it.data) }
 }

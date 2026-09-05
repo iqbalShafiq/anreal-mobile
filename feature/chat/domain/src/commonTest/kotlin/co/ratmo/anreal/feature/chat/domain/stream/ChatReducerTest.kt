@@ -186,7 +186,40 @@ class ChatReducerTest {
             StreamEnvelope.Event("s1", 2, ChatStreamEvent.ApprovalResolved("a1")),
         )
 
-        assertThat(pending.pendingApprovals).isEqualTo(listOf(approval))
-        assertThat(resolved.pendingApprovals).isEqualTo(emptyList())
+        assertThat(pending.pendingInteractions.map { it.id }).isEqualTo(listOf("a1"))
+        assertThat(resolved.pendingInteractions).isEqualTo(emptyList())
+    }
+
+    @Test
+    fun native_interaction_request_resolve_and_stale_update_pending_input() {
+        val interaction = NativeInteraction(
+            id = "i1",
+            toolName = "web_search",
+            kind = InteractionKind.ToolApproval,
+        )
+        val pending = ChatThreadState().reduce(
+            StreamEnvelope.Event("s1", 1, ChatStreamEvent.InteractionRequested(interaction)),
+        )
+        val stale = pending.reduce(
+            StreamEnvelope.Event("s1", 2, ChatStreamEvent.InteractionMarkedStale("i1")),
+        )
+        val resolved = pending.reduce(
+            StreamEnvelope.Event("s1", 2, ChatStreamEvent.InteractionResolved("i1")),
+        )
+
+        assertThat(pending.pendingInteractions).isEqualTo(listOf(interaction))
+        assertThat(stale.pendingInteractions).isEqualTo(emptyList())
+        assertThat(stale.staleInteractionIds).isEqualTo(setOf("i1"))
+        assertThat(resolved.pendingInteractions).isEqualTo(emptyList())
+    }
+
+    @Test
+    fun deep_research_progress_updates_status() {
+        val status = DeepResearchStatus(phase = DeepResearchPhase.Planning, message = "Planning")
+        val state = ChatThreadState().reduce(
+            StreamEnvelope.Event("s1", 1, ChatStreamEvent.DeepResearchProgress(status)),
+        )
+
+        assertThat(state.deepResearch).isEqualTo(status)
     }
 }

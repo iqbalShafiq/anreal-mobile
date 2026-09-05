@@ -31,6 +31,10 @@ import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
+import co.ratmo.anreal.feature.chat.domain.stream.ImageOverrideArgs
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionAvailability
+import co.ratmo.anreal.feature.chat.domain.stream.InteractionResponse
+import co.ratmo.anreal.feature.chat.domain.stream.SessionGrant
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -275,7 +279,7 @@ class StubChatRepository : ChatRepository {
     override fun observeCachedCatalog(): Flow<CachedModelCatalog?> = cachedCatalog
 
     @OptIn(ExperimentalTime::class)
-    override suspend fun refreshCatalog(): Result<ModelCatalog, ChatError> {
+    override suspend fun loadCatalog(outputType: String?): Result<ModelCatalog, ChatError> {
         val refreshedCatalog = cachedCatalog.value?.copy(
             catalog = builtInCatalog,
             lastSuccessfulRefreshEpochMillis = Clock.System.now().toEpochMilliseconds(),
@@ -296,8 +300,14 @@ class StubChatRepository : ChatRepository {
         )
     }
 
-    override suspend fun loadCapabilities(): Result<ChatCapabilities, ChatError> {
-        return Result.Success(ChatCapabilities(webSearchAvailable = true, imageGenerationAvailable = true))
+    override suspend fun loadCapabilities(sessionId: String?): Result<ChatCapabilities, ChatError> {
+        return Result.Success(
+            ChatCapabilities(
+                webSearchAvailable = true,
+                deepResearchAvailable = true,
+                imageGenerationAvailable = true,
+            ),
+        )
     }
 
     override suspend fun listSessionDocuments(sessionId: String): Result<List<SessionDocument>, ChatError> {
@@ -391,15 +401,23 @@ class StubChatRepository : ChatRepository {
         return Result.Success(Unit)
     }
 
-    override suspend fun decideApproval(
-        approvalId: String,
-        approved: Boolean,
+    override suspend fun getInteractionStatus(
+        interactionId: String,
+    ): Result<InteractionAvailability, ChatError> = Result.Success(InteractionAvailability.Pending)
+
+    override suspend fun stageInteractionPolicy(
+        interactionId: String,
+        response: InteractionResponse,
+        grantScope: SessionGrant?,
+        overrideArgs: ImageOverrideArgs?,
     ): EmptyResult<ChatError> = Result.Success(Unit)
 
-    override suspend fun respondClarification(
-        clarificationId: String,
-        answers: Map<String, List<String>>,
-        skipped: List<String>,
+    override suspend fun answerInteraction(
+        sessionId: String,
+        interactionId: String,
+        response: InteractionResponse,
+        options: ChatRunOptions,
+        onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> = Result.Success(Unit)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {

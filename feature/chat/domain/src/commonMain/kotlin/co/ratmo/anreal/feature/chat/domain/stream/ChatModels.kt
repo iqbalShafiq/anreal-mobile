@@ -50,6 +50,73 @@ data class ChatMessage(
     val memoryPosition: Int? = null,
 )
 
+enum class InteractionKind {
+    ToolApproval,
+    ToolQuestion,
+}
+
+data class NativeInteraction(
+    val id: String,
+    val toolName: String,
+    val kind: InteractionKind,
+    val reason: String? = null,
+    val argumentsJson: String = "",
+    val questions: List<InteractionQuestion> = emptyList(),
+)
+
+data class InteractionQuestion(
+    val id: String,
+    val text: String,
+    val choices: List<InteractionChoice> = emptyList(),
+    val allowCustom: Boolean = false,
+)
+
+data class InteractionChoice(
+    val label: String,
+    val value: String,
+)
+
+data class QuestionAnswer(
+    val questionId: String,
+    val value: String,
+)
+
+sealed interface InteractionResponse {
+    data class ToolApproval(
+        val approved: Boolean,
+        val reason: String? = null,
+    ) : InteractionResponse
+
+    data class ToolQuestion(
+        val answers: List<QuestionAnswer>,
+    ) : InteractionResponse
+}
+
+enum class InteractionAvailability {
+    Pending,
+    Unavailable,
+}
+
+data class ImageOverrideArgs(
+    val modelId: String? = null,
+    val aspectRatio: String? = null,
+    val quality: String? = null,
+    val background: String? = null,
+    val imageCount: Int? = null,
+)
+
+enum class SessionGrant {
+    Session,
+}
+
+data class ImageGenSettings(
+    val modelId: String,
+    val aspectRatio: String? = null,
+    val quality: String? = null,
+    val background: String? = null,
+    val imageCount: Int? = null,
+)
+
 enum class RunStatus {
     Idle,
     Streaming,
@@ -70,8 +137,9 @@ data class ChatThreadState(
     val status: RunStatus = RunStatus.Idle,
     val messages: List<ChatMessage> = emptyList(),
     val error: String? = null,
-    val pendingApprovals: List<ToolApproval> = emptyList(),
-    val pendingClarifications: List<Clarification> = emptyList(),
+    val pendingInteractions: List<NativeInteraction> = emptyList(),
+    val staleInteractionIds: Set<String> = emptySet(),
+    val deepResearch: DeepResearchStatus? = null,
 )
 
 data class ToolApproval(
@@ -159,9 +227,26 @@ sealed interface ChatStreamEvent {
     data class ApprovalResolved(val id: String) : ChatStreamEvent
     data class ClarificationRequested(val clarification: Clarification) : ChatStreamEvent
     data class ClarificationResolved(val id: String) : ChatStreamEvent
+    data class InteractionRequested(val interaction: NativeInteraction) : ChatStreamEvent
+    data class InteractionResolved(val id: String) : ChatStreamEvent
+    data class InteractionMarkedStale(val id: String) : ChatStreamEvent
+    data class DeepResearchProgress(val status: DeepResearchStatus) : ChatStreamEvent
     data class Compaction(val phase: String) : ChatStreamEvent
 
     data class Unknown(
         val type: String,
     ) : ChatStreamEvent
 }
+
+enum class DeepResearchPhase {
+    Planning,
+    Researching,
+    Synthesizing,
+    Completed,
+    Failed,
+}
+
+data class DeepResearchStatus(
+    val phase: DeepResearchPhase,
+    val message: String = "",
+)

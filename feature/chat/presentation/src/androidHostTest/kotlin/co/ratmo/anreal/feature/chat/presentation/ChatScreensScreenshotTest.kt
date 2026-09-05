@@ -19,8 +19,10 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatInteractionPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatModelUnavailablePreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatPopulatedPreviewState
+import co.ratmo.anreal.feature.chat.presentation.preview.chatQuestionPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatStreamingPreviewState
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.github.takahirom.roborazzi.captureScreenRoboImage
@@ -132,6 +134,43 @@ class ChatScreensScreenshotTest {
             .performClick()
         assertTrue(actions.lastOrNull() == ChatAction.OnRetryCatalog)
         captureScreenRoboImage()
+    }
+
+    @Test
+    fun interactionApprovalDialogLight() {
+        val actions = mutableListOf<ChatAction>()
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                ChatScreen(
+                    state = chatInteractionPreviewState(),
+                    onAction = { actions += it },
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.APPROVAL_TITLE),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText("web_search").assertIsDisplayed()
+        captureScreenRoboImage()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_ALLOW_ONCE),
+        ).performClick()
+        assertTrue(actions.lastOrNull() is ChatAction.OnInteractionAllowOnce)
+    }
+
+    @Test
+    fun interactionQuestionDialogLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                ChatScreen(state = chatQuestionPreviewState(), onAction = {})
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Which focus?").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Which focus?").captureRoboImage()
     }
 
     @Test

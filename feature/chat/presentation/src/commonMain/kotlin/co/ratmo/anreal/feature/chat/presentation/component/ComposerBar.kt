@@ -150,6 +150,7 @@ internal fun ComposerBar(
                     ) {
                         ComposerAddButton(
                             featuresActive = state.webSearchEnabled ||
+                                state.deepResearchEnabled ||
                                 state.imageGenerationEnabled ||
                                 state.isUploading,
                             onClick = { sheet = ComposerSheet.Features },
