@@ -7,13 +7,20 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import co.ratmo.anreal.feature.chat.presentation.account.AccountRoot
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.Serializable
 
 data class EnterProjectRequest(val projectId: String, val name: String?)
 
+data class ForkSendRequest(val sessionId: String, val firstMessage: String)
+
 @Serializable
 data class ChatRoute(val sessionId: String? = null)
+
+@Serializable
+data class SharedChatRoute(val token: String)
 
 @Serializable
 data object AccountRoute
@@ -25,11 +32,21 @@ fun NavGraphBuilder.chatGraph(
     onNavigateProjects: () -> Unit = {},
     onNavigateDocuments: () -> Unit = {},
     onNavigateImages: () -> Unit = {},
+    onNavigateToLogin: (String) -> Unit = {},
+    onNavigateToRegister: (String) -> Unit = {},
+    onNavigateToSignIn: (String) -> Unit = {},
+    isAuthenticated: Flow<Boolean> = flowOf(false),
     enterProjectRequest: StateFlow<EnterProjectRequest?>,
     onEnterProjectConsumed: () -> Unit,
+    forkSendRequest: StateFlow<ForkSendRequest?>,
+    onForkSendConsumed: () -> Unit,
+    onForkSend: (ForkSendRequest) -> Unit = {},
 ) {
     composable<ChatRoute> {
         val enterProject by enterProjectRequest.collectAsStateWithLifecycle(
+            minActiveState = Lifecycle.State.CREATED,
+        )
+        val forkSend by forkSendRequest.collectAsStateWithLifecycle(
             minActiveState = Lifecycle.State.CREATED,
         )
         ChatRoot(
@@ -41,6 +58,8 @@ fun NavGraphBuilder.chatGraph(
             enterProjectId = enterProject?.projectId,
             enterProjectName = enterProject?.name,
             onEnterProjectConsumed = onEnterProjectConsumed,
+            forkSend = forkSend,
+            onForkSendConsumed = onForkSendConsumed,
         )
     }
     composable<AccountRoute> {
@@ -48,6 +67,21 @@ fun NavGraphBuilder.chatGraph(
             account = account,
             onBack = { navController.popBackStack() },
             onSignOut = onSignOut,
+        )
+    }
+    composable<SharedChatRoute> {
+        SharedChatRoot(
+            onBack = { navController.popBackStack() },
+            onNavigateToChat = { sessionId, firstMessage ->
+                onForkSend(ForkSendRequest(sessionId, firstMessage))
+                navController.navigate(ChatRoute(sessionId = sessionId)) {
+                    popUpTo<ChatRoute> { inclusive = true }
+                    launchSingleTop = true
+                }
+            },
+            onNavigateToLogin = onNavigateToLogin,
+            onNavigateToRegister = onNavigateToRegister,
+            isAuthenticated = isAuthenticated,
         )
     }
 }

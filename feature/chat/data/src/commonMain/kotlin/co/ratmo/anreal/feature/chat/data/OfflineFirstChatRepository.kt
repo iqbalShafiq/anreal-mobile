@@ -9,14 +9,21 @@ import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
+import co.ratmo.anreal.feature.chat.domain.ChatShareLink
+import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ForkResult
+import co.ratmo.anreal.feature.chat.domain.ForkSeed
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
 import co.ratmo.anreal.feature.chat.domain.DocumentStorage
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
+import co.ratmo.anreal.feature.chat.domain.PublicShareSnapshot
+import co.ratmo.anreal.feature.chat.domain.validate
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
@@ -291,6 +298,28 @@ class OfflineFirstChatRepository(
         sessionId: String,
         snippetId: String,
     ): EmptyResult<ChatError> = remote.clearContextSnippet(sessionId, snippetId)
+
+    override suspend fun createChatShare(sessionId: String): Result<ChatShareLink, ChatError> =
+        remote.createShare(sessionId)
+
+    override suspend fun getChatShareStatus(sessionId: String): Result<ChatShareStatus, ChatError> =
+        remote.shareStatus(sessionId)
+
+    override suspend fun getLatestChatShare(sessionId: String): Result<ChatShareLink, ChatError> =
+        remote.latestShare(sessionId)
+
+    override suspend fun deactivateChatShares(sessionId: String): Result<ChatShareDeactivation, ChatError> =
+        remote.deactivateShares(sessionId)
+
+    override suspend fun forkSharedChat(seed: ForkSeed): Result<ForkResult, ChatError> {
+        return when (val validation = seed.validate()) {
+            is Result.Error -> validation
+            is Result.Success -> remote.forkSharedChat(seed)
+        }
+    }
+
+    override suspend fun getPublicShare(token: String): Result<PublicShareSnapshot, ChatError> =
+        remote.publicShare(token)
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return remote.listRecentProjects()

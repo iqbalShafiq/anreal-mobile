@@ -26,6 +26,7 @@ data class RegisterState(
     val email: String = "",
     val password: String = "",
     val confirmPassword: String = "",
+    val rememberMe: Boolean = false,
     val nameError: UiText? = null,
     val emailError: UiText? = null,
     val passwordError: UiText? = null,
@@ -39,6 +40,7 @@ sealed interface RegisterAction {
     data class OnEmailChange(val email: String) : RegisterAction
     data class OnPasswordChange(val password: String) : RegisterAction
     data class OnConfirmPasswordChange(val confirmPassword: String) : RegisterAction
+    data class OnRememberMeChange(val rememberMe: Boolean) : RegisterAction
     data object OnSubmit : RegisterAction
     data object OnLoginClick : RegisterAction
 }
@@ -82,6 +84,7 @@ class RegisterViewModel(
                     it.copy(confirmPassword = action.confirmPassword, confirmError = null, formError = null)
                 }
             }
+            is RegisterAction.OnRememberMeChange -> _state.update { it.copy(rememberMe = action.rememberMe) }
             RegisterAction.OnSubmit -> submit()
             RegisterAction.OnLoginClick -> {
                 viewModelScope.launch {
@@ -120,6 +123,7 @@ class RegisterViewModel(
                 name = current.name.trim(),
                 email = current.email.trim(),
                 password = current.password,
+                rememberMe = current.rememberMe,
             )
                 .onSuccess {
                     _state.update { it.copy(isSubmitting = false) }

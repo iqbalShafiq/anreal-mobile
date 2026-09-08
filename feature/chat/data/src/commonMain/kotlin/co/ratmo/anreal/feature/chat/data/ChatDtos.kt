@@ -11,6 +11,7 @@ import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ModelPrices
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
@@ -104,13 +105,34 @@ data class ModelCatalogDto(
 )
 
 @Serializable
+data class ModelProviderDto(
+    val slug: String = "",
+    val name: String = "",
+)
+
+@Serializable
+data class ModelPricesDto(
+    val input: Double? = null,
+    val cachedInput: Double? = null,
+    val output: Double? = null,
+)
+
+@Serializable
 data class ModelInfoDto(
     val modelId: String,
     val label: String,
     val name: String? = null,
-    val reasoningEfforts: List<String> = emptyList(),
+    val hint: String? = null,
+    val description: String? = null,
+    val iconSvg: String? = null,
+    val provider: ModelProviderDto? = null,
     val contextWindowTokens: Int = 0,
+    val maxInputTokens: Int? = null,
+    val maxOutputTokens: Int? = null,
+    val prices: ModelPricesDto? = null,
+    val reasoningEfforts: List<String> = emptyList(),
     val outputType: String = "text",
+    val inputModalities: List<String> = emptyList(),
 )
 
 @Serializable
@@ -417,17 +439,38 @@ internal fun List<ChatMessage>.mergeToolResultMessages(): List<ChatMessage> {
 fun ModelCatalogDto.toCatalog(): ModelCatalog = ModelCatalog(
     models = models
         .filter { it.outputType != "image" }
-        .map { dto ->
-            ChatModel(
-                id = dto.modelId,
-                label = dto.name?.trim()?.takeIf { it.isNotEmpty() } ?: dto.label,
-                reasoningEfforts = dto.reasoningEfforts,
-                contextWindowTokens = dto.contextWindowTokens,
-            )
-        },
+        .map { dto -> dto.toModel() },
     efforts = reasoningEfforts.map { dto ->
         ReasoningEffort(key = dto.key, label = dto.label, description = dto.description)
     },
+)
+
+fun ModelCatalogDto.toFullCatalog(): ModelCatalog = ModelCatalog(
+    models = models.map { dto -> dto.toModel() },
+    efforts = reasoningEfforts.map { dto ->
+        ReasoningEffort(key = dto.key, label = dto.label, description = dto.description)
+    },
+)
+
+fun ModelCatalogDto.toTextCatalog(): ModelCatalog = toCatalog()
+
+fun ModelCatalogDto.toImageModels(): List<ChatModel> = models
+    .filter { it.outputType == "image" }
+    .map { dto -> dto.toModel() }
+
+private fun ModelInfoDto.toModel(): ChatModel = ChatModel(
+    id = modelId,
+    label = name?.trim()?.takeIf { it.isNotEmpty() } ?: label,
+    reasoningEfforts = reasoningEfforts,
+    contextWindowTokens = contextWindowTokens,
+    outputType = outputType,
+    providerName = provider?.name.orEmpty(),
+    hint = hint,
+    description = description,
+    maxInputTokens = maxInputTokens,
+    maxOutputTokens = maxOutputTokens,
+    prices = prices?.let { ModelPrices(input = it.input, cachedInput = it.cachedInput, output = it.output) },
+    inputModalities = inputModalities,
 )
 
 fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(

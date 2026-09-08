@@ -8,6 +8,7 @@ import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceImage
 import co.ratmo.anreal.feature.workspace.domain.WorkspacePage
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceRepository
 
 class StubWorkspaceRepository : WorkspaceRepository {
@@ -18,8 +19,16 @@ class StubWorkspaceRepository : WorkspaceRepository {
     override suspend fun listProjects(
         query: String?,
         cursor: String?,
-    ): Result<WorkspacePage<Project>, WorkspaceError> =
-        Result.Success(WorkspacePage(projects.filter { query.isNullOrBlank() || it.name.contains(query, true) }, null))
+        sort: WorkspaceProjectSort,
+    ): Result<WorkspacePage<Project>, WorkspaceError> {
+        val filtered = projects.filter { query.isNullOrBlank() || it.name.contains(query, true) }
+        val sorted = when (sort) {
+            WorkspaceProjectSort.Name -> filtered.sortedBy { it.name.lowercase() }
+            WorkspaceProjectSort.LastOpenedAt -> filtered.sortedByDescending { it.lastOpenedAt.orEmpty() }
+            WorkspaceProjectSort.UpdatedAt -> filtered.sortedByDescending { it.updatedAt }
+        }
+        return Result.Success(WorkspacePage(sorted, null))
+    }
 
     override suspend fun createProject(name: String, description: String?): Result<Project, WorkspaceError> {
         val project = Project("project-${projects.size + 1}", name, description, 0, 0, null, "", "")

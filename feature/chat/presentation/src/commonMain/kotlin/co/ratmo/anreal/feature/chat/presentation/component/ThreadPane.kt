@@ -417,11 +417,11 @@ private fun waitingForFirstAssistantToken(state: ChatState): Boolean {
 }
 
 @Composable
-private fun MessageBubble(
+internal fun MessageBubble(
     message: ChatMessage,
     busy: Boolean,
     showActions: Boolean = true,
-    onAction: (ChatAction) -> Unit,
+    onAction: (ChatAction) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == ChatRole.User

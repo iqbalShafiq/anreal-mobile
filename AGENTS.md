@@ -10,7 +10,7 @@ Anreal is the **Kotlin Multiplatform client** of `chat-with-document`. Android s
 
 - This repo is a **client**. No agent runtime, no Prisma, no Anvia React.
 - Talk to the existing Hono API. Do not invent endpoints.
-- Auth is Better Auth email/password with the Bearer plugin. Read `set-auth-token` after sign-in/sign-up, persist the token through the encrypted `SessionTokenStore`, and send `Authorization: Bearer <token>`. A legacy `Set-Cookie` parser may remain only as a migration fallback; authenticated mobile requests do not send browser cookies.
+- Auth is Better Auth email/password with the Bearer plugin. Read `set-auth-token` after sign-in/sign-up, persist the token through the encrypted `SessionTokenStore`, and send `Authorization: Bearer <token>`. A legacy `Set-Cookie` parser may remain only as a migration fallback; authenticated mobile requests do not send browser cookies. Login and register may send `rememberMe`. The only unauthenticated product call is `GET /api/shares/{token}`.
 - Display name: **Anreal**. Visual language: DocChat (aurora, frost, amber *seed*).
 
 ---
@@ -160,6 +160,7 @@ Read `DESIGN.md` before writing UI.
 - **Boarding → Login / Register** is a one-way vertical **pager**: boarding is replaced by the form and both move **up**. Login and Register have no back affordance and system back must not reveal boarding. **Login ↔ Register** is the same replace-current strip (login → register up, register → login down). No fade. Hide the IME before this navigate.
 - **Auth → Chat** slides forward (right → left). Logout / pop to **boarding** is the reverse.
 - **Chat → Account** is the same horizontal push. Account is opened from the left-drawer account footer (the whole row). The Account root follows the Pen design's drill-down menu: grouped account, preference, support, and danger surfaces lead to full-width detail sections with 160ms directional content motion. Logout stays as a destructive row in the Account content, never in the drawer menu.
+- **Chat → Shared chat** (`SharedChatRoute(token)`) is the same horizontal push. Opening a public `/share/{token}` deep link lands on that route. Fork-on-send replaces the current Chat destination with `ChatRoute(sessionId)` so a second Chat is never stacked. `GET /api/shares/{token}` is the only unauthenticated API call; it uses the per-request skip-auth flag and never sends `Authorization`.
 - One `AnrealAtmosphere` wraps the `NavHost`. Nested calls do not remount aurora: `Aurora` is passthrough, while Workspace and Account request a solid dynamic `surface`; Chat crossfades from aurora to surface after the new-chat draft receives its first message.
 
 ---

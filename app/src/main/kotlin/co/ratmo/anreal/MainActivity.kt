@@ -19,9 +19,14 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = splashBars,
             navigationBarStyle = splashBars,
         )
+        val sharedToken = intent?.data?.takeIf { it.pathSegments.firstOrNull() == "share" }
+            ?.pathSegments?.getOrNull(1)
 
         setContent {
-            App(buildInfo = AppBuildInfo(versionName = BuildConfig.VERSION_NAME))
+            App(
+                buildInfo = AppBuildInfo(versionName = BuildConfig.VERSION_NAME),
+                sharedToken = sharedToken,
+            )
         }
     }
 }

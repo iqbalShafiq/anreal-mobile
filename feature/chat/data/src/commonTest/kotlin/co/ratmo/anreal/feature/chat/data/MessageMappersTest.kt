@@ -141,6 +141,37 @@ class MessageMappersTest {
     }
 
     @Test
+    fun catalog_maps_rich_model_fields_and_image_models() {
+        val catalog = ModelCatalogDto(
+            models = listOf(
+                ModelInfoDto(
+                    modelId = "chat-1",
+                    label = "Luna",
+                    hint = "Balanced",
+                    description = "Balanced reasoning and speed.",
+                    provider = ModelProviderDto(slug = "openai", name = "OpenAI"),
+                    contextWindowTokens = 200_000,
+                    maxInputTokens = 100_000,
+                    maxOutputTokens = 8_000,
+                    prices = ModelPricesDto(input = 1.25, output = 10.0),
+                    inputModalities = listOf("text", "image"),
+                ),
+                ModelInfoDto(modelId = "img-1", label = "Flux", outputType = "image"),
+            ),
+            reasoningEfforts = listOf(ReasoningEffortDto(key = "high", label = "High")),
+        )
+
+        assertThat(catalog.toCatalog().models.map { it.id }).isEqualTo(listOf("chat-1"))
+        val model = catalog.toFullCatalog().models.first { it.id == "chat-1" }
+        assertThat(model.providerName).isEqualTo("OpenAI")
+        assertThat(model.hint).isEqualTo("Balanced")
+        assertThat(model.maxInputTokens).isEqualTo(100_000)
+        assertThat(model.prices?.input).isEqualTo(1.25)
+        assertThat(model.inputModalities).isEqualTo(listOf("text", "image"))
+        assertThat(catalog.toImageModels().map { it.id }).isEqualTo(listOf("img-1"))
+    }
+
+    @Test
     fun history_dto_maps_tool_content() {
         val dto = historyMessageDto(
             role = "assistant",

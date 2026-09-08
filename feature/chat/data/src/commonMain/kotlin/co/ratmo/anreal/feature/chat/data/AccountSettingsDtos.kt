@@ -58,6 +58,8 @@ data class ModelUsageDto(
     val model: String,
     val requestCount: Long,
     val totalTokens: Long,
+    val inputTokens: Long = 0,
+    val outputTokens: Long = 0,
 )
 
 @Serializable
@@ -92,6 +94,13 @@ data class ExplicitFactDto(
     val section: String? = null,
     val fact: String,
     val createdAt: String,
+    val source: FactSourceDto? = null,
+)
+
+@Serializable
+data class FactSourceDto(
+    val sessionId: String? = null,
+    val messageId: String? = null,
 )
 
 fun UsageSummaryDto.toUsageSummary(): UsageSummary = UsageSummary(
@@ -109,7 +118,7 @@ fun UsageSummaryDto.toUsageSummary(): UsageSummary = UsageSummary(
             output = tokens.composition.output,
         ),
     ),
-    byModel = byModel.map { ModelUsage(it.model, it.requestCount, it.totalTokens) },
+    byModel = byModel.map { ModelUsage(it.model, it.requestCount, it.totalTokens, it.inputTokens, it.outputTokens) },
     byReasoningEffort = byReasoningEffort.map {
         ReasoningUsage(it.reasoningEffort, it.requestCount, it.totalTokens)
     },
@@ -124,7 +133,13 @@ fun ProfilingSettingsDto.toPersonalizationSettings(): PersonalizationSettings =
 private fun ProfileDto.toProfile(): PersonalizationProfile = PersonalizationProfile(
     sections = PROFILE_SECTION_KEYS.associateWith { key -> sections[key].toProfileBullets() },
     explicitFacts = explicitFacts.map {
-        ExplicitProfileFact(section = it.section, fact = it.fact, createdAt = it.createdAt)
+        ExplicitProfileFact(
+            section = it.section,
+            fact = it.fact,
+            createdAt = it.createdAt,
+            sourceSessionId = it.source?.sessionId,
+            sourceMessageId = it.source?.messageId,
+        )
     },
     updatedAt = updatedAt,
 )

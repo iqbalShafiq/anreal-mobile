@@ -8,6 +8,12 @@ data class WorkspacePage<T>(
     val nextCursor: String?,
 )
 
+enum class WorkspaceProjectSort(val wire: String) {
+    UpdatedAt("updatedAt"),
+    LastOpenedAt("lastOpenedAt"),
+    Name("name"),
+}
+
 data class Project(
     val id: String,
     val name: String,

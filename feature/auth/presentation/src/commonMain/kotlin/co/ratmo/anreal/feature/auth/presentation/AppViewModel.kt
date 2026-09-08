@@ -7,8 +7,10 @@ import co.ratmo.anreal.core.domain.model.AppPreferences
 import co.ratmo.anreal.core.domain.model.AppPreferencesRepository
 import co.ratmo.anreal.feature.auth.domain.AuthSession
 import co.ratmo.anreal.feature.auth.domain.SessionStatus
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -31,8 +33,15 @@ class AppViewModel(
         started = SharingStarted.Eagerly,
         initialValue = null,
     )
+    val isSignedIn: StateFlow<Boolean> = status.mapSignedIn().stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = false,
+    )
 
     fun signOut() {
         viewModelScope.launch { authSession.signOut() }
     }
 }
+
+private fun StateFlow<SessionStatus>.mapSignedIn(): Flow<Boolean> = map { it is SessionStatus.SignedIn }

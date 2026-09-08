@@ -29,6 +29,8 @@ data class ModelUsage(
     val model: String,
     val requestCount: Long,
     val totalTokens: Long,
+    val inputTokens: Long = 0,
+    val outputTokens: Long = 0,
 )
 
 data class ReasoningUsage(
@@ -53,6 +55,8 @@ data class ExplicitProfileFact(
     val section: String?,
     val fact: String,
     val createdAt: String,
+    val sourceSessionId: String? = null,
+    val sourceMessageId: String? = null,
 )
 
 data class PersonalizationProfile(

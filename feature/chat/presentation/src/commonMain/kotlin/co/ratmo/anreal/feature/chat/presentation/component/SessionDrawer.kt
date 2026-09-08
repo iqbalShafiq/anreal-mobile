@@ -135,6 +135,10 @@ internal fun SessionDrawer(
                                     selected = session.id == state.selectedSessionId,
                                     onClick = { onAction(ChatAction.OnSessionClick(session.id)) },
                                     onRename = { onAction(ChatAction.OnSessionMenuRename(session.id)) },
+                                    onShare = {
+                                        onAction(ChatAction.OnSessionClick(session.id))
+                                        onAction(ChatAction.OnOpenShare)
+                                    },
                                     onDelete = { onAction(ChatAction.OnSessionMenuDelete(session.id)) },
                                 )
                             }
@@ -343,6 +347,7 @@ internal fun SessionRow(
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
+    onShare: () -> Unit = {},
     menuExpanded: Boolean? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -364,6 +369,7 @@ internal fun SessionRow(
             onToggleMenu = { if (menuExpanded == null) expanded = true },
             onDismissMenu = { if (menuExpanded == null) expanded = false },
             onRename = onRename,
+            onShare = onShare,
             onDelete = onDelete,
         )
     }
@@ -377,6 +383,7 @@ private fun SessionRowContent(
     onToggleMenu: () -> Unit,
     onDismissMenu: () -> Unit,
     onRename: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Row(
@@ -420,6 +427,13 @@ private fun SessionRowContent(
                     onClick = {
                         onDismissMenu()
                         onRename()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(AnrealCopy.get(AnrealCopy.ACTION_SHARE)) },
+                    onClick = {
+                        onDismissMenu()
+                        onShare()
                     },
                 )
                 DropdownMenuItem(

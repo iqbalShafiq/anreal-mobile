@@ -16,6 +16,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatShareLink
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
@@ -147,6 +148,12 @@ data class ModelUnavailableUi(
     val label: String,
 )
 
+data class ChatShareLinkUi(
+    val token: String,
+    val urlPath: String,
+    val title: String?,
+)
+
 data class CitedDocumentUi(
     val id: String,
     val filename: String,
@@ -215,6 +222,14 @@ data class ChatState(
     val humanInputBusy: Boolean = false,
     val activeProjectId: String? = null,
     val activeProjectName: String? = null,
+    val shareOpen: Boolean = false,
+    val shareStatusActive: Boolean? = null,
+    val shareLoading: Boolean = false,
+    val shareError: UiText? = null,
+    val latestShare: ChatShareLinkUi? = null,
+    val isCreatingShare: Boolean = false,
+    val isDeactivatingShares: Boolean = false,
+    val showDeactivateConfirm: Boolean = false,
 ) {
     val inProject: Boolean get() = activeProjectId != null
 }
@@ -306,6 +321,15 @@ sealed interface ChatAction {
     data class OnOpenRecentProject(val projectId: String) : ChatAction
     data class OnEnterProject(val projectId: String, val name: String?) : ChatAction
     data class OnRemoveActiveDocument(val documentId: String) : ChatAction
+    data class OnForkSend(val sessionId: String, val firstMessage: String) : ChatAction
+    data object OnOpenShare : ChatAction
+    data object OnDismissShare : ChatAction
+    data object OnCreateShare : ChatAction
+    data object OnCopyShareLink : ChatAction
+    data object OnRequestDeactivateShares : ChatAction
+    data object OnDismissDeactivateShares : ChatAction
+    data object OnConfirmDeactivateShares : ChatAction
+    data object OnRetryShare : ChatAction
 }
 
 sealed interface ChatEvent {
@@ -504,6 +528,21 @@ class ChatViewModel(
             is ChatAction.OnRemoveActiveDocument -> viewModelScope.launch {
                 unlinkDocument(action.documentId)
             }
+            is ChatAction.OnForkSend -> viewModelScope.launch {
+                forkSend(action.sessionId, action.firstMessage)
+            }
+            ChatAction.OnOpenShare -> viewModelScope.launch { openShare() }
+            ChatAction.OnDismissShare -> _state.update {
+                it.copy(shareOpen = false, shareError = null, showDeactivateConfirm = false)
+            }
+            ChatAction.OnCreateShare -> viewModelScope.launch { createShare() }
+            ChatAction.OnCopyShareLink -> viewModelScope.launch { copyShareLink() }
+            ChatAction.OnRequestDeactivateShares -> _state.update { it.copy(showDeactivateConfirm = true) }
+            ChatAction.OnDismissDeactivateShares -> if (!_state.value.isDeactivatingShares) {
+                _state.update { it.copy(showDeactivateConfirm = false) }
+            }
+            ChatAction.OnConfirmDeactivateShares -> viewModelScope.launch { deactivateShares() }
+            ChatAction.OnRetryShare -> viewModelScope.launch { loadShareStatus() }
         }
     }
 
@@ -515,8 +554,12 @@ class ChatViewModel(
         refreshSessions()
         // A fresh launch always starts on a New chat draft. Rejoin a live run
         // so a process death mid-stream does not drop the in-flight answer.
+        // A deep-linked or forked ChatRoute carries sessionId in SavedStateHandle.
+        val requestedSessionId = savedStateHandle.get<String>(SESSION_KEY)
         if (activeSessionId != null) {
             selectSession(activeSessionId)
+        } else if (!requestedSessionId.isNullOrBlank()) {
+            selectSession(requestedSessionId)
         } else {
             openDraft()
         }
@@ -1109,6 +1152,15 @@ class ChatViewModel(
 
     private fun isStreaming(state: ChatState): Boolean {
         return state.isSending || state.thread.status == RunStatus.Streaming
+    }
+
+    private suspend fun forkSend(sessionId: String, firstMessage: String) {
+        if (firstMessage.isBlank()) return
+        if (_state.value.selectedSessionId != sessionId) {
+            selectSession(sessionId)
+        }
+        setDraft(firstMessage)
+        sendText(firstMessage.trim(), newClientMessageId())
     }
 
     private suspend fun submitComposer() {
@@ -1709,6 +1761,92 @@ class ChatViewModel(
             }
     }
 
+    private suspend fun openShare() {
+        if (_state.value.thread.messages.isEmpty()) return
+        val sessionId = _state.value.selectedSessionId ?: return
+        _state.update {
+            it.copy(shareOpen = true, shareLoading = true, shareError = null, showDeactivateConfirm = false)
+        }
+        loadShareStatus(sessionId)
+    }
+
+    private suspend fun loadShareStatus(sessionId: String? = _state.value.selectedSessionId) {
+        val currentSessionId = sessionId ?: return
+        _state.update { it.copy(shareLoading = true, shareError = null) }
+        when (val status = chatRepository.getChatShareStatus(currentSessionId)) {
+            is Result.Success -> {
+                _state.update { it.copy(shareStatusActive = status.data.active) }
+                if (status.data.active) {
+                    when (val latest = chatRepository.getLatestChatShare(currentSessionId)) {
+                        is Result.Success -> _state.update {
+                            it.copy(
+                                shareLoading = false,
+                                latestShare = latest.data.toUi(),
+                            )
+                        }
+                        is Result.Error -> _state.update {
+                            it.copy(shareLoading = false, shareError = latest.error.toUiText())
+                        }
+                    }
+                } else {
+                    _state.update { it.copy(shareLoading = false, latestShare = null) }
+                }
+            }
+            is Result.Error -> _state.update {
+                it.copy(shareLoading = false, shareError = status.error.toUiText())
+            }
+        }
+    }
+
+    private suspend fun createShare() {
+        val sessionId = _state.value.selectedSessionId ?: return
+        if (_state.value.isCreatingShare) return
+        _state.update { it.copy(isCreatingShare = true, shareError = null) }
+        when (val result = chatRepository.createChatShare(sessionId)) {
+            is Result.Success -> {
+                _state.update {
+                    it.copy(
+                        isCreatingShare = false,
+                        shareStatusActive = true,
+                        latestShare = result.data.toUi(),
+                    )
+                }
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_SHARE_CREATED)))
+            }
+            is Result.Error -> _state.update {
+                it.copy(isCreatingShare = false, shareError = result.error.toUiText())
+            }
+        }
+    }
+
+    private suspend fun copyShareLink() {
+        val link = _state.value.latestShare ?: return
+        _events.send(ChatEvent.CopyText(link.urlPath))
+        _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_SHARE_LINK_COPIED)))
+    }
+
+    private suspend fun deactivateShares() {
+        val sessionId = _state.value.selectedSessionId ?: return
+        if (_state.value.isDeactivatingShares) return
+        _state.update { it.copy(isDeactivatingShares = true, shareError = null) }
+        when (val result = chatRepository.deactivateChatShares(sessionId)) {
+            is Result.Success -> {
+                _state.update {
+                    it.copy(
+                        isDeactivatingShares = false,
+                        showDeactivateConfirm = false,
+                        shareStatusActive = false,
+                        latestShare = null,
+                    )
+                }
+                _events.send(ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.TOAST_SHARES_DEACTIVATED)))
+            }
+            is Result.Error -> _state.update {
+                it.copy(isDeactivatingShares = false, shareError = result.error.toUiText())
+            }
+        }
+    }
+
     private suspend fun loadSessionDocuments(sessionId: String) {
         chatRepository.listSessionDocuments(sessionId)
             .onSuccess { documents ->
@@ -1914,6 +2052,12 @@ private fun ChatSession.toUi(): ChatSessionUi = ChatSessionUi(
 )
 
 private fun RecentProject.toUi(): RecentProjectUi = RecentProjectUi(id = id, name = name)
+
+private fun ChatShareLink.toUi(): ChatShareLinkUi = ChatShareLinkUi(
+    token = token,
+    urlPath = urlPath,
+    title = title,
+)
 
 private fun SessionDocument.toUi(): SessionDocumentUi = SessionDocumentUi(
     id = id,

@@ -59,8 +59,8 @@ class ModelCatalogCacheTest {
 
         assertThat(dao.models.value).isEqualTo(
             listOf(
-                ModelCatalogModelEntity("slow", "Slow", 200_000, 0),
-                ModelCatalogModelEntity("fast", "Fast", 128_000, 1),
+                ModelCatalogModelEntity("slow", "Slow", 200_000, 0, "text", "", null, null, null, null, null, null, null, ""),
+                ModelCatalogModelEntity("fast", "Fast", 128_000, 1, "text", "", null, null, null, null, null, null, null, ""),
             ),
         )
         assertThat(dao.efforts.value).isEqualTo(

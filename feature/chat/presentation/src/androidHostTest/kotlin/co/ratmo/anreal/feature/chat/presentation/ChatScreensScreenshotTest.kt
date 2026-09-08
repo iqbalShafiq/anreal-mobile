@@ -18,6 +18,7 @@ import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatPart
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatThreadState
+import co.ratmo.anreal.feature.chat.domain.PublicShareSnapshot
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatInteractionPreviewState
 import co.ratmo.anreal.feature.chat.presentation.preview.chatModelUnavailablePreviewState
@@ -209,6 +210,138 @@ class ChatScreensScreenshotTest {
         ).performClick()
         assertTrue(actions.lastOrNull() == ChatAction.OnDismissModelUnavailable)
         composeTestRule.onNodeWithText(AnrealCopy.get(AnrealCopy.MODELS_EMPTY)).assertIsDisplayed()
+    }
+
+    @Test
+    fun shareDialogWithLinkLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                ChatScreen(
+                    state = chatPopulatedPreviewState().copy(
+                        shareOpen = true,
+                        shareStatusActive = true,
+                        latestShare = ChatShareLinkUi("tok", "/share/tok", "Notes"),
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.DIALOG_SHARE_TITLE),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText("/share/tok").assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_COPY_LINK),
+        ).assertIsDisplayed()
+        captureScreenRoboImage()
+    }
+
+    @Test
+    fun sharedChatPopulatedLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                SharedChatScreen(
+                    state = SharedChatState(
+                        token = "tok",
+                        isLoading = false,
+                        isAuthenticated = true,
+                        snapshot = PublicShareSnapshot(
+                            token = "tok",
+                            title = "Q3 revenue notes",
+                            createdAt = "now",
+                            ownerName = "Ada",
+                            messages = listOf(
+                                ChatMessage(
+                                    id = "share-0",
+                                    role = ChatRole.User,
+                                    parts = listOf(ChatPart.Text("share-0-0", "Summarize the PDF.")),
+                                    isComplete = true,
+                                ),
+                            ),
+                        ),
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Summarize the PDF.").assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.SHARED_CHAT_FORK_CHIP),
+        ).assertIsDisplayed()
+        captureScreenRoboImage()
+    }
+
+    @Test
+    fun sharedChatGuestGateLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                SharedChatScreen(
+                    state = SharedChatState(
+                        token = "tok",
+                        isLoading = false,
+                        isAuthenticated = false,
+                        snapshot = PublicShareSnapshot(
+                            token = "tok",
+                            title = "Q3 revenue notes",
+                            createdAt = "now",
+                            ownerName = "Ada",
+                            messages = listOf(
+                                ChatMessage(
+                                    id = "share-0",
+                                    role = ChatRole.User,
+                                    parts = listOf(ChatPart.Text("share-0-0", "Summarize the PDF.")),
+                                    isComplete = true,
+                                ),
+                            ),
+                        ),
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.SHARED_CHAT_GATE_BODY),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_SIGN_IN),
+        ).assertIsDisplayed()
+        captureScreenRoboImage()
+    }
+
+    @Test
+    fun sharedChatErrorShowsRetry() {
+        val actions = mutableListOf<SharedChatAction>()
+        composeTestRule.setContent {
+            AnrealPreview(dark = false) {
+                SharedChatScreen(
+                    state = SharedChatState(
+                        token = "dead",
+                        isLoading = false,
+                        error = UiText.StringResource(AnrealCopy.ERROR_SHARE_NOT_FOUND),
+                    ),
+                    onAction = { actions += it },
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ERROR_SHARE_NOT_FOUND),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_RETRY),
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            AnrealCopy.get(AnrealCopy.ACTION_RETRY),
+        ).performClick()
+        assertTrue(actions.lastOrNull() == SharedChatAction.OnRetry)
+        captureScreenRoboImage()
     }
 
     @Test

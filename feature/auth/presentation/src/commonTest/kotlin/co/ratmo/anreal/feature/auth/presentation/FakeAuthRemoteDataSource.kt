@@ -13,7 +13,7 @@ class FakeAuthRemoteDataSource : AuthRemoteDataSource {
     var signUpResult: Result<User, AuthError> = signInResult
     var signedInEmail: String? = null
 
-    override suspend fun signIn(email: String, password: String): Result<User, AuthError> {
+    override suspend fun signIn(email: String, password: String, rememberMe: Boolean): Result<User, AuthError> {
         signedInEmail = email
         return signInResult
     }
@@ -22,6 +22,7 @@ class FakeAuthRemoteDataSource : AuthRemoteDataSource {
         name: String,
         email: String,
         password: String,
+        rememberMe: Boolean,
     ): Result<User, AuthError> {
         signedInEmail = email
         return signUpResult

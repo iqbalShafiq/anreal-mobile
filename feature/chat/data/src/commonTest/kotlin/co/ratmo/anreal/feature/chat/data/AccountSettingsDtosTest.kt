@@ -31,4 +31,27 @@ class AccountSettingsDtosTest {
 
         assertThat(dto.toUsageSummary().tokens.totalTokens).isEqualTo(4_000_000_005L)
     }
+
+    @Test
+    fun usage_mapper_keeps_per_model_input_output_breakdown() {
+        val dto = json.decodeFromString<UsageSummaryDto>(
+            """{"storage":{"usedBytes":1,"maxBytes":2,"remainingBytes":1},"tokens":{"requestCount":3,"inputTokens":10,"outputTokens":5,"totalTokens":15,"cachedInputTokens":2,"cacheCreationInputTokens":1,"composition":{"inputUncached":8,"cacheRead":2,"output":5}},"byModel":[{"model":"meta/muse-spark-1.3-contributor","requestCount":2,"totalTokens":12,"inputTokens":9,"outputTokens":3}],"byReasoningEffort":[]}""",
+        )
+
+        val model = dto.toUsageSummary().byModel.single()
+        assertThat(model.model).isEqualTo("meta/muse-spark-1.3-contributor")
+        assertThat(model.inputTokens).isEqualTo(9L)
+        assertThat(model.outputTokens).isEqualTo(3L)
+    }
+
+    @Test
+    fun profile_mapper_keeps_explicit_fact_source() {
+        val dto = json.decodeFromString<ProfilingSettingsDto>(
+            """{"user":{"sections":{},"explicitFacts":[{"section":"identity","fact":"Prefers Kotlin","createdAt":"now","source":{"sessionId":"s1","messageId":"m1"}}],"updatedAt":"now"},"projects":[]}""",
+        )
+
+        val fact = dto.toPersonalizationSettings().user?.explicitFacts?.single() ?: error("fact expected")
+        assertThat(fact.sourceSessionId).isEqualTo("s1")
+        assertThat(fact.sourceMessageId).isEqualTo("m1")
+    }
 }

@@ -11,6 +11,11 @@ sealed interface ChatError : Error {
     data object InteractionHandled : ChatError
     data object InteractionPolicyUnavailable : ChatError
     data object InteractionStageInvalid : ChatError
+    data object ShareNotFound : ChatError
+    data object NoActiveShare : ChatError
+    data object ForkTargetNotFound : ChatError
+    data object InvalidForkRequest : ChatError
+    data object ShareUnavailable : ChatError
     data class Network(val error: DataError.Network) : ChatError
     data class Local(val error: DataError.Local) : ChatError
 }

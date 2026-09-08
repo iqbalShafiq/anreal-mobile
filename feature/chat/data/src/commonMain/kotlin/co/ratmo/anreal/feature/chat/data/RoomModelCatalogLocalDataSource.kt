@@ -7,6 +7,7 @@ import co.ratmo.anreal.core.database.ModelCatalogModelEntity
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
+import co.ratmo.anreal.feature.chat.domain.ModelPrices
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -41,6 +42,14 @@ class RoomModelCatalogLocalDataSource(
                                         .map { it.effortKey }
                                         .toList(),
                                     contextWindowTokens = model.contextWindowTokens,
+                                    outputType = model.outputType,
+                                    providerName = model.providerName,
+                                    hint = model.hint,
+                                    description = model.description,
+                                    maxInputTokens = model.maxInputTokens,
+                                    maxOutputTokens = model.maxOutputTokens,
+                                    prices = model.toPrices(),
+                                    inputModalities = model.toModalities(),
                                 )
                             },
                         efforts = effortRows
@@ -70,6 +79,16 @@ class RoomModelCatalogLocalDataSource(
                     label = model.label,
                     contextWindowTokens = model.contextWindowTokens,
                     position = position,
+                    outputType = model.outputType,
+                    providerName = model.providerName,
+                    hint = model.hint,
+                    description = model.description,
+                    maxInputTokens = model.maxInputTokens,
+                    maxOutputTokens = model.maxOutputTokens,
+                    priceInput = model.prices?.input,
+                    priceCachedInput = model.prices?.cachedInput,
+                    priceOutput = model.prices?.output,
+                    inputModalities = model.inputModalities.joinToString(","),
                 )
             },
             efforts = catalog.efforts.mapIndexed { position, effort ->
@@ -97,3 +116,11 @@ class RoomModelCatalogLocalDataSource(
         dao.upsertSelection(modelId, reasoningEffort)
     }
 }
+
+private fun ModelCatalogModelEntity.toPrices(): ModelPrices? {
+    if (priceInput == null && priceCachedInput == null && priceOutput == null) return null
+    return ModelPrices(input = priceInput, cachedInput = priceCachedInput, output = priceOutput)
+}
+
+private fun ModelCatalogModelEntity.toModalities(): List<String> =
+    inputModalities.split(",").map { it.trim() }.filter { it.isNotEmpty() }

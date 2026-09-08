@@ -68,6 +68,7 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Add
 import com.composables.icons.materialsymbols.rounded.Arrow_back
@@ -181,7 +182,10 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (state.section == WorkspaceSection.Projects) {
-                        FilterChips()
+                        ProjectSortChips(
+                            selected = state.projectSort,
+                            onSelect = { onAction(WorkspaceAction.SetProjectSort(it)) },
+                        )
                     } else if (state.section == WorkspaceSection.Images) {
                         ViewModeToggle(
                             selected = state.viewMode,
@@ -850,33 +854,37 @@ private fun WorkspaceLoadedLabel(
 }
 
 @Composable
-private fun FilterChips() {
+private fun ProjectSortChips(
+    selected: WorkspaceProjectSort,
+    onSelect: (WorkspaceProjectSort) -> Unit,
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs)) {
         val chips = listOf(
-            AnrealCopy.get(AnrealCopy.LABEL_FILTER_ALL) to true,
-            AnrealCopy.get(AnrealCopy.LABEL_FILTER_RECENT) to false,
-            AnrealCopy.get(AnrealCopy.LABEL_FILTER_SHARED) to false,
+            AnrealCopy.get(AnrealCopy.LABEL_SORT_UPDATED) to WorkspaceProjectSort.UpdatedAt,
+            AnrealCopy.get(AnrealCopy.LABEL_SORT_OPENED) to WorkspaceProjectSort.LastOpenedAt,
+            AnrealCopy.get(AnrealCopy.LABEL_SORT_NAME) to WorkspaceProjectSort.Name,
         )
-        chips.forEach { (label, selected) ->
+        chips.forEach { (label, sort) ->
+            val isSelected = sort == selected
             Surface(
-                onClick = {},
+                onClick = { onSelect(sort) },
                 modifier = Modifier
                     .widthIn(min = AnrealSpacing.chipMinWidth)
                     .heightIn(min = AnrealSpacing.touch),
                 shape = MaterialTheme.shapes.extraLarge,
-                color = if (selected) {
+                color = if (isSelected) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
                     MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.82f)
                 },
-                contentColor = if (selected) {
+                contentColor = if (isSelected) {
                     MaterialTheme.colorScheme.onPrimaryContainer
                 } else {
                     MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 border = androidx.compose.foundation.BorderStroke(
                     width = 1.dp,
-                    color = if (selected) {
+                    color = if (isSelected) {
                         MaterialTheme.colorScheme.primary.copy(alpha = 0.48f)
                     } else {
                         MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.56f)

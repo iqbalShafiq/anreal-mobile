@@ -187,6 +187,12 @@ interface ChatRepository {
         sourceRole: String,
     ): Result<ContextSnippet, ChatError>
     suspend fun clearContextSnippet(sessionId: String, snippetId: String): EmptyResult<ChatError>
+    suspend fun createChatShare(sessionId: String): Result<ChatShareLink, ChatError>
+    suspend fun getChatShareStatus(sessionId: String): Result<ChatShareStatus, ChatError>
+    suspend fun getLatestChatShare(sessionId: String): Result<ChatShareLink, ChatError>
+    suspend fun deactivateChatShares(sessionId: String): Result<ChatShareDeactivation, ChatError>
+    suspend fun forkSharedChat(seed: ForkSeed): Result<ForkResult, ChatError>
+    suspend fun getPublicShare(token: String): Result<PublicShareSnapshot, ChatError>
     suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError>
     suspend fun openProject(id: String): Result<RecentProject, ChatError>
 }

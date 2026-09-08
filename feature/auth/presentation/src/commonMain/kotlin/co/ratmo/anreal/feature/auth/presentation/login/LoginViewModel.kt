@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 data class LoginState(
     val email: String = "",
     val password: String = "",
+    val rememberMe: Boolean = false,
     val emailError: UiText? = null,
     val passwordError: UiText? = null,
     val formError: UiText? = null,
@@ -31,6 +32,7 @@ data class LoginState(
 sealed interface LoginAction {
     data class OnEmailChange(val email: String) : LoginAction
     data class OnPasswordChange(val password: String) : LoginAction
+    data class OnRememberMeChange(val rememberMe: Boolean) : LoginAction
     data object OnSubmit : LoginAction
     data object OnRegisterClick : LoginAction
 }
@@ -62,6 +64,7 @@ class LoginViewModel(
             is LoginAction.OnPasswordChange -> {
                 _state.update { it.copy(password = action.password, passwordError = null, formError = null) }
             }
+            is LoginAction.OnRememberMeChange -> _state.update { it.copy(rememberMe = action.rememberMe) }
             LoginAction.OnSubmit -> submit()
             LoginAction.OnRegisterClick -> {
                 viewModelScope.launch {
@@ -88,7 +91,7 @@ class LoginViewModel(
 
         viewModelScope.launch {
             _state.update { it.copy(isSubmitting = true) }
-            authRemoteDataSource.signIn(current.email.trim(), current.password)
+            authRemoteDataSource.signIn(current.email.trim(), current.password, current.rememberMe)
                 .onSuccess {
                     _state.update { it.copy(isSubmitting = false) }
                     _events.send(LoginEvent.NavigateHome)

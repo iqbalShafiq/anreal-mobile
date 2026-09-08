@@ -14,6 +14,7 @@ import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceImage
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -92,6 +93,7 @@ sealed interface WorkspaceCardSheetTarget {
 data class WorkspaceState(
     val section: WorkspaceSection = WorkspaceSection.Projects,
     val viewMode: WorkspaceViewMode = WorkspaceViewMode.List,
+    val projectSort: WorkspaceProjectSort = WorkspaceProjectSort.UpdatedAt,
     val projects: List<ProjectUi> = emptyList(),
     val documents: List<DocumentUi> = emptyList(),
     val images: List<ImageUi> = emptyList(),
@@ -118,6 +120,7 @@ data class WorkspaceState(
 sealed interface WorkspaceAction {
     data class SelectSection(val section: WorkspaceSection) : WorkspaceAction
     data class SetViewMode(val mode: WorkspaceViewMode) : WorkspaceAction
+    data class SetProjectSort(val sort: WorkspaceProjectSort) : WorkspaceAction
     data object Retry : WorkspaceAction
     data class ChangeQuery(val value: String) : WorkspaceAction
     data object LoadMore : WorkspaceAction
@@ -171,6 +174,12 @@ class WorkspaceViewModel(
                 }
             }
             is WorkspaceAction.SetViewMode -> _state.update { it.copy(viewMode = action.mode) }
+            is WorkspaceAction.SetProjectSort -> {
+                _state.update { it.copy(projectSort = action.sort) }
+                if (_state.value.section == WorkspaceSection.Projects) {
+                    viewModelScope.launch { awaitThenLoad(WorkspaceSection.Projects) }
+                }
+            }
             WorkspaceAction.Retry -> viewModelScope.launch { awaitThenLoad(_state.value.section) }
             is WorkspaceAction.ChangeQuery -> {
                 _state.update { it.copy(query = action.value) }
@@ -244,7 +253,10 @@ class WorkspaceViewModel(
         if (_state.value.isLoading) return
         _state.update { it.copy(isLoading = true, error = null) }
         when (section) {
-            WorkspaceSection.Projects -> applyResult(section, repository.listProjects(_state.value.query)) { page ->
+            WorkspaceSection.Projects -> applyResult(
+                section,
+                repository.listProjects(_state.value.query, sort = _state.value.projectSort),
+            ) { page ->
                 _state.update { state ->
                     state.copy(
                         projects = page.items.map(Project::toUi),
@@ -276,7 +288,11 @@ class WorkspaceViewModel(
         if (_state.value.isLoadingMore) return
         _state.update { it.copy(isLoadingMore = true) }
         when (section) {
-            WorkspaceSection.Projects -> repository.listProjects(_state.value.query, cursor)
+            WorkspaceSection.Projects -> repository.listProjects(
+                _state.value.query,
+                cursor,
+                _state.value.projectSort,
+            )
                 .onSuccess { page ->
                     _state.update {
                         it.copy(

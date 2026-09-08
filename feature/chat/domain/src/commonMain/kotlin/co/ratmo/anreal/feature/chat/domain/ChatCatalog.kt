@@ -2,11 +2,25 @@ package co.ratmo.anreal.feature.chat.domain
 
 import co.ratmo.anreal.feature.chat.domain.stream.ImageGenSettings
 
+data class ModelPrices(
+    val input: Double? = null,
+    val cachedInput: Double? = null,
+    val output: Double? = null,
+)
+
 data class ChatModel(
     val id: String,
     val label: String,
     val reasoningEfforts: List<String> = emptyList(),
     val contextWindowTokens: Int = 0,
+    val outputType: String = "text",
+    val providerName: String = "",
+    val hint: String? = null,
+    val description: String? = null,
+    val maxInputTokens: Int? = null,
+    val maxOutputTokens: Int? = null,
+    val prices: ModelPrices? = null,
+    val inputModalities: List<String> = emptyList(),
 )
 
 data class ReasoningEffort(

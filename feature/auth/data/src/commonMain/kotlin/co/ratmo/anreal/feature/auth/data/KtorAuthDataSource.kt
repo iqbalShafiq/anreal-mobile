@@ -19,10 +19,10 @@ class KtorAuthDataSource(
     private val tokenStore: SessionTokenStore,
 ) : AuthRemoteDataSource {
 
-    override suspend fun signIn(email: String, password: String): Result<User, AuthError> {
+    override suspend fun signIn(email: String, password: String, rememberMe: Boolean): Result<User, AuthError> {
         return httpClient.post<AuthCredentialsDto, AuthSessionResponseDto>(
             route = "/api/auth/sign-in/email",
-            body = AuthCredentialsDto(email = email, password = password),
+            body = AuthCredentialsDto(email = email, password = password, rememberMe = rememberMe),
         ).toAuthUserResult()
     }
 
@@ -30,10 +30,11 @@ class KtorAuthDataSource(
         name: String,
         email: String,
         password: String,
+        rememberMe: Boolean,
     ): Result<User, AuthError> {
         return httpClient.post<AuthCredentialsDto, AuthSessionResponseDto>(
             route = "/api/auth/sign-up/email",
-            body = AuthCredentialsDto(email = email, password = password, name = name),
+            body = AuthCredentialsDto(email = email, password = password, name = name, rememberMe = rememberMe),
         ).toAuthUserResult(detectEmailTaken = true)
     }
 

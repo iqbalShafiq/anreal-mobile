@@ -58,6 +58,7 @@ import co.ratmo.anreal.feature.chat.presentation.component.QueueConflictDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RenameSessionDialog
 import co.ratmo.anreal.feature.chat.presentation.component.RunActiveDialog
 import co.ratmo.anreal.feature.chat.presentation.component.SessionDrawer
+import co.ratmo.anreal.feature.chat.presentation.component.ShareDialog
 import co.ratmo.anreal.feature.chat.presentation.component.ThreadPane
 import co.ratmo.anreal.feature.chat.presentation.component.documentsBadgeCount
 import co.ratmo.anreal.feature.chat.presentation.preview.chatConflictPreviewState
@@ -79,6 +80,7 @@ import co.ratmo.anreal.feature.chat.presentation.preview.previewAccount
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.rounded.Description
 import com.composables.icons.materialsymbols.rounded.Menu
+import com.composables.icons.materialsymbols.rounded.Share
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CancellationException
 import io.github.vinceglb.filekit.FileKit
@@ -99,6 +101,8 @@ fun ChatRoot(
     enterProjectId: String? = null,
     enterProjectName: String? = null,
     onEnterProjectConsumed: () -> Unit = {},
+    forkSend: ForkSendRequest? = null,
+    onForkSendConsumed: () -> Unit = {},
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +113,11 @@ fun ChatRoot(
         val projectId = enterProjectId ?: return@LaunchedEffect
         viewModel.onAction(ChatAction.OnEnterProject(projectId, enterProjectName))
         onEnterProjectConsumed()
+    }
+    LaunchedEffect(forkSend) {
+        val request = forkSend ?: return@LaunchedEffect
+        viewModel.onAction(ChatAction.OnForkSend(request.sessionId, request.firstMessage))
+        onForkSendConsumed()
     }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
@@ -248,6 +257,7 @@ fun ChatScreen(
                                 onOpenDrawer = { scope.launch { drawerState.open() } },
                                 onOpenContextUsage = { contextUsageOpen = true },
                                 onOpenDocuments = { documentsOpen = true },
+                                onOpenShare = { onAction(ChatAction.OnOpenShare) },
                             )
                         } else {
                         GlassTopBar(
@@ -260,6 +270,7 @@ fun ChatScreen(
                                 onOpenDrawer = { scope.launch { drawerState.open() } },
                                 onOpenContextUsage = { contextUsageOpen = true },
                                 onOpenDocuments = { documentsOpen = true },
+                                onOpenShare = { onAction(ChatAction.OnOpenShare) },
                             )
                         }
                         }
@@ -322,6 +333,9 @@ fun ChatScreen(
     if (state.libraryOpen) {
         DocumentLibraryDialog(state, onAction)
     }
+    if (state.shareOpen) {
+        ShareDialog(state, onAction)
+    }
     state.modelUnavailable?.let { model ->
         ModelUnavailableDialog(
             model = model,
@@ -349,6 +363,7 @@ private fun ChatTopBarContent(
     onOpenDrawer: () -> Unit,
     onOpenContextUsage: () -> Unit,
     onOpenDocuments: () -> Unit,
+    onOpenShare: () -> Unit,
 ) {
     TopAppBar(
         title = {
@@ -373,6 +388,26 @@ private fun ChatTopBarContent(
                 error = state.contextUsageError,
                 onClick = onOpenContextUsage,
             )
+            IconButton(
+                onClick = onOpenShare,
+                enabled = state.thread.messages.isNotEmpty(),
+            ) {
+                if (state.shareStatusActive == true) {
+                    BadgedBox(
+                        badge = { Badge() },
+                    ) {
+                        Icon(
+                            imageVector = MaterialSymbols.Rounded.Share,
+                            contentDescription = AnrealCopy.get(AnrealCopy.CD_SHARE_CHAT),
+                        )
+                    }
+                } else {
+                    Icon(
+                        imageVector = MaterialSymbols.Rounded.Share,
+                        contentDescription = AnrealCopy.get(AnrealCopy.CD_SHARE_CHAT),
+                    )
+                }
+            }
             IconButton(onClick = onOpenDocuments) {
                 if (documentCount > 0) {
                     BadgedBox(

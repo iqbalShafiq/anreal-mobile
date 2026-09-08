@@ -10,6 +10,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
+import co.ratmo.anreal.feature.chat.domain.ChatShareLink
+import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
@@ -18,6 +21,10 @@ import co.ratmo.anreal.feature.chat.domain.DocumentStorage
 import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.toLatestHistoryWindow
+import co.ratmo.anreal.feature.chat.domain.ForkResult
+import co.ratmo.anreal.feature.chat.domain.ForkSeed
+import co.ratmo.anreal.feature.chat.domain.PublicShareSnapshot
+import co.ratmo.anreal.feature.chat.domain.validate
 import co.ratmo.anreal.feature.chat.domain.LibraryDocument
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
@@ -419,6 +426,49 @@ class StubChatRepository : ChatRepository {
         options: ChatRunOptions,
         onLine: suspend (String) -> Unit,
     ): EmptyResult<ChatError> = Result.Success(Unit)
+
+    override suspend fun createChatShare(sessionId: String): Result<ChatShareLink, ChatError> {
+        return Result.Success(
+            ChatShareLink(
+                token = "stub-share-token",
+                urlPath = "/share/stub-share-token",
+                sessionId = sessionId,
+                title = sessions.value.firstOrNull { it.id == sessionId }?.title,
+                createdAt = nowIso(),
+            ),
+        )
+    }
+
+    override suspend fun getChatShareStatus(sessionId: String): Result<ChatShareStatus, ChatError> =
+        Result.Success(ChatShareStatus(sessionId = sessionId, active = true))
+
+    override suspend fun getLatestChatShare(sessionId: String): Result<ChatShareLink, ChatError> =
+        createChatShare(sessionId)
+
+    override suspend fun deactivateChatShares(sessionId: String): Result<ChatShareDeactivation, ChatError> =
+        Result.Success(ChatShareDeactivation(sessionId = sessionId, revoked = 1))
+
+    override suspend fun forkSharedChat(seed: ForkSeed): Result<ForkResult, ChatError> {
+        return when (val validation = seed.validate()) {
+            is Result.Error -> validation
+            is Result.Success -> {
+                val sessionId = "forked-${seed.forkedFromToken.take(8)}"
+                sessions.update { listOf(ChatSession(id = sessionId, title = "Fork", updatedAt = nowIso())) + it }
+                Result.Success(ForkResult(sessionId = sessionId, seededMessages = seed.messages.size + 1))
+            }
+        }
+    }
+
+    override suspend fun getPublicShare(token: String): Result<PublicShareSnapshot, ChatError> =
+        Result.Success(
+            PublicShareSnapshot(
+                token = token,
+                title = "Shared chat",
+                createdAt = nowIso(),
+                ownerName = "Ada",
+                messages = storedHistory("dev-session"),
+            ),
+        )
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> {
         return Result.Success(

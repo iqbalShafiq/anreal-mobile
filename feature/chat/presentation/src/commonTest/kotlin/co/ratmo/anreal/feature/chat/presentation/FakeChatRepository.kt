@@ -9,6 +9,9 @@ import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
+import co.ratmo.anreal.feature.chat.domain.ChatShareLink
+import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
@@ -18,7 +21,10 @@ import co.ratmo.anreal.feature.chat.domain.DocumentStorage
 import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.toLatestHistoryWindow
+import co.ratmo.anreal.feature.chat.domain.ForkResult
+import co.ratmo.anreal.feature.chat.domain.ForkSeed
 import co.ratmo.anreal.feature.chat.domain.LibraryDocumentPage
+import co.ratmo.anreal.feature.chat.domain.PublicShareSnapshot
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
@@ -43,6 +49,7 @@ import kotlinx.coroutines.flow.update
 class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<List<ChatSession>>(emptyList())
     var refreshResult: Result<SessionPage, ChatError> = Result.Success(SessionPage(emptyList()))
     var draft: ChatSession = ChatSession(id = "draft", title = "New chat", updatedAt = "now")
+    var createSessionResult: Result<ChatSession, ChatError>? = null
     var cachedHistory: List<ChatMessage> = emptyList()
     var history: Result<List<ChatMessage>, ChatError> = Result.Success(emptyList())
     var holdHistory: Boolean = false
@@ -137,7 +144,7 @@ class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<L
     override suspend fun createSession(
         sessionId: String?,
         projectId: String?,
-    ): Result<ChatSession, ChatError> = openDraft(projectId)
+    ): Result<ChatSession, ChatError> = createSessionResult ?: openDraft(projectId)
 
     override suspend fun openDraft(projectId: String?): Result<ChatSession, ChatError> {
         openedProjectIds += projectId
@@ -427,6 +434,32 @@ class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<L
         streamLines.forEach { line -> onLine(line) }
         return answerResult
     }
+
+    var shareStatus: Result<ChatShareStatus, ChatError> =
+        Result.Success(ChatShareStatus("s1", false))
+    var latestShare: Result<ChatShareLink, ChatError> =
+        Result.Error(ChatError.NoActiveShare)
+    var createShareResult: Result<ChatShareLink, ChatError> =
+        Result.Success(ChatShareLink("tok", "/share/tok", "s1", "Notes", "now"))
+    var deactivateResult: Result<ChatShareDeactivation, ChatError> =
+        Result.Success(ChatShareDeactivation("s1", 1))
+    var forkResult: Result<ForkResult, ChatError> =
+        Result.Success(ForkResult("s2", 2))
+    var publicShare: Result<PublicShareSnapshot, ChatError> =
+        Result.Success(PublicShareSnapshot("tok", "Notes", "now", "Ada", emptyList()))
+
+    override suspend fun createChatShare(sessionId: String): Result<ChatShareLink, ChatError> = createShareResult
+
+    override suspend fun getChatShareStatus(sessionId: String): Result<ChatShareStatus, ChatError> = shareStatus
+
+    override suspend fun getLatestChatShare(sessionId: String): Result<ChatShareLink, ChatError> = latestShare
+
+    override suspend fun deactivateChatShares(sessionId: String): Result<ChatShareDeactivation, ChatError> =
+        deactivateResult
+
+    override suspend fun forkSharedChat(seed: ForkSeed): Result<ForkResult, ChatError> = forkResult
+
+    override suspend fun getPublicShare(token: String): Result<PublicShareSnapshot, ChatError> = publicShare
 
     override suspend fun listRecentProjects(): Result<List<RecentProject>, ChatError> = recentProjects
 

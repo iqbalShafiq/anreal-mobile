@@ -42,9 +42,11 @@ data class MultipartFile(
 suspend inline fun <reified Response : Any> HttpClient.get(
     route: String,
     queryParameters: Map<String, Any?> = emptyMap(),
+    skipAuth: Boolean = false,
 ): Result<Response, DataError.Network> {
     return safeCall {
         ktorGet(urlString = route) {
+            if (skipAuth) header(SKIP_AUTH_HEADER, "true")
             queryParameters.forEach { (key, value) ->
                 if (value != null) parameter(key, value)
             }

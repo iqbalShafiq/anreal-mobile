@@ -903,7 +903,12 @@ private fun UsageBreakdownCard(title: String, rows: List<UsageBreakdownUi>) {
         SettingsCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 rows.forEachIndexed { index, row ->
-                    AccountValueRow(row.label, "${row.requests} requests · ${row.tokens} tokens")
+                    val value = if (row.detail.isBlank()) {
+                        "${row.requests} requests · ${row.tokens} tokens"
+                    } else {
+                        "${row.requests} requests · ${row.tokens} tokens · ${row.detail}"
+                    }
+                    AccountValueRow(row.label, value)
                     if (index < rows.lastIndex) HorizontalDivider(
                         modifier = Modifier.padding(horizontal = AnrealSpacing.md),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
@@ -987,7 +992,14 @@ private fun ProfileCard(title: String, profile: ProfileUi?, onReset: () -> Unit)
                     }
                 }
                 profile.explicitFacts.forEach { fact ->
-                    Text("• $fact", style = MaterialTheme.typography.bodyMedium)
+                    Text("• ${fact.fact}", style = MaterialTheme.typography.bodyMedium)
+                    if (fact.source.isNotBlank()) {
+                        Text(
+                            fact.source,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = glassMutedTextColor(),
+                        )
+                    }
                 }
             }
         }

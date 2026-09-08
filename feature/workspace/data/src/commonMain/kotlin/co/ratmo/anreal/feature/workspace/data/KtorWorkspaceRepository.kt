@@ -18,6 +18,7 @@ import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceImage
 import co.ratmo.anreal.feature.workspace.domain.WorkspacePage
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceRepository
 import io.ktor.client.HttpClient
 
@@ -25,6 +26,7 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
     override suspend fun listProjects(
         query: String?,
         cursor: String?,
+        sort: WorkspaceProjectSort,
     ): Result<WorkspacePage<Project>, WorkspaceError> =
         httpClient.get<ProjectPageDto>(
             route = "/api/projects",
@@ -32,7 +34,7 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
                 "q" to query,
                 "cursor" to cursor,
                 "limit" to 50,
-                "sort" to "updatedAt",
+                "sort" to sort.wire,
             ),
         ).map(ProjectPageDto::toPage).mapWorkspaceError()
 

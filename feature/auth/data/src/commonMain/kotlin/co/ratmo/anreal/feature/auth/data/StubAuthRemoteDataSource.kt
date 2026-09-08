@@ -11,7 +11,7 @@ class StubAuthRemoteDataSource(
     private val tokenStore: SessionTokenStore,
 ) : AuthRemoteDataSource {
 
-    override suspend fun signIn(email: String, password: String): Result<User, AuthError> {
+    override suspend fun signIn(email: String, password: String, rememberMe: Boolean): Result<User, AuthError> {
         return succeed(email = email.trim())
     }
 
@@ -19,6 +19,7 @@ class StubAuthRemoteDataSource(
         name: String,
         email: String,
         password: String,
+        rememberMe: Boolean,
     ): Result<User, AuthError> {
         return succeed(email = email.trim(), name = name.trim().ifBlank { STUB_NAME })
     }

@@ -44,6 +44,7 @@ data class UsageBreakdownUi(
     val label: String,
     val requests: String,
     val tokens: String,
+    val detail: String = "",
 )
 
 data class ProfileSectionUi(
@@ -54,11 +55,16 @@ data class ProfileSectionUi(
 
 data class ProfileUi(
     val sections: List<ProfileSectionUi>,
-    val explicitFacts: List<String>,
+    val explicitFacts: List<ProfileFactUi>,
     val updatedAt: String,
 ) {
     val isEmpty: Boolean get() = sections.all { it.bullets.isEmpty() } && explicitFacts.isEmpty()
 }
+
+data class ProfileFactUi(
+    val fact: String,
+    val source: String = "",
+)
 
 data class ProjectProfileUi(
     val id: String,
@@ -299,7 +305,14 @@ private fun UsageSummary.toUi(): AccountUsageUi = AccountUsageUi(
     inputTokens = tokens.inputTokens.toCount(),
     outputTokens = tokens.outputTokens.toCount(),
     cachedTokens = tokens.cachedInputTokens.toCount(),
-    models = byModel.map { UsageBreakdownUi(it.model, it.requestCount.toCount(), it.totalTokens.toCount()) },
+    models = byModel.map {
+        UsageBreakdownUi(
+            label = it.model,
+            requests = it.requestCount.toCount(),
+            tokens = it.totalTokens.toCount(),
+            detail = "${it.inputTokens.toCount()} in · ${it.outputTokens.toCount()} out",
+        )
+    },
     reasoning = byReasoningEffort.map {
         UsageBreakdownUi(
             it.reasoningEffort.replaceFirstChar { char -> char.uppercase() },
@@ -317,7 +330,12 @@ private fun PersonalizationProfile.toUi(): ProfileUi = ProfileUi(
             bullets = bullets.map { it.text },
         )
     },
-    explicitFacts = explicitFacts.map { it.fact },
+    explicitFacts = explicitFacts.map { fact ->
+        ProfileFactUi(
+            fact = fact.fact,
+            source = fact.sourceSessionId?.takeIf { it.isNotBlank() }?.let { "From chat $it" }.orEmpty(),
+        )
+    },
     updatedAt = updatedAt,
 )
 

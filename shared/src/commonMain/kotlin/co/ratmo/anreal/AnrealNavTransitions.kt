@@ -16,12 +16,14 @@ import co.ratmo.anreal.feature.auth.presentation.LoginRoute
 import co.ratmo.anreal.feature.auth.presentation.RegisterRoute
 import co.ratmo.anreal.feature.chat.presentation.AccountRoute
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
+import co.ratmo.anreal.feature.chat.presentation.SharedChatRoute
 
 enum class AnrealRouteKind {
     Boarding,
     Login,
     Register,
     Chat,
+    SharedChat,
     Account,
     Other,
 }
@@ -48,6 +50,8 @@ fun classifyNavMotion(from: AnrealRouteKind, to: AnrealRouteKind): AnrealNavMoti
         fromApp && toAuth -> AnrealNavMotion.HorizontalBack
         from == AnrealRouteKind.Chat && to == AnrealRouteKind.Account -> AnrealNavMotion.HorizontalForward
         from == AnrealRouteKind.Account && to == AnrealRouteKind.Chat -> AnrealNavMotion.HorizontalBack
+        from == AnrealRouteKind.Chat && to == AnrealRouteKind.SharedChat -> AnrealNavMotion.HorizontalForward
+        from == AnrealRouteKind.SharedChat && to == AnrealRouteKind.Chat -> AnrealNavMotion.HorizontalBack
         else -> AnrealNavMotion.Fade
     }
 }
@@ -58,7 +62,9 @@ private val AnrealRouteKind.isAuth: Boolean
         this == AnrealRouteKind.Register
 
 private val AnrealRouteKind.isApp: Boolean
-    get() = this == AnrealRouteKind.Chat || this == AnrealRouteKind.Account
+    get() = this == AnrealRouteKind.Chat ||
+        this == AnrealRouteKind.Account ||
+        this == AnrealRouteKind.SharedChat
 
 fun NavDestination.toRouteKind(): AnrealRouteKind {
     return when {
@@ -66,6 +72,7 @@ fun NavDestination.toRouteKind(): AnrealRouteKind {
         hasRoute<LoginRoute>() -> AnrealRouteKind.Login
         hasRoute<RegisterRoute>() -> AnrealRouteKind.Register
         hasRoute<ChatRoute>() -> AnrealRouteKind.Chat
+        hasRoute<SharedChatRoute>() -> AnrealRouteKind.SharedChat
         hasRoute<AccountRoute>() -> AnrealRouteKind.Account
         else -> AnrealRouteKind.Other
     }

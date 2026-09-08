@@ -21,7 +21,13 @@ import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
+import co.ratmo.anreal.feature.chat.domain.ChatShareLink
+import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.ForkResult
+import co.ratmo.anreal.feature.chat.domain.ForkSeed
+import co.ratmo.anreal.feature.chat.domain.PublicShareSnapshot
 import co.ratmo.anreal.feature.chat.domain.ContextSnippet
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
@@ -399,6 +405,44 @@ class KtorChatRemoteDataSource(
             route = "/api/projects/$id/open",
         ).map { it.toProject() }.mapNetwork()
     }
+
+    suspend fun createShare(sessionId: String): Result<ChatShareLink, ChatError> {
+        return httpClient.postForResponse<ShareLinkDto>(
+            route = "/api/chat/sessions/$sessionId/shares",
+        ).map { it.toShareLink() }.mapNetwork()
+    }
+
+    suspend fun shareStatus(sessionId: String): Result<ChatShareStatus, ChatError> {
+        return httpClient.get<ShareStatusDto>(
+            route = "/api/chat/sessions/$sessionId/shares/status",
+        ).map { it.toShareStatus() }.mapNetwork()
+    }
+
+    suspend fun latestShare(sessionId: String): Result<ChatShareLink, ChatError> {
+        return httpClient.get<ShareLinkDto>(
+            route = "/api/chat/sessions/$sessionId/shares/latest",
+        ).map { it.toShareLink() }.mapError { it.toShareError() }
+    }
+
+    suspend fun deactivateShares(sessionId: String): Result<ChatShareDeactivation, ChatError> {
+        return httpClient.postForResponse<DeactivateSharesDto>(
+            route = "/api/chat/sessions/$sessionId/shares/deactivate",
+        ).map { it.toDeactivation() }.mapNetwork()
+    }
+
+    suspend fun forkSharedChat(seed: ForkSeed): Result<ForkResult, ChatError> {
+        return httpClient.post<ForkRequestDto, ForkResponseDto>(
+            route = "/api/chat/fork",
+            body = seed.toRequestDto(),
+        ).map { it.toForkResult() }.mapError { it.toForkError() }
+    }
+
+    suspend fun publicShare(token: String): Result<PublicShareSnapshot, ChatError> {
+        return httpClient.get<PublicShareDto>(
+            route = "/api/shares/$token",
+            skipAuth = true,
+        ).map { it.toSnapshot() }.mapError { it.toShareError() }
+    }
 }
 
 private fun ChatUpload.toMultipartFile(): MultipartFile = MultipartFile(bytes, filename, mediaType)
@@ -428,6 +472,39 @@ private fun DataError.Network.toInteractionError(): ChatError {
         "INTERACTION_POLICY_UNAVAILABLE" -> ChatError.InteractionPolicyUnavailable
         "INTERACTION_STAGE_INVALID" -> ChatError.InteractionStageInvalid
         else -> ChatError.Network(this)
+    }
+}
+
+private fun DataError.Network.toShareError(): ChatError {
+    if (kind == DataError.Network.Kind.NOT_FOUND) {
+        return when (code) {
+            "CHAT_SHARE_NOT_FOUND" -> ChatError.ShareNotFound
+            else -> ChatError.NoActiveShare
+        }
+    }
+    return when (code) {
+        "CHAT_SHARE_NOT_FOUND" -> ChatError.ShareNotFound
+        else -> mapShareUnavailable()
+    }
+}
+
+private fun DataError.Network.toForkError(): ChatError {
+    return when {
+        kind == DataError.Network.Kind.NOT_FOUND -> ChatError.ForkTargetNotFound
+        kind == DataError.Network.Kind.BAD_REQUEST ||
+            kind == DataError.Network.Kind.UNPROCESSABLE_ENTITY -> ChatError.InvalidForkRequest
+        else -> mapShareUnavailable()
+    }
+}
+
+private fun DataError.Network.mapShareUnavailable(): ChatError {
+    return if (
+        kind == DataError.Network.Kind.SERVER_ERROR ||
+        kind == DataError.Network.Kind.SERVICE_UNAVAILABLE
+    ) {
+        ChatError.ShareUnavailable
+    } else {
+        ChatError.Network(this)
     }
 }
 

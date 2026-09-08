@@ -40,6 +40,8 @@ import co.ratmo.anreal.feature.auth.presentation.authGraph
 import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
 import co.ratmo.anreal.feature.chat.presentation.EnterProjectRequest
+import co.ratmo.anreal.feature.chat.presentation.ForkSendRequest
+import co.ratmo.anreal.feature.chat.presentation.SharedChatRoute
 import co.ratmo.anreal.feature.chat.presentation.chatGraph
 import kotlinx.coroutines.flow.MutableStateFlow
 import co.ratmo.anreal.feature.workspace.presentation.WorkspaceRoute
@@ -52,6 +54,7 @@ import kotlin.time.TimeSource
 @Composable
 fun App(
     buildInfo: AppBuildInfo = AppBuildInfo(versionName = "1.0"),
+    sharedToken: String? = null,
     viewModel: AppViewModel = koinViewModel(),
 ) {
     val status by viewModel.status.collectAsStateWithLifecycle()
@@ -88,7 +91,7 @@ fun App(
                         markDescription = AnrealCopy.get(AnrealCopy.CD_APP_MARK),
                     )
                 } else {
-                    AuthenticatedHost(status = status, viewModel = viewModel)
+                    AuthenticatedHost(status = status, viewModel = viewModel, sharedToken = sharedToken)
                 }
             }
         }
@@ -121,6 +124,7 @@ private fun rememberSplashVisible(status: SessionStatus): Boolean {
 private fun AuthenticatedHost(
     status: SessionStatus,
     viewModel: AppViewModel,
+    sharedToken: String? = null,
 ) {
     val navController = rememberNavController()
     val user by viewModel.user.collectAsStateWithLifecycle()
@@ -140,6 +144,22 @@ private fun AuthenticatedHost(
     val focusManager = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
     val enterProjectRequest = remember { MutableStateFlow<EnterProjectRequest?>(null) }
+    val forkSendRequest = remember { MutableStateFlow<ForkSendRequest?>(null) }
+    var pendingSharedToken by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(sharedToken) {
+        if (!sharedToken.isNullOrBlank()) {
+            navController.navigate(SharedChatRoute(sharedToken))
+        }
+    }
+    LaunchedEffect(status) {
+        val token = pendingSharedToken
+        if (status is SessionStatus.SignedIn && token != null) {
+            pendingSharedToken = null
+            navController.navigate(SharedChatRoute(token)) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
     AnrealAtmosphere {
         NavHost(
             modifier = Modifier.fillMaxSize(),
@@ -175,8 +195,25 @@ private fun AuthenticatedHost(
                 onNavigateProjects = { navController.navigate(WorkspaceRoute(WorkspaceSection.Projects)) },
                 onNavigateDocuments = { navController.navigate(WorkspaceRoute(WorkspaceSection.Documents)) },
                 onNavigateImages = { navController.navigate(WorkspaceRoute(WorkspaceSection.Images)) },
+                onNavigateToLogin = { token ->
+                    pendingSharedToken = token
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                    navController.navigate(LoginRoute(""))
+                },
+                onNavigateToRegister = { token ->
+                    pendingSharedToken = token
+                    keyboard?.hide()
+                    focusManager.clearFocus()
+                    navController.navigate(RegisterRoute(""))
+                },
+                onNavigateToSignIn = { navController.navigate(LoginRoute("")) },
+                isAuthenticated = viewModel.isSignedIn,
                 enterProjectRequest = enterProjectRequest,
                 onEnterProjectConsumed = { enterProjectRequest.value = null },
+                forkSendRequest = forkSendRequest,
+                onForkSendConsumed = { forkSendRequest.value = null },
+                onForkSend = { forkSendRequest.value = it },
             )
             workspaceGraph(
                 navController = navController,

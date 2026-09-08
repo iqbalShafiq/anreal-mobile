@@ -8,6 +8,7 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
 import co.ratmo.anreal.feature.chat.domain.ChatUpload
+import co.ratmo.anreal.feature.chat.domain.ForkSeed
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.queue.SteerAttachment
 import co.ratmo.anreal.feature.chat.domain.queue.SteerSnippet
@@ -434,6 +435,118 @@ class KtorChatRemoteDataSourceTest {
         val result = source.loadContextSnippet("s1")
 
         assertThat((result as Result.Success).data?.id).isEqualTo("n1")
+    }
+
+    @Test
+    fun create_share_maps_token_response() = runTest {
+        val source = source(
+            path = "/api/chat/sessions/s1/shares",
+            status = HttpStatusCode.Created,
+            body = """{"token":"tok","urlPath":"/share/tok","sessionId":"s1","title":"Notes","createdAt":"now"}""",
+        )
+
+        val result = source.createShare("s1")
+
+        assertThat((result as Result.Success).data.token).isEqualTo("tok")
+    }
+
+    @Test
+    fun share_status_maps_active_flag() = runTest {
+        val source = source(
+            path = "/api/chat/sessions/s1/shares/status",
+            body = """{"sessionId":"s1","active":true}""",
+        )
+
+        val result = source.shareStatus("s1")
+
+        assertThat((result as Result.Success).data.active).isEqualTo(true)
+    }
+
+    @Test
+    fun latest_share_missing_link_maps_no_active_share() = runTest {
+        val source = source(
+            path = "/api/chat/sessions/s1/shares/latest",
+            status = HttpStatusCode.NotFound,
+            body = """{"error":"No active share link"}""",
+        )
+
+        val result = source.latestShare("s1")
+
+        assertThat(result).isEqualTo(Result.Error(ChatError.NoActiveShare))
+    }
+
+    @Test
+    fun deactivate_shares_maps_revoked_count() = runTest {
+        val source = source(
+            path = "/api/chat/sessions/s1/shares/deactivate",
+            body = """{"sessionId":"s1","revoked":2}""",
+        )
+
+        val result = source.deactivateShares("s1")
+
+        assertThat((result as Result.Success).data.revoked).isEqualTo(2)
+    }
+
+    @Test
+    fun fork_maps_seeded_result() = runTest {
+        val source = source(
+            path = "/api/chat/fork",
+            status = HttpStatusCode.Created,
+            body = """{"sessionId":"s2","seededMessages":3}""",
+        )
+
+        val result = source.forkSharedChat(
+            ForkSeed(
+                sessionId = "s2",
+                forkedFromToken = "tok",
+                forkedFromTitle = "Notes",
+                messages = emptyList(),
+                firstMessage = "What about the second part?",
+            ),
+        )
+
+        assertThat((result as Result.Success).data.seededMessages).isEqualTo(3)
+    }
+
+    @Test
+    fun public_share_omits_authorization_and_maps_snapshot() = runTest {
+        var authorization: String? = "unset"
+        val engine = MockEngine { request ->
+            check(request.url.encodedPath == "/api/shares/tok")
+            authorization = request.headers[HttpHeaders.Authorization]
+            respond(
+                content = """{"token":"tok","title":"Notes","createdAt":"now","ownerName":"Ada","messages":[{"role":"user","content":[{"type":"text","text":"Hi"}]}]}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json"),
+            )
+        }
+        val source = KtorChatRemoteDataSource(
+            httpClient = HttpClientFactory.create(
+                engine = engine,
+                tokenStore = InMemorySessionTokenStore().also { it.save("saved-token") },
+                baseUrl = "http://127.0.0.1:3001",
+            ),
+        )
+
+        val result = source.publicShare("tok")
+
+        assertThat(authorization).isEqualTo(null)
+        val snapshot = (result as Result.Success).data
+        assertThat(snapshot.ownerName).isEqualTo("Ada")
+        assertThat((snapshot.messages.single().parts.single() as ChatPart.Text).text).isEqualTo("Hi")
+    }
+
+    @Test
+    fun public_share_revoked_token_maps_share_not_found() = runTest {
+        val source = source(
+            path = "/api/shares/dead",
+            status = HttpStatusCode.NotFound,
+            body = """{"error":"Shared link not found or no longer active","code":"CHAT_SHARE_NOT_FOUND"}""",
+        )
+
+        val result = source.publicShare("dead")
+
+        assertThat(result).isEqualTo(Result.Error(ChatError.ShareNotFound))
     }
 }
 

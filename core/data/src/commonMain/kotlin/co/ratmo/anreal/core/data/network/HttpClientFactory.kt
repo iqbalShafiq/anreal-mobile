@@ -61,8 +61,12 @@ object HttpClientFactory {
             }
         }.also { client ->
             client.plugin(HttpSend).intercept { request ->
-                tokenStore.token()?.let { token ->
-                    request.headers.append(HttpHeaders.Authorization, "Bearer $token")
+                val skipAuth = request.headers[SKIP_AUTH_HEADER] == "true"
+                request.headers.remove(SKIP_AUTH_HEADER)
+                if (!skipAuth) {
+                    tokenStore.token()?.let { token ->
+                        request.headers.append(HttpHeaders.Authorization, "Bearer $token")
+                    }
                 }
                 val call = execute(request)
                 if (call.response.status == HttpStatusCode.Unauthorized) {
@@ -83,6 +87,7 @@ object HttpClientFactory {
 internal const val DEFAULT_REQUEST_TIMEOUT_MILLIS = 60_000L
 internal const val DEFAULT_CONNECT_TIMEOUT_MILLIS = 15_000L
 internal const val DEFAULT_SOCKET_TIMEOUT_MILLIS = 60_000L
+const val SKIP_AUTH_HEADER = "X-Anreal-Skip-Auth"
 
 private object KermitNetworkLogger : KtorLogger {
     private val logger = KermitLogger.withTag("AnrealApi")

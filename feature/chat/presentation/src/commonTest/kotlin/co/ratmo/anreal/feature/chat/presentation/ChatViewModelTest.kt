@@ -63,6 +63,22 @@ class ChatViewModelTest {
     }
 
     @Test
+    fun bootstrap_opens_requested_session_from_saved_state() = runTest {
+        val fake = FakeChatRepository().apply {
+            refreshResult = Result.Success(
+                SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
+            )
+        }
+        val viewModel = ChatViewModel(
+            SavedStateHandle(mapOf("sessionId" to "s1")),
+            fake,
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("s1")
+    }
+
+    @Test
     fun bootstrap_opens_draft_even_when_sessions_exist() = runTest {
         val fake = FakeChatRepository().apply {
             refreshResult = Result.Success(
@@ -1329,6 +1345,74 @@ class ChatViewModelTest {
         assertThat(fake.stageCalls).isEqualTo(emptyList())
         assertThat(fake.answeredInteractions.single().response)
             .isEqualTo(InteractionResponse.ToolQuestion(answers))
+    }
+
+    @Test
+    fun open_share_loads_latest_link_when_active() = runTest {
+        val fake = populatedRepo().apply {
+            shareStatus = Result.Success(co.ratmo.anreal.feature.chat.domain.ChatShareStatus("draft", true))
+            latestShare = Result.Success(
+                co.ratmo.anreal.feature.chat.domain.ChatShareLink("tok", "/share/tok", "draft", "Notes", "now"),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnOpenShare)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.shareOpen).isTrue()
+        assertThat(viewModel.state.value.shareStatusActive == true).isTrue()
+        assertThat(viewModel.state.value.latestShare?.token).isEqualTo("tok")
+    }
+
+    @Test
+    fun create_share_updates_status_and_link() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnOpenShare)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnCreateShare)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.shareStatusActive == true).isTrue()
+        assertThat(viewModel.state.value.latestShare?.urlPath).isEqualTo("/share/tok")
+    }
+
+    @Test
+    fun deactivate_shares_clears_link() = runTest {
+        val fake = populatedRepo().apply {
+            shareStatus = Result.Success(co.ratmo.anreal.feature.chat.domain.ChatShareStatus("draft", true))
+            latestShare = Result.Success(
+                co.ratmo.anreal.feature.chat.domain.ChatShareLink("tok", "/share/tok", "draft", "Notes", "now"),
+            )
+        }
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnOpenShare)
+        advanceUntilIdle()
+        viewModel.onAction(ChatAction.OnRequestDeactivateShares)
+        viewModel.onAction(ChatAction.OnConfirmDeactivateShares)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.shareStatusActive == false).isTrue()
+        assertThat(viewModel.state.value.latestShare).isNull()
+    }
+
+    @Test
+    fun fork_send_selects_session_and_sends_first_message() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(SavedStateHandle(), fake)
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnForkSend("s1", "Hello from share"))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedSessionId).isEqualTo("s1")
+        assertThat(fake.sentText).isEqualTo("Hello from share")
     }
 }
 

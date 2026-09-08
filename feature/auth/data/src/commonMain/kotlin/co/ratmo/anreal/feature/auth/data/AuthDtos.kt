@@ -8,6 +8,7 @@ data class AuthCredentialsDto(
     val email: String,
     val password: String,
     val name: String? = null,
+    val rememberMe: Boolean? = null,
 )
 
 @Serializable

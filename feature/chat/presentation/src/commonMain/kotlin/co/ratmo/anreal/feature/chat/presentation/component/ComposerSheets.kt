@@ -32,6 +32,7 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
+import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
 
 internal enum class ComposerSheet {
@@ -177,11 +178,7 @@ private fun ModelAndReasoningSheet(
                 state.models.forEach { model ->
                     SheetOption(
                         title = model.label,
-                        subtitle = if (model.contextWindowTokens > 0) {
-                            "${model.contextWindowTokens / 1000}k context"
-                        } else {
-                            null
-                        },
+                        subtitle = model.describe(),
                         selected = model.id == state.selectedModelId,
                         onClick = { onAction(ChatAction.OnSelectModel(model.id)) },
                     )
@@ -235,6 +232,27 @@ private fun CachedCatalogError(
             }
         }
     }
+}
+
+private fun ChatModel.describe(): String? {
+    val parts = mutableListOf<String>()
+    if (providerName.isNotBlank()) parts += providerName
+    val hintText = hint?.trim()?.takeIf { it.isNotEmpty() }
+    if (hintText != null) parts += hintText
+    if (contextWindowTokens > 0) parts += "${contextWindowTokens / 1000}k context"
+    prices?.let { prices ->
+        val input = prices.input
+        val output = prices.output
+        if (input != null || output != null) {
+            val inputText = input?.let { "$$it/M in" } ?: "in n/a"
+            val outputText = output?.let { "$$it/M out" } ?: "out n/a"
+            parts += "$inputText · $outputText"
+        }
+    }
+    if (inputModalities.isNotEmpty()) parts += inputModalities.joinToString(", ")
+    description?.trim()?.takeIf { it.isNotEmpty() }?.let { parts += it }
+    if (outputType == "image") parts += "Image model"
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 }
 
 @Composable
@@ -348,8 +366,7 @@ private fun AttachSheet(
 
 @AnrealPreviews
 @Composable
-private fun ModelAndReasoningSheetPreview() {
-    AnrealPreview {
+private fun ModelAndReasoningSheetPreview() {    AnrealPreview {
         ComposerSheets(
             sheet = ComposerSheet.Model,
             state = chatComposerCatalogPreviewState(),

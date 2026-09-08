@@ -4,7 +4,11 @@ import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 
 interface WorkspaceRepository {
-    suspend fun listProjects(query: String? = null, cursor: String? = null): Result<WorkspacePage<Project>, WorkspaceError>
+    suspend fun listProjects(
+        query: String? = null,
+        cursor: String? = null,
+        sort: WorkspaceProjectSort = WorkspaceProjectSort.UpdatedAt,
+    ): Result<WorkspacePage<Project>, WorkspaceError>
     suspend fun createProject(name: String, description: String?): Result<Project, WorkspaceError>
     suspend fun getProject(id: String): Result<Project, WorkspaceError>
     suspend fun updateProject(id: String, name: String, description: String?): Result<Project, WorkspaceError>

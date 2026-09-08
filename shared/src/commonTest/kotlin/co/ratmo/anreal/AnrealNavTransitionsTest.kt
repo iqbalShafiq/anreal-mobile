@@ -55,4 +55,12 @@ class AnrealNavTransitionsTest {
         assertThat(classifyNavMotion(AnrealRouteKind.Account, AnrealRouteKind.Chat))
             .isEqualTo(AnrealNavMotion.HorizontalBack)
     }
+
+    @Test
+    fun chat_to_shared_chat_slides_forward() {
+        assertThat(classifyNavMotion(AnrealRouteKind.Chat, AnrealRouteKind.SharedChat))
+            .isEqualTo(AnrealNavMotion.HorizontalForward)
+        assertThat(classifyNavMotion(AnrealRouteKind.SharedChat, AnrealRouteKind.Chat))
+            .isEqualTo(AnrealNavMotion.HorizontalBack)
+    }
 }
