@@ -1,0 +1,69 @@
+# Adoption Design — User Skills, Self-Serve MCP & Static Sites (Mobile)
+
+Date: 2026-09-23 | Branch backend: `feat/user-skills-mcp` (PR #19) | Mobile branch: `codex/complete-api-integration`
+Status: approved sections 1–5 in chat, awaiting file review before `writing-plans`.
+
+## 0. Outcome & constraints
+
+- Outcome: mobile (`anreal-mobile`, KMP, Android ships / iOS compiles) memakai tiga domain backend yang saat ini nol referensi: Skills, MCP servers, Static Sites + delta chat (`capabilities` counts, `metadata.skillIds/mcpServerIds`, stream `site_build_progress` + `site_build_ready`).
+- Constraints: client only (no new endpoints), auth Bearer existing (preview site publik tanpa auth via capability URL), ikuti `AGENTS.md` + `DESIGN.md` + skills `android-*` (`module-structure`, `data-layer`, `presentation-mvi`, `navigation`, `error-handling`), reuse `HttpClientFactory`, `KtorChatRemoteDataSource` pattern, parser+reducer tunggal, `FeaturesSheet`, `ToolActivityCard`, `WorkspaceScreen` list+preview, `AccountSettingsLayout` drill-down. Pragmatis, konsisten, tidak redundan, testable.
+- Success: unit hijau (MockEngine + DTO + mapper + reducer + ViewModel), manual staging tiga alur lolos, regresi (capabilities lama parse, chat tanpa ids jalan, preview publik tanpa login) lolos.
+- Non-goals: OAuth MCP, share skill, marketplace, auto-enable tanpa review, push notif build selesai, enkripsi client-side (server envelope AES-256-GCM).
+
+## 1. Architecture (approach A: chat-owned, approved)
+
+- No new `:feature:*` module, no `:core:chat-ui`. Extend `feature:chat:{domain,data,presentation}` only.
+- Domain (`feature:chat:domain`): models `Skill(id,name,description,bodyMd,isEnabled,status,issues,version)`, `McpServer(id,name,url,authType,allowedTools,tools,isEnabled,status,lastCheckedAt,lastError,hasCredentials,hasHeaders)`, `McpTestResult`, `SessionSiteEntry(siteId,version,stableVersion,status,previewUrl,downloadUrl,updatedAt)`, `SiteBuildState(siteId,version,phase,message,previewUrl,downloadUrl)`; interfaces `SkillsRemoteDataSource`, `McpRemoteDataSource`, `SitesRemoteDataSource` plus `EnhancementSelectionStore` (DataStore-backed: observe/save selected `skillIds`/`mcpServerIds`, `intersectWithCatalog` on load). Single-source → DataSource (no Repository, YAGNI). Shared id types stay in `core:domain` only if a second feature needs them; until then chat-scoped.
+- Data (`feature:chat:data`): DTOs + `toDomain()` mappers beside DTOs; `KtorSkillsDataSource` (CRUD + enable), `KtorMcpDataSource` (CRUD + enable + test), `KtorSitesDataSource` (by-session, download bytes, retry, rollback; preview = URL string). Use `httpClient` + existing error mapper; `HttpClientFactory.create(engine)` for MockEngine tests. `CancellationException` rethrown.
+- Presentation (`feature:chat:presentation`): `SkillsViewModel` + `McpViewModel` (MVI State/Action/Event, `_state.update{copy}`, `UiText` via `toUiText()`, `SavedStateHandle` for editor form fields); extend `ChatState` with `capabilities.userSkillsCount/userMcpCount`, `selectedSkillIds/selectedMcpServerIds`, `siteBuilds: Map<sessionId, SiteBuildState>`, `siteVersions: Map<sessionId, List<SiteVersionEntry>>`. Components in `presentation/component/` (`SkillsSheets.kt`, `McpSheets.kt`, `SiteBuildPanel.kt`), previews via `@AnrealPreviews`.
+- DI: `chatDataModule` + `chatPresentationModule` additions (`singleOf`/`viewModelOf`); assemble in `:app` `AnrealApplication` only; `koinViewModel()` in Roots only.
+- Navigation: `@Serializable SkillsRoute`, `McpRoute` in chat presentation; `chatGraph` handles intra-feature via `NavController`; editor = drill-down detail inside same destination (à la `AccountSettingsLayout`, 160ms directional motion), not a new graph. Cross-feature (none needed) would be lambda in `:app`/`shared/App.kt`. Transitions via root `NavHost` `anrealEnter/anrealExit`.
+- iOS: `commonMain` compiles; Android WebView + FileKit save real; iOS WebView/file-save = TODO stubs compiling.
+
+## 2. Components & data contracts
+
+- All new DTO fields have defaults; JSON `ignoreUnknownKeys = true`.
+- `SkillDto{id,userId,name,description,bodyMd,isEnabled,status,issuesJson?,version,createdAt,updatedAt}` → `toSkill()`. Status `active|invalid|draft`.
+- `McpServerDto{id,userId,name,url,authType,allowedToolsJson=[],toolsJson?,isEnabled,status,lastCheckedAt?,lastError?,hasCredentials,hasHeaders}` → `toMcpServer()` maps `allowedToolsJson→allowedTools`. Never model secret values. Status `ok|untested|error`; only `ok` + non-empty tools used at run (dropped silently server-side; UI subtitle honest, never fake-enabled).
+- `McpTestResultDto{ok,tools?=[{name,description,parameters?}],error?}`.
+- `SessionSiteEntryDto{siteId,version,stableVersion,status,previewUrl,downloadUrl,updatedAt}`; status `queued|running|ready|failed`.
+- `CapabilitiesDto` += `userSkillsCount: Int = 0`, `userMcpCount: Int = 0` (raw counts, no status filter — server counts all rows).
+- `ChatRequestMetadataDto` += `skillIds: List<String> = emptyList()` (max 20), `mcpServerIds: List<String> = emptyList()` (max 5); omit → server `[]`; unknown/disabled dropped fail-open.
+- Client pre-validation (server authoritative): skill name `^[a-z0-9]+(?:-[a-z0-9]+)*$` ≤64, description 1..1024, bodyMd 1..16000 starting `---` with `name:`/`description:` exactly equal (one quote layer allowed); zod layer allows 70/1100/17000 so client uses tighter service limits. MCP url public https only (reject http/loopback/RFC1918/`*.local`), header name token ≤128, `authorization` forbidden, ≤16 headers, tool desc ≤16000 (never truncate at 2000). Skill PUT promotion draft→active requires `markReviewed: true`. MCP PUT `authType:none` clears stored token; headers = replace; edit-test sends `serverId` to reuse stored secrets when fields empty.
+
+## 3. Data flow
+
+- Capabilities load → counts → catalog first load defaults selection = all enabled (skills: `isEnabled && status==active`; MCP: `isEnabled && status==ok && tools non-empty`); persist last selection (DataStore; web parity keys `anreal.skills.selection`/`anreal.mcp.selection`, caps 20/5, `intersectWithCatalog` on load).
+- Each `POST /api/chat` turn sends `metadata.skillIds/mcpServerIds` from session selection.
+- Stream: extend existing parser + pure reducer (no second pipeline; composables never parse JSONL). Handle `siteBuildProgress{siteId,version,phase,message}` → `data.name=siteBuildProgress` and `siteBuildReady{siteId,version,previewUrl,screenshotUrl,downloadUrl}` → `data.name=siteBuildReady`. `applySiteBuildEvent(prev,event)`: keep preview when same siteId else null; `ready` → `phase:ready,message:"Situs siap diunduh."`. `applySiteVersionEvent`: `starting→queued`, `failed→failed`, else `running`; `ready` → `status:ready,stable:true` others `stable:false`, sort by version, reset list on different siteId. Hide site parts from transcript (`isRenderablePart=false`), render in chrome (`composerTopSlot`).
+- Fallback poll `GET /api/sites/by-session/{sessionId}` → reconstruct initial `siteBuild`/`siteVersions` (ready/failed vs `starting "Menunggu antrean build."` / `building "Membangun situs."`).
+- Preview: URL string only (`/api/sites/{id}/v{n}/preview/*`), public (no `Authorization`, capability URL), embed sandboxed (`allow-scripts`, opaque origin, no cookies), `no-store`; traversal `..`/`\` → 400 surfaced honestly. No manual fetch except cache.
+- Download: `GET .../download` (auth) → `application/zip` (`site-{id}-v{n}.zip`) → FileKit save; 404 when version not ready.
+- Retry: `POST .../retry` only `failed` → 202 `{queued}` + optimistic `phase:starting "Mengulang build."`; else 409.
+- Rollback: `POST .../rollback {version 1..10000}` target must be `ready` → 200 manifest shifting `stableVersion`; else 400/409. Version select defaults to stable; single-version hides dropdown.
+
+## 4. UI/UX (web parity: `apps/platform/src`, adapted to M3 Expressive)
+
+- Composer plus-menu: add `Skills` + `MCP` rows via `EnhancementRow` (Switch + `CountBadge active/total` + gear `Manage skills|Manage MCP servers`). Trigger `+` (`Additional features`); active strip icons `Brain|Plug` + tooltip `{active} of {total} … for this chat`. Switch disabled when `total==0`, row hidden while catalog loading. Copy: `Skills on — the agent follows your enabled skills` / `No skills yet — open Skills to write the first one` / `Skills off for this chat`; MCP mirrors.
+- Management screens (list + editor, loading/empty/error/populated + in-flight): header (`Skills — Reusable procedures your agent loads when the task fits.` / `MCP servers — Connect external tools over Streamable HTTP. Test before saving.`), skeleton shimmer ×2, empty (`No skills yet — write the first one.` / `No servers yet — paste a URL…`), error `Could not load…` (`role=alert`), rows `ManagementRow` with status subtitle (skill `draft→"Draft — review in the editor before enabling"` toggle disabled `Review first`; `invalid→"Invalid — edit to fix"`; MCP dot `ok=emerald/error=danger/else=neutral` + `{n} tools · untested — test in the editor to activate` / lastError), toggle/edit/delete + delete confirm (`Delete skill? … cannot be undone.`).
+- Skill editor: `New|Edit skill`, Upload `.md` prefill (`prefillFromMarkdown`), Name (`release-notes`, helper slug + frontmatter match), Description (one line agent fit), `SKILL.md` mono rows=12 + `SKILL_TEMPLATE`, footer Cancel + Create|Save|Saving…, field errors from `issuesToFieldErrors` fallback `Could not save`. Dismiss editor → list first, list → close.
+- MCP editor: `New|Edit MCP server`, Name, Server URL (public https, private blocked), Auth Select None|Bearer (+ Token `type=password`, `Leave empty to keep…`, `Stored server-side only, never shown again.`), Test|Testing…|Re-test, Custom headers add/remove (rows password, note replace semantics), guards (`URL changed — re-test before saving.`, `Test first…`, `Allow at least one tool.`, `testError role=alert`), checklist `Tools ({checked}/{total} allowed)` checkboxes + `This server exposes no tools.` Footer Cancel + Add|Save|Saving….
+- Site panel (`composerTopSlot`, above composer): card `v{n} · {message}` + Hide/Show (`aria-expanded`); queued/running steps `starting:Menyiapkan, planning:Menyusun brief, building:Membangun halaman, bundling:Build production, preview:Menyiapkan pratinjau, ready:Siap` (done Check / active spinner / todo) + `Pratinjau segera hadir. role=status`; ready → all done + `Lihat pratinjau` (DialogShell xl, iframe full, footer `Unduh zip`) + body `Unduh zip`; failed → `border-danger` + message + `Coba lagi`; multi-version Select (`v3, v2 (stabil), v1 • gagal`) + Rollback (disabled unless ready non-stable selected); null build renders nothing.
+- System: semantic `colorScheme`, `typography`, `AnrealSpacing`/4dp, M3 Expressive, glass wrappers only (no `Modifier.blur`, no `#E8A317`/black fills), Symbols Rounded with resource `contentDescription` (null decorative), `AnrealMotion` (`graphicsLayer` transform/opacity, no `scale(0)`/ease-in/layout anim/per-token fade), reduced motion/transparency + 48.dp targets. Composer stays editable while streaming (filled → queue `POST /api/chat/steer`, empty → Stop). String resources for user-facing copy; dynamic-only stays `String`.
+
+## 5. Errors, tests, verification
+
+- Decode non-2xx bodies before mapping; preserve `error/message`, `code`, status, primitive details in `DataError.Network`; 4xx user-safe shown, 5xx generic.
+- Cases: skill POST/PUT 400 `{error, issues:[{path∈name|description|bodyMd,message}]}` → field errors; duplicate name 400 (P2002); foreign id 404 `SKILL_NOT_FOUND`/`MCP_SERVER_NOT_FOUND` (never 403-distinguish); enable draft → `Review the skill…`, invalid → `Fix the skill…`, cap 20 → `Skill limit reached (20 active)`; MCP cap 5, invalid URL/auth → 400; test → always 200 (`{ok:false,error}` includes invalid body, non-public URL, missing bearer token, `MCP test failed: …` redacted ≤300); retry non-failed → 409 `only failed builds can be retried`; rollback non-ready → 409; bad version/id → 400; download non-ready → 404; preview traversal → 400.
+- Tests: `KtorSkills/Mcp/SitesTest` (MockEngine: success, 400 issues, 404 foreign, test `ok:false`, retry 409 when not failed, preview traversal 400), DTO unknown-keys + defaults, mapper `allowedToolsJson→allowedTools`, reducer JSONL fixtures (progress + ready), ViewModel tests with fakes + Turbine (`Dispatchers.setMain(UnconfinedTestDispatcher())`), robot pattern if 3+ UI tests, Roborazzi PNGs for chrome/screen changes + light/dark previews (populated + loading/empty/error).
+- Verification: Gradle unit tasks green for touched modules; manual vs staging (skill draft→review→enable→chat follows; MCP Test green→Save→tools listed→disable→count 0; site request→progress→preview→zip download→retry when failed); regression (old capabilities parse, chat without ids works, public preview loads logged-out).
+- Out of scope reaffirmed (see §0). Sequencing: DTO+mapper → DataSource → chat wiring (metadata + stream + poll) → UI (composer rows → management screens → site panel) → tests; each slice testable; fast check `:feature:chat:presentation:compileAndroidMain` + `:compileKotlinIosArm64`, full debug `:app:assembleDebug`.
+
+## 6. Open deltas vs backend agent note (verified in working tree)
+
+- Skill PUT promotion needs `markReviewed: true`; without it draft stays draft.
+- Second stream event `site_build_ready` exists alongside `site_build_progress`.
+- Capabilities counts are raw row counts (no status filter).
+- `ChatRequestMetadataSchema` runtime (`client-request.ts`) is authoritative for `skillIds/mcpServerIds`; OpenAPI `components.ts` omits them.
+- Zod caps (70/1100/17000) differ from service caps (64/1024/16000); client enforces service caps.
+- Sites storage is file-based (`SITE_DATA_DIR`), not Prisma; `v:version` Hono segment arrives as `v1` then stripped.
