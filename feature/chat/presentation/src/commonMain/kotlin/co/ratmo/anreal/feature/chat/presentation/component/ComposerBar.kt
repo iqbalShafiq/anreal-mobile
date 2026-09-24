@@ -36,7 +36,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
-import co.ratmo.anreal.core.designsystem.component.AnrealBottomSheet
 import co.ratmo.anreal.core.designsystem.component.GlassChrome
 import co.ratmo.anreal.core.designsystem.component.GlassChromeMode
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -67,9 +66,10 @@ internal fun ComposerBar(
     modelSheetOpenRequest: Boolean = false,
     onModelSheetOpenRequestConsumed: () -> Unit = {},
     surfaceTinted: Boolean = false,
+    onNavigateSkills: () -> Unit = {},
+    onNavigateMcp: () -> Unit = {},
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
-    var management by remember { mutableStateOf<ManagementSheet?>(null) }
     LaunchedEffect(modelSheetOpenRequest) {
         if (modelSheetOpenRequest) {
             sheet = ComposerSheet.Model
@@ -200,31 +200,14 @@ internal fun ComposerBar(
         onOpenAttachments = { sheet = ComposerSheet.Attach },
         onManageSkills = {
             sheet = null
-            management = ManagementSheet.Skills
+            onNavigateSkills()
         },
         onManageMcp = {
             sheet = null
-            management = ManagementSheet.Mcp
+            onNavigateMcp()
         },
         onDismiss = { sheet = null },
     )
-    management?.let { target ->
-        AnrealBottomSheet(onDismiss = { management = null }) {
-            when (target) {
-                ManagementSheet.Skills -> SkillsManagementRoot(
-                    onDismiss = { management = null },
-                )
-                ManagementSheet.Mcp -> McpManagementRoot(
-                    onDismiss = { management = null },
-                )
-            }
-        }
-    }
-}
-
-private enum class ManagementSheet {
-    Skills,
-    Mcp,
 }
 
 private fun String.toUploadStatusLabel(): String = AnrealCopy.get(

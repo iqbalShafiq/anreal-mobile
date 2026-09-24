@@ -98,6 +98,8 @@ fun ChatRoot(
     onNavigateProjects: () -> Unit = {},
     onNavigateDocuments: () -> Unit = {},
     onNavigateImages: () -> Unit = {},
+    onNavigateSkills: () -> Unit = {},
+    onNavigateMcp: () -> Unit = {},
     enterProjectId: String? = null,
     enterProjectName: String? = null,
     onEnterProjectConsumed: () -> Unit = {},
@@ -174,6 +176,8 @@ fun ChatRoot(
             onAction = viewModel::onAction,
             account = account,
             revealChatsGeneration = revealChats,
+            onNavigateSkills = onNavigateSkills,
+            onNavigateMcp = onNavigateMcp,
         )
         SnackbarHost(
             hostState = snackbarHostState,
@@ -198,6 +202,8 @@ fun ChatScreen(
     initialChatsDrawer: DrawerValue = DrawerValue.Closed,
     initialDocumentsDrawer: Boolean = false,
     revealChatsGeneration: Int = 0,
+    onNavigateSkills: () -> Unit = {},
+    onNavigateMcp: () -> Unit = {},
 ) {
     val drawerState = rememberDrawerState(initialValue = initialChatsDrawer)
     var documentsOpen by remember { mutableStateOf(initialDocumentsDrawer) }
@@ -292,6 +298,8 @@ fun ChatScreen(
                             modelSheetOpenRequest = modelSheetOpenRequest,
                             onModelSheetOpenRequestConsumed = { modelSheetOpenRequest = false },
                             surfaceTinted = !shouldShowChatAurora(state),
+                            onNavigateSkills = onNavigateSkills,
+                            onNavigateMcp = onNavigateMcp,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .onSizeChanged { composerHeightPx = it.height },

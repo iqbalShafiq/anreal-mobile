@@ -3,6 +3,7 @@ package co.ratmo.anreal.feature.chat.data
 import co.ratmo.anreal.core.data.AppConfig
 import co.ratmo.anreal.feature.chat.domain.AccountSettingsDataSource
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
+import co.ratmo.anreal.feature.chat.domain.EnhancementSelectionStore
 import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
 import co.ratmo.anreal.feature.chat.domain.SiteBaseUrlProvider
 import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
@@ -49,6 +50,13 @@ val chatDataModule = module {
         }
     }
     single<SiteBaseUrlProvider> { AppConfigSiteBaseUrlProvider(get()) }
+    single<EnhancementSelectionStore> {
+        if (get<AppConfig>().environment.stubApi) {
+            InMemoryEnhancementSelectionStore()
+        } else {
+            DataStoreEnhancementSelectionStore(createEnhancementSelectionDataStore())
+        }
+    }
 }
 
 private class AppConfigSiteBaseUrlProvider(

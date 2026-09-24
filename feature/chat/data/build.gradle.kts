@@ -23,6 +23,9 @@ kotlin {
         implementation(libs.koin.core)
         implementation(libs.androidx.datastore.preferences.core)
     }
+    sourceSets.androidMain.dependencies {
+        implementation(libs.koin.android)
+    }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)
         implementation(libs.ktor.client.mock)

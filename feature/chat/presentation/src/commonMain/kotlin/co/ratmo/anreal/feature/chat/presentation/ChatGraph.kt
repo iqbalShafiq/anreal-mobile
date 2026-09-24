@@ -7,6 +7,8 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import co.ratmo.anreal.feature.chat.presentation.account.AccountRoot
+import co.ratmo.anreal.feature.chat.presentation.component.McpManagementRoot
+import co.ratmo.anreal.feature.chat.presentation.component.SkillsManagementRoot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -24,6 +26,12 @@ data class SharedChatRoute(val token: String)
 
 @Serializable
 data object AccountRoute
+
+@Serializable
+data object SkillsRoute
+
+@Serializable
+data object McpRoute
 
 fun NavGraphBuilder.chatGraph(
     navController: NavController,
@@ -60,6 +68,8 @@ fun NavGraphBuilder.chatGraph(
             onEnterProjectConsumed = onEnterProjectConsumed,
             forkSend = forkSend,
             onForkSendConsumed = onForkSendConsumed,
+            onNavigateSkills = { navController.navigate(SkillsRoute) },
+            onNavigateMcp = { navController.navigate(McpRoute) },
         )
     }
     composable<AccountRoute> {
@@ -68,6 +78,12 @@ fun NavGraphBuilder.chatGraph(
             onBack = { navController.popBackStack() },
             onSignOut = onSignOut,
         )
+    }
+    composable<SkillsRoute> {
+        SkillsManagementRoot(onDismiss = { navController.popBackStack() })
+    }
+    composable<McpRoute> {
+        McpManagementRoot(onDismiss = { navController.popBackStack() })
     }
     composable<SharedChatRoute> {
         SharedChatRoot(
