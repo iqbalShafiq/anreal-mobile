@@ -78,6 +78,7 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.core.presentation.toUiText
+import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.McpAuthType
 import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
 import co.ratmo.anreal.feature.chat.domain.McpServer
@@ -132,7 +133,7 @@ internal data class McpEditorState(
     val testState: McpTestState = McpTestState.Untested,
     val checkedTools: Set<String> = emptySet(),
     val fieldErrors: Map<String, String> = emptyMap(),
-    val editorError: String? = null,
+    val editorError: UiText? = null,
     val saving: Boolean = false,
 )
 
@@ -264,10 +265,10 @@ internal class McpViewModel(
     private suspend fun loadServers() {
         _state.update { it.copy(loading = true, error = null) }
         when (val result = mcpSource.listServers()) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { it.copy(loading = false, servers = result.data) }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update {
                     it.copy(
                         loading = false,
@@ -337,7 +338,7 @@ internal class McpViewModel(
             headers = editor.headers.map { it.name.trim() to it.value },
             serverId = editor.sourceId,
         )) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { current ->
                     val currentEditor = current.editor ?: return@update current
                     current.copy(
@@ -357,13 +358,13 @@ internal class McpViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update { current ->
                     current.copy(
                         editor = current.editor?.copy(
                             testState = McpTestState.Untested,
-                            editorError = result.error.serverMessage
-                                ?: result.error.toUiText().asString(),
+                            editorError = result.error.serverMessage?.let(UiText::DynamicString)
+                                ?: result.error.toUiText(),
                         ),
                     )
                 }
@@ -386,19 +387,19 @@ internal class McpViewModel(
         val tested = editor.testState as? McpTestState.Tested
         if (tested == null || !tested.ok) {
             _state.update {
-                it.copy(editor = editor.copy(editorError = TEST_FIRST_MESSAGE))
+                it.copy(editor = editor.copy(editorError = UiText.StringResource(AnrealCopy.MCP_TEST_FIRST)))
             }
             return
         }
         if (tested.testedUrl != editor.url.trim()) {
             _state.update {
-                it.copy(editor = editor.copy(editorError = RETEST_MESSAGE))
+                it.copy(editor = editor.copy(editorError = UiText.StringResource(AnrealCopy.MCP_URL_RETEST)))
             }
             return
         }
         if (editor.checkedTools.isEmpty()) {
             _state.update {
-                it.copy(editor = editor.copy(editorError = TOOLS_MIN_MESSAGE))
+                it.copy(editor = editor.copy(editorError = UiText.StringResource(AnrealCopy.MCP_TOOLS_MIN)))
             }
             return
         }
@@ -423,7 +424,7 @@ internal class McpViewModel(
             )
         }
         when (result) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 savedStateHandle[EDITOR_NAME_KEY] = ""
                 savedStateHandle[EDITOR_URL_KEY] = ""
                 _state.update { current ->
@@ -434,13 +435,13 @@ internal class McpViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update { current ->
                     current.copy(
                         editor = current.editor?.copy(
                             saving = false,
-                            editorError = result.error.serverMessage
-                                ?: result.error.toUiText().asString(),
+                            editorError = result.error.serverMessage?.let(UiText::DynamicString)
+                                ?: result.error.toUiText(),
                         ),
                     )
                 }
@@ -452,7 +453,7 @@ internal class McpViewModel(
         if (_state.value.rowBusyId != null) return
         _state.update { it.copy(rowBusyId = id) }
         when (val result = mcpSource.setServerEnabled(id, enabled)) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { current ->
                     current.copy(
                         rowBusyId = null,
@@ -462,7 +463,7 @@ internal class McpViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update { it.copy(rowBusyId = null) }
                 _events.send(McpEvent.ShowMessage(result.error.toUiText()))
             }
@@ -473,7 +474,7 @@ internal class McpViewModel(
         val id = _state.value.deleteTargetId ?: return
         _state.update { it.copy(deleteBusy = true, deleteError = null) }
         when (val result = mcpSource.deleteServer(id)) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { current ->
                     current.copy(
                         deleteBusy = false,
@@ -482,7 +483,7 @@ internal class McpViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update {
                     it.copy(deleteBusy = false, deleteError = result.error.toUiText())
                 }
@@ -492,9 +493,6 @@ internal class McpViewModel(
 
     private companion object {
         const val MAX_HEADERS = 16
-        const val TEST_FIRST_MESSAGE = "Test the connection first before saving."
-        const val RETEST_MESSAGE = "URL changed — re-test before saving."
-        const val TOOLS_MIN_MESSAGE = "Allow at least one tool."
     }
 }
 
@@ -849,9 +847,9 @@ private fun McpEditor(
         }
         HeadersEditor(editor = editor, onAction = onAction)
         TestSection(editor = editor, onAction = onAction)
-        editor.editorError?.let { message ->
+        editor.editorError?.let { error ->
             Text(
-                text = message,
+                text = error.asString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )

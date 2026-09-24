@@ -449,6 +449,8 @@ object AnrealCopy {
     const val SITE_STEP_READY = "site_step_ready"
     const val SITE_PREVIEW_TITLE = "site_preview_title"
     const val SITE_PREVIEW_UNAVAILABLE = "site_preview_unavailable"
+    const val SITE_DOWNLOAD_SAVED = "site_download_saved"
+    const val SITE_DOWNLOAD_FAILED = "site_download_failed"
 
     fun get(key: String): String {
         return when (key) {
@@ -906,6 +908,8 @@ object AnrealCopy {
             SITE_STEP_READY -> "Siap"
             SITE_PREVIEW_TITLE -> "Site preview"
             SITE_PREVIEW_UNAVAILABLE -> "Preview is not available on this device yet."
+            SITE_DOWNLOAD_SAVED -> "Site zip saved."
+            SITE_DOWNLOAD_FAILED -> "Could not save that file."
             else -> key
         }
     }

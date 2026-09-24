@@ -67,6 +67,7 @@ import co.ratmo.anreal.core.presentation.ObserveAsEvents
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.asString
 import co.ratmo.anreal.core.presentation.toUiText
+import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.Skill
 import co.ratmo.anreal.feature.chat.domain.SkillStatus
 import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
@@ -100,7 +101,7 @@ internal data class SkillEditorState(
     val description: String = "",
     val bodyMd: String = "",
     val fieldErrors: Map<String, String> = emptyMap(),
-    val serverError: String? = null,
+    val serverError: UiText? = null,
     val saving: Boolean = false,
 )
 
@@ -186,10 +187,10 @@ internal class SkillsViewModel(
     private suspend fun loadSkills() {
         _state.update { it.copy(loading = true, error = null) }
         when (val result = skillsSource.listSkills()) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { it.copy(loading = false, skills = result.data) }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update {
                     it.copy(
                         loading = false,
@@ -277,7 +278,7 @@ internal class SkillsViewModel(
             )
         }
         when (result) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 savedStateHandle[EDITOR_NAME_KEY] = ""
                 savedStateHandle[EDITOR_DESCRIPTION_KEY] = ""
                 savedStateHandle[EDITOR_BODY_KEY] = ""
@@ -289,13 +290,13 @@ internal class SkillsViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update { current ->
                     current.copy(
                         editor = current.editor?.copy(
                             saving = false,
-                            serverError = result.error.serverMessage
-                                ?: result.error.toUiText().asString(),
+                            serverError = result.error.serverMessage?.let(UiText::DynamicString)
+                                ?: result.error.toUiText(),
                         ),
                     )
                 }
@@ -307,7 +308,7 @@ internal class SkillsViewModel(
         if (_state.value.rowBusyId != null) return
         _state.update { it.copy(rowBusyId = id) }
         when (val result = skillsSource.setSkillEnabled(id, enabled)) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { current ->
                     current.copy(
                         rowBusyId = null,
@@ -317,7 +318,7 @@ internal class SkillsViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update { it.copy(rowBusyId = null) }
                 _events.send(SkillsEvent.ShowMessage(result.error.toUiText()))
             }
@@ -328,7 +329,7 @@ internal class SkillsViewModel(
         val id = _state.value.deleteTargetId ?: return
         _state.update { it.copy(deleteBusy = true, deleteError = null) }
         when (val result = skillsSource.deleteSkill(id)) {
-            is co.ratmo.anreal.core.domain.util.Result.Success -> {
+            is Result.Success -> {
                 _state.update { current ->
                     current.copy(
                         deleteBusy = false,
@@ -337,7 +338,7 @@ internal class SkillsViewModel(
                     )
                 }
             }
-            is co.ratmo.anreal.core.domain.util.Result.Error -> {
+            is Result.Error -> {
                 _state.update {
                     it.copy(deleteBusy = false, deleteError = result.error.toUiText())
                 }
@@ -727,9 +728,9 @@ private fun SkillEditor(
             textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
             shape = MaterialTheme.shapes.extraLarge,
         )
-        editor.serverError?.let { message ->
+        editor.serverError?.let { error ->
             Text(
-                text = message,
+                text = error.asString(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )

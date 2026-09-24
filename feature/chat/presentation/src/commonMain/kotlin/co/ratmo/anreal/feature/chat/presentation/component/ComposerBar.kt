@@ -67,7 +67,6 @@ internal fun ComposerBar(
     modelSheetOpenRequest: Boolean = false,
     onModelSheetOpenRequestConsumed: () -> Unit = {},
     surfaceTinted: Boolean = false,
-    onDownloadSiteZip: (siteId: String, version: Int) -> Unit = { _, _ -> },
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
     var management by remember { mutableStateOf<ManagementSheet?>(null) }
@@ -106,11 +105,14 @@ internal fun ComposerBar(
                 SiteBuildPanel(
                     build = state.selectedSessionId?.let { state.siteBuilds[it] },
                     versions = state.selectedSessionId?.let { state.siteVersions[it] }.orEmpty(),
+                    baseUrl = state.siteBaseUrl,
                     onRetry = { siteId -> onAction(ChatAction.OnSiteRetry(siteId)) },
                     onRollback = { siteId, version ->
                         onAction(ChatAction.OnSiteRollback(siteId, version))
                     },
-                    onDownloadZip = onDownloadSiteZip,
+                    onDownloadZip = { siteId, version ->
+                        onAction(ChatAction.OnSiteDownload(siteId, version))
+                    },
                 )
                 SessionImageStrip(state = state, onAction = onAction)
                 state.uploadingDocuments.filter { it.status != "ready" }.forEach { document ->

@@ -29,7 +29,11 @@ class SiteBuildPanelScreenshotTest {
     fun sitePanelReadyLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {
-                SiteBuildPanel(build = siteReadyState(), versions = siteVersionEntries())
+                SiteBuildPanel(
+                    build = siteReadyState(),
+                    versions = siteVersionEntries(),
+                    baseUrl = "http://127.0.0.1:3001",
+                )
             }
         }
 
@@ -42,7 +46,11 @@ class SiteBuildPanelScreenshotTest {
     fun sitePanelFailedLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {
-                SiteBuildPanel(build = siteFailedState(), versions = siteVersionEntries())
+                SiteBuildPanel(
+                    build = siteFailedState(),
+                    versions = siteVersionEntries(),
+                    baseUrl = "http://127.0.0.1:3001",
+                )
             }
         }
 

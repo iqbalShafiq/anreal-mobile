@@ -32,6 +32,7 @@ import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.SessionSiteEntry
+import co.ratmo.anreal.feature.chat.domain.SiteBaseUrlProvider
 import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
 import co.ratmo.anreal.feature.chat.domain.SiteBuildState
 import co.ratmo.anreal.feature.chat.domain.SiteStatus
@@ -47,6 +48,9 @@ import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionImage
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.queue.QueueStatus
+import co.ratmo.anreal.feature.chat.presentation.component.SiteZipSaveResult
+import co.ratmo.anreal.feature.chat.presentation.component.SiteZipSaver
+import co.ratmo.anreal.feature.chat.presentation.component.FileKitSiteZipSaver
 import co.ratmo.anreal.feature.chat.domain.queue.QueuedItem
 import co.ratmo.anreal.feature.chat.domain.queue.addItem
 import co.ratmo.anreal.feature.chat.domain.queue.applyAck
@@ -250,6 +254,7 @@ data class ChatState(
     val selectedMcpServerIds: List<String> = emptyList(),
     val siteBuilds: Map<String, SiteBuildState> = emptyMap(),
     val siteVersions: Map<String, List<SiteVersionEntry>> = emptyMap(),
+    val siteBaseUrl: String = "",
 ) {
     val inProject: Boolean get() = activeProjectId != null
 }
@@ -351,9 +356,12 @@ sealed interface ChatAction {
     data object OnConfirmDeactivateShares : ChatAction
     data object OnRetryShare : ChatAction
     data class OnSkillsToggle(val skillIds: List<String>) : ChatAction
+    data object OnSkillsEnableAll : ChatAction
     data class OnMcpToggle(val serverIds: List<String>) : ChatAction
+    data object OnMcpEnableAll : ChatAction
     data class OnSiteRetry(val siteId: String) : ChatAction
     data class OnSiteRollback(val siteId: String, val version: Int) : ChatAction
+    data class OnSiteDownload(val siteId: String, val version: Int) : ChatAction
 }
 
 sealed interface ChatEvent {
@@ -376,12 +384,15 @@ class ChatViewModel(
     private val mcpSource: McpRemoteDataSource? = null,
     private val sitesSource: SitesRemoteDataSource? = null,
     private val selectionStore: EnhancementSelectionStore? = null,
+    private val siteBaseUrlProvider: SiteBaseUrlProvider? = null,
+    private val siteZipSaver: SiteZipSaver = FileKitSiteZipSaver(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
         ChatState(
             selectedSessionId = savedStateHandle[SESSION_KEY],
             draft = savedStateHandle[DRAFT_KEY] ?: "",
+            siteBaseUrl = siteBaseUrlProvider?.baseUrl().orEmpty(),
         ),
     )
     val state = _state.asStateFlow()
@@ -577,9 +588,12 @@ class ChatViewModel(
             ChatAction.OnConfirmDeactivateShares -> viewModelScope.launch { deactivateShares() }
             ChatAction.OnRetryShare -> viewModelScope.launch { loadShareStatus() }
             is ChatAction.OnSkillsToggle -> viewModelScope.launch { toggleSkills(action.skillIds) }
+            ChatAction.OnSkillsEnableAll -> viewModelScope.launch { enableAllSkills() }
             is ChatAction.OnMcpToggle -> viewModelScope.launch { toggleMcp(action.serverIds) }
+            ChatAction.OnMcpEnableAll -> viewModelScope.launch { enableAllMcp() }
             is ChatAction.OnSiteRetry -> viewModelScope.launch { retrySite(action.siteId) }
             is ChatAction.OnSiteRollback -> viewModelScope.launch { rollbackSite(action.siteId, action.version) }
+            is ChatAction.OnSiteDownload -> viewModelScope.launch { downloadSite(action.siteId, action.version) }
         }
     }
 
@@ -2124,6 +2138,42 @@ class ChatViewModel(
         val resolved = intersectWithCatalog(ids, latestMcpServers.map { it.id })
         _state.update { it.copy(selectedMcpServerIds = resolved) }
         store.saveMcpServerIds(resolved)
+    }
+
+    private suspend fun enableAllSkills() {
+        val store = selectionStore ?: return
+        val ids = latestSkills
+            .filter { it.isEnabled && it.status == SkillStatus.Active }
+            .map { it.id }
+        _state.update { it.copy(selectedSkillIds = ids) }
+        store.saveSkillIds(ids)
+    }
+
+    private suspend fun enableAllMcp() {
+        val store = selectionStore ?: return
+        val ids = latestMcpServers
+            .filter { it.isEnabled && it.status == McpStatus.Ok && it.tools.isNotEmpty() }
+            .map { it.id }
+        _state.update { it.copy(selectedMcpServerIds = ids) }
+        store.saveMcpServerIds(ids)
+    }
+
+    private suspend fun downloadSite(siteId: String, version: Int) {
+        val source = sitesSource ?: return
+        val bytes = when (val result = source.downloadSite(siteId, version)) {
+            is Result.Success -> result.data
+            is Result.Error -> {
+                _events.send(ChatEvent.ShowMessage(result.error.toUiText()))
+                return
+            }
+        }
+        when (val save = siteZipSaver.save("site-$siteId-v$version.zip", bytes)) {
+            SiteZipSaveResult.Saved -> _events.send(
+                ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.SITE_DOWNLOAD_SAVED)),
+            )
+            SiteZipSaveResult.Cancelled -> Unit
+            is SiteZipSaveResult.Failed -> _events.send(ChatEvent.ShowMessage(save.message))
+        }
     }
 
     private suspend fun pollSessionSites(sessionId: String) {

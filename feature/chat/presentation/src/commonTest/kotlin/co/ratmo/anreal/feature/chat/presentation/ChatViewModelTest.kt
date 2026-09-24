@@ -31,6 +31,7 @@ import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
 import co.ratmo.anreal.feature.chat.domain.SessionSiteEntry
+import co.ratmo.anreal.feature.chat.domain.SiteBaseUrlProvider
 import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
 import co.ratmo.anreal.feature.chat.domain.SiteBuildState
 import co.ratmo.anreal.feature.chat.domain.SiteStatus
@@ -39,6 +40,8 @@ import co.ratmo.anreal.feature.chat.domain.Skill
 import co.ratmo.anreal.feature.chat.domain.SkillStatus
 import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
 import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
+import co.ratmo.anreal.feature.chat.presentation.component.SiteZipSaveResult
+import co.ratmo.anreal.feature.chat.presentation.component.SiteZipSaver
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
 import co.ratmo.anreal.feature.chat.domain.stream.ChatMessage
@@ -1533,6 +1536,123 @@ class ChatViewModelTest {
         assertThat(versions?.first { it.version == 1 }?.stable).isEqualTo(false)
     }
 
+    @Test
+    fun enable_all_restores_eligible_skills_and_mcp() = runTest {
+        val selection = FakeSelectionStore()
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(
+                listOf(
+                    Skill(id = "s1", name = "alpha", description = "Alpha"),
+                    Skill(id = "s2", name = "beta", description = "Beta", isEnabled = false),
+                    Skill(id = "s3", name = "gamma", description = "Gamma", status = SkillStatus.Draft),
+                ),
+            ),
+            mcpSource = FakeMcpSource(
+                listOf(
+                    McpServer(id = "m1", name = "docs", url = "https://mcp.example.com/mcp", isEnabled = true, status = McpStatus.Ok, tools = listOf(McpTool("search", "Search"))),
+                    McpServer(id = "m2", name = "fresh", url = "https://mcp.example.com/fresh", isEnabled = true, status = McpStatus.Untested, tools = listOf(McpTool("search", "Search"))),
+                    McpServer(id = "m3", name = "down", url = "https://mcp.example.com/down", isEnabled = true, status = McpStatus.Error, tools = listOf(McpTool("search", "Search"))),
+                ),
+            ),
+            sitesSource = FakeSitesSource(),
+            selectionStore = selection,
+        )
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnSkillsToggle(emptyList()))
+        viewModel.onAction(ChatAction.OnMcpToggle(emptyList()))
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.selectedSkillIds).isEqualTo(emptyList())
+        assertThat(viewModel.state.value.selectedMcpServerIds).isEqualTo(emptyList())
+
+        viewModel.onAction(ChatAction.OnSkillsEnableAll)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.selectedSkillIds).isEqualTo(listOf("s1"))
+        assertThat(selection.savedSkills).isEqualTo(listOf("s1"))
+
+        viewModel.onAction(ChatAction.OnMcpEnableAll)
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.selectedMcpServerIds).isEqualTo(listOf("m1"))
+        assertThat(selection.savedMcp).isEqualTo(listOf("m1"))
+    }
+
+    @Test
+    fun site_base_url_flows_from_provider_into_state() = runTest {
+        val viewModel = ChatViewModel(
+            SavedStateHandle(),
+            populatedRepo(),
+            FakeChatPreferencesRepository(),
+            siteBaseUrlProvider = SiteBaseUrlProvider { "http://127.0.0.1:3001" },
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.siteBaseUrl).isEqualTo("http://127.0.0.1:3001")
+    }
+
+    @Test
+    fun site_download_saves_bytes_and_confirms() = runTest {
+        val sites = FakeSitesSource().apply {
+            downloadResult = Result.Success(byteArrayOf(1, 2, 3))
+        }
+        val saver = FakeSiteZipSaver()
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+            siteZipSaver = saver,
+        )
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnSiteDownload("s1", 2))
+            assertThat(awaitItem()).isEqualTo(
+                ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.SITE_DOWNLOAD_SAVED)),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+
+        assertThat(saver.savedNames).isEqualTo(listOf("site-s1-v2.zip"))
+        assertThat(saver.savedSizes).isEqualTo(listOf(3))
+    }
+
+    @Test
+    fun site_download_error_surfaces_message() = runTest {
+        val sites = FakeSitesSource().apply {
+            downloadResult = Result.Error(DataError.Network.NOT_FOUND)
+        }
+        val saver = FakeSiteZipSaver()
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+            siteZipSaver = saver,
+        )
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnSiteDownload("s1", 2))
+            assertThat(awaitItem()).isEqualTo(
+                ChatEvent.ShowMessage(UiText.StringResource(AnrealCopy.ERROR_NOT_FOUND)),
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+
+        assertThat(saver.savedNames).isEqualTo(emptyList())
+    }
+
     private fun populatedRepo(): FakeChatRepository = FakeChatRepository().apply {
         refreshResult = Result.Success(
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
@@ -1783,6 +1903,7 @@ private class FakeMcpSource(
 
 private class FakeSitesSource : SitesRemoteDataSource {
     var entries: Result<List<SessionSiteEntry>, DataError.Network> = Result.Success(emptyList())
+    var downloadResult: Result<ByteArray, DataError.Network> = Result.Success(ByteArray(0))
     var retryResult: Result<SiteBuildState, DataError.Network> =
         Result.Success(SiteBuildState("s1", 1, SiteBuildPhase.Starting, "Mengulang build."))
     var rollbackResult: Result<Int, DataError.Network> = Result.Success(1)
@@ -1801,7 +1922,7 @@ private class FakeSitesSource : SitesRemoteDataSource {
     }
 
     override suspend fun downloadSite(siteId: String, version: Int): Result<ByteArray, DataError.Network> =
-        Result.Success(ByteArray(0))
+        downloadResult
 
     override suspend fun retrySite(siteId: String): Result<SiteBuildState, DataError.Network> = retryResult
 
@@ -1829,5 +1950,18 @@ private class FakeSelectionStore(
     override suspend fun saveMcpServerIds(ids: List<String>) {
         savedMcp = ids
         mcpIds.value = ids
+    }
+}
+
+private class FakeSiteZipSaver(
+    var result: SiteZipSaveResult = SiteZipSaveResult.Saved,
+) : SiteZipSaver {
+    val savedNames = mutableListOf<String>()
+    val savedSizes = mutableListOf<Int>()
+
+    override suspend fun save(filename: String, bytes: ByteArray): SiteZipSaveResult {
+        savedNames += filename
+        savedSizes += bytes.size
+        return result
     }
 }

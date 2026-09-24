@@ -81,7 +81,7 @@ private val BUILD_STEPS = listOf(
 internal fun SiteBuildPanel(
     build: SiteBuildState?,
     versions: List<SiteVersionEntry> = emptyList(),
-    baseUrl: String = "",
+    baseUrl: String,
     onRetry: (siteId: String) -> Unit = {},
     onRollback: (siteId: String, version: Int) -> Unit = { _, _ -> },
     onDownloadZip: (siteId: String, version: Int) -> Unit = { _, _ -> },
@@ -426,7 +426,11 @@ internal fun siteVersionEntries(): List<SiteVersionEntry> = listOf(
 @Composable
 private fun SitePanelBuildingPreview() {
     AnrealPreview {
-        SiteBuildPanel(build = siteBuildingState(), versions = siteVersionEntries())
+        SiteBuildPanel(
+            build = siteBuildingState(),
+            versions = siteVersionEntries(),
+            baseUrl = PREVIEW_BASE_URL,
+        )
     }
 }
 
@@ -434,7 +438,11 @@ private fun SitePanelBuildingPreview() {
 @Composable
 private fun SitePanelReadyPreview() {
     AnrealPreview {
-        SiteBuildPanel(build = siteReadyState(), versions = siteVersionEntries())
+        SiteBuildPanel(
+            build = siteReadyState(),
+            versions = siteVersionEntries(),
+            baseUrl = PREVIEW_BASE_URL,
+        )
     }
 }
 
@@ -442,7 +450,11 @@ private fun SitePanelReadyPreview() {
 @Composable
 private fun SitePanelFailedPreview() {
     AnrealPreview {
-        SiteBuildPanel(build = siteFailedState(), versions = siteVersionEntries())
+        SiteBuildPanel(
+            build = siteFailedState(),
+            versions = siteVersionEntries(),
+            baseUrl = PREVIEW_BASE_URL,
+        )
     }
 }
 
@@ -450,6 +462,8 @@ private fun SitePanelFailedPreview() {
 @Composable
 private fun SitePanelHiddenPreview() {
     AnrealPreview {
-        SiteBuildPanel(build = null)
+        SiteBuildPanel(build = null, baseUrl = PREVIEW_BASE_URL)
     }
 }
+
+private const val PREVIEW_BASE_URL = "http://127.0.0.1:3001"

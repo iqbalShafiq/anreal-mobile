@@ -357,10 +357,13 @@ private fun FeaturesSheet(
                 totalCount = state.capabilities.userSkillsCount,
                 manageDescription = AnrealCopy.get(AnrealCopy.CD_MANAGE_SKILLS),
                 onToggle = { on ->
-                    // Turning back on from empty restores nothing here: the ChatViewModel
-                    // only intersects the ids it is given. Re-enable from the manager,
-                    // which owns the full catalog.
-                    onAction(ChatAction.OnSkillsToggle(if (on) state.selectedSkillIds else emptyList()))
+                    // Toggling ON with an empty selection restores every eligible skill:
+                    // the toggle actions only intersect the ids they are given.
+                    if (on && state.selectedSkillIds.isEmpty()) {
+                        onAction(ChatAction.OnSkillsEnableAll)
+                    } else {
+                        onAction(ChatAction.OnSkillsToggle(if (on) state.selectedSkillIds else emptyList()))
+                    }
                 },
                 onManage = onManageSkills,
             )
@@ -380,7 +383,11 @@ private fun FeaturesSheet(
                 totalCount = state.capabilities.userMcpCount,
                 manageDescription = AnrealCopy.get(AnrealCopy.CD_MANAGE_MCP),
                 onToggle = { on ->
-                    onAction(ChatAction.OnMcpToggle(if (on) state.selectedMcpServerIds else emptyList()))
+                    if (on && state.selectedMcpServerIds.isEmpty()) {
+                        onAction(ChatAction.OnMcpEnableAll)
+                    } else {
+                        onAction(ChatAction.OnMcpToggle(if (on) state.selectedMcpServerIds else emptyList()))
+                    }
                 },
                 onManage = onManageMcp,
             )

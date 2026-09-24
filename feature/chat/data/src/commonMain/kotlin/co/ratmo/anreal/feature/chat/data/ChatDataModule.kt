@@ -4,6 +4,7 @@ import co.ratmo.anreal.core.data.AppConfig
 import co.ratmo.anreal.feature.chat.domain.AccountSettingsDataSource
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.SiteBaseUrlProvider
 import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
 import co.ratmo.anreal.feature.chat.domain.SitesRemoteDataSource
 import org.koin.dsl.module
@@ -47,4 +48,11 @@ val chatDataModule = module {
             KtorSitesDataSource(get())
         }
     }
+    single<SiteBaseUrlProvider> { AppConfigSiteBaseUrlProvider(get()) }
+}
+
+private class AppConfigSiteBaseUrlProvider(
+    private val appConfig: AppConfig,
+) : SiteBaseUrlProvider {
+    override fun baseUrl(): String = appConfig.baseUrl
 }

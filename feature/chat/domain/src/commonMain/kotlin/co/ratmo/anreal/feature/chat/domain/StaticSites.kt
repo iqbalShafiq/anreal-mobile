@@ -37,6 +37,10 @@ interface EnhancementSelectionStore {
     suspend fun saveMcpServerIds(ids: List<String>)
 }
 
+fun interface SiteBaseUrlProvider {
+    fun baseUrl(): String
+}
+
 fun intersectWithCatalog(selected: List<String>, catalogIds: List<String>): List<String> {
     val catalog = catalogIds.toSet()
     return selected.filter { it in catalog }.distinct()
