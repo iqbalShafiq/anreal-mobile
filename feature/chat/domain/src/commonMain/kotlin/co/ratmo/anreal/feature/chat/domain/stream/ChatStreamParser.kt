@@ -261,6 +261,23 @@ private fun parseDataEvent(event: JsonObject, type: String): ChatStreamEvent {
                 downloadUrl = data.string("downloadUrl").orEmpty(),
             )
         }
+        "artifactFocus" -> {
+            val data = event["data"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+            if (data.keys != setOf("artifactId", "artifactType") &&
+                data.keys != setOf("artifactId", "artifactType", "label")
+            ) {
+                return ChatStreamEvent.Unknown(type)
+            }
+            val artifactType = data.string("artifactType") ?: return ChatStreamEvent.Unknown(type)
+            if (artifactType !in setOf("document", "image", "web_bundle", "site", "task", "schedule", "session")) {
+                return ChatStreamEvent.Unknown(type)
+            }
+            ChatStreamEvent.ArtifactFocus(
+                artifactId = data.string("artifactId") ?: return ChatStreamEvent.Unknown(type),
+                artifactType = artifactType,
+                label = data.string("label"),
+            )
+        }
         else -> ChatStreamEvent.Unknown(type)
     }
 }

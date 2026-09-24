@@ -10,6 +10,7 @@ enum class SiteBuildPhase { Starting, Planning, Building, Bundling, Preview, Rea
 data class SessionSiteEntry(
     val siteId: String, val version: Int, val stableVersion: Int?,
     val status: SiteStatus, val previewUrl: String?, val downloadUrl: String, val updatedAt: String,
+    val sessionId: String = "",
 )
 
 data class SiteVersionEntry(

@@ -9,6 +9,7 @@ import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatSessionDetail
 import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
 import co.ratmo.anreal.feature.chat.domain.ChatShareLink
 import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
@@ -205,6 +206,8 @@ class OfflineFirstChatRepository(
     }
 
     override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = remote.listActiveRuns()
+
+    override suspend fun getSession(id: String): Result<ChatSessionDetail, ChatError> = remote.getSession(id)
 
     override suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError> =
         remote.getSessionMessageCount(sessionId)

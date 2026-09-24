@@ -108,6 +108,13 @@ private fun ChatThreadState.applyEvent(envelope: StreamEnvelope.Event): ChatThre
             siteBuild = applySiteBuildEvent(advanced.siteBuild, event.siteId, event.version, SiteBuildPhase.Ready, "", event.previewUrl, event.downloadUrl),
             siteVersions = applySiteVersionEvent(advanced.siteVersions, event.siteId, event.version, SiteBuildPhase.Ready, event.previewUrl, event.downloadUrl),
         )
+        is ChatStreamEvent.ArtifactFocus -> advanced.copy(
+            pendingArtifactFocus = ArtifactFocusState(
+                artifactId = event.artifactId,
+                artifactType = event.artifactType,
+                label = event.label,
+            ),
+        )
         is ChatStreamEvent.Unknown -> advanced
     }
 }

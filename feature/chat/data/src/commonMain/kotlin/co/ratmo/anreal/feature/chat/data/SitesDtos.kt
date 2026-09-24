@@ -20,6 +20,7 @@ data class SessionSiteEntryDto(
     val siteId: String, val version: Int, val stableVersion: Int? = null,
     val status: String = "queued", val previewUrl: String? = null,
     val downloadUrl: String = "", val updatedAt: String = "",
+    val sessionId: String = "",
 )
 
 @Serializable
@@ -37,7 +38,7 @@ data class SiteManifestDto(val siteId: String, val stableVersion: Int? = null, v
 fun SessionSiteEntryDto.toEntry(): SessionSiteEntry = SessionSiteEntry(
     siteId = siteId, version = version, stableVersion = stableVersion,
     status = when (status) { "running" -> SiteStatus.Running; "ready" -> SiteStatus.Ready; "failed" -> SiteStatus.Failed; else -> SiteStatus.Queued },
-    previewUrl = previewUrl, downloadUrl = downloadUrl, updatedAt = updatedAt,
+    previewUrl = previewUrl, downloadUrl = downloadUrl, updatedAt = updatedAt, sessionId = sessionId,
 )
 
 class KtorSitesDataSource(private val httpClient: HttpClient) : SitesRemoteDataSource {

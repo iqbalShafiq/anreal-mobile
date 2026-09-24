@@ -21,6 +21,7 @@ import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
+import co.ratmo.anreal.feature.chat.domain.ChatSessionDetail
 import co.ratmo.anreal.feature.chat.domain.ChatShareDeactivation
 import co.ratmo.anreal.feature.chat.domain.ChatShareLink
 import co.ratmo.anreal.feature.chat.domain.ChatShareStatus
@@ -168,6 +169,14 @@ class KtorChatRemoteDataSource(
             queryParameters = mapOf("sessionId" to sessionId),
         )
             .map { it.toCapabilities() }
+            .mapNetwork()
+    }
+
+    suspend fun getSession(id: String): Result<ChatSessionDetail, ChatError> {
+        return httpClient.get<ChatSessionDetailDto>(
+            route = "/api/chat/sessions/$id",
+        )
+            .map { it.toDetail() }
             .mapNetwork()
     }
 

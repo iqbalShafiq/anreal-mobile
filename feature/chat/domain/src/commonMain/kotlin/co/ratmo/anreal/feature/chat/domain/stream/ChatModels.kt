@@ -145,6 +145,13 @@ data class ChatThreadState(
     val deepResearch: DeepResearchStatus? = null,
     val siteBuild: SiteBuildState? = null,
     val siteVersions: List<SiteVersionEntry> = emptyList(),
+    val pendingArtifactFocus: ArtifactFocusState? = null,
+)
+
+data class ArtifactFocusState(
+    val artifactId: String,
+    val artifactType: String,
+    val label: String? = null,
 )
 
 data class ToolApproval(
@@ -250,6 +257,12 @@ sealed interface ChatStreamEvent {
         val version: Int,
         val previewUrl: String?,
         val downloadUrl: String,
+    ) : ChatStreamEvent
+
+    data class ArtifactFocus(
+        val artifactId: String,
+        val artifactType: String,
+        val label: String? = null,
     ) : ChatStreamEvent
 
     data class Unknown(

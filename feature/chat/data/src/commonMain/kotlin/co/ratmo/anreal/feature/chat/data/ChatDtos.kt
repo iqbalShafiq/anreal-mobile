@@ -2,6 +2,7 @@ package co.ratmo.anreal.feature.chat.data
 
 import co.ratmo.anreal.core.domain.model.ChatSession
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
+import co.ratmo.anreal.feature.chat.domain.ChatSessionDetail
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
@@ -484,6 +485,21 @@ fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(
     context7Configured = context7Configured,
     userSkillsCount = userSkillsCount,
     userMcpCount = userMcpCount,
+)
+
+fun ChatSessionDetailDto.toDetail(): ChatSessionDetail = ChatSessionDetail(
+    sessionId = sessionId,
+    projectId = projectId,
+    title = title,
+    updatedAt = updatedAt,
+)
+
+@Serializable
+data class ChatSessionDetailDto(
+    val sessionId: String,
+    val projectId: String? = null,
+    val title: String = "",
+    val updatedAt: String = "",
 )
 
 fun ImageGenSettings.toDto(): ImageGenSettingsDto = ImageGenSettingsDto(

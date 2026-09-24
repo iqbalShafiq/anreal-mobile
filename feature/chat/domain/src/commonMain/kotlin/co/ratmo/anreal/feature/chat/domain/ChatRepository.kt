@@ -29,6 +29,13 @@ data class ActiveRun(
     val lastEventId: Int,
 )
 
+data class ChatSessionDetail(
+    val sessionId: String,
+    val projectId: String?,
+    val title: String,
+    val updatedAt: String,
+)
+
 data class ContextUsage(
     val modelId: String,
     val modelLabel: String,
@@ -132,6 +139,7 @@ interface ChatRepository {
     suspend fun stop(streamId: String): EmptyResult<ChatError>
     suspend fun runStatus(sessionId: String): Result<RunStatusSnapshot, ChatError>
     suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError>
+    suspend fun getSession(id: String): Result<ChatSessionDetail, ChatError>
     suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError>
     suspend fun getContextUsage(
         sessionId: String,
