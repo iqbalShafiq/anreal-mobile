@@ -1,6 +1,8 @@
 package co.ratmo.anreal.feature.workspace.data
 
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ArtifactItem
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
@@ -52,6 +54,7 @@ data class DocumentDto(
     val originSessionId: String = "",
     val projectId: String? = null,
     val projectName: String? = null,
+    val kind: String = "source",
 )
 
 @Serializable
@@ -67,6 +70,7 @@ data class ImageDto(
     val height: Int = 0,
     val modelId: String = "",
     val prompt: String = "",
+    val caption: String = "",
     val nOfTotal: String? = null,
     val createdAt: String = "",
 )
@@ -170,6 +174,7 @@ fun DocumentPageDto.toPage(): WorkspacePage<WorkspaceDocument> = WorkspacePage(
             item.originSessionId,
             item.projectId,
             item.projectName,
+            item.kind,
         )
     },
     nextCursor = nextCursor,
@@ -177,6 +182,7 @@ fun DocumentPageDto.toPage(): WorkspacePage<WorkspaceDocument> = WorkspacePage(
 
 fun ImageDto.toImage(): WorkspaceImage = WorkspaceImage(
     id, projectId, sessionId, mediaType, width, height, modelId, prompt, nOfTotal, createdAt,
+    caption = caption.ifBlank { prompt },
 )
 
 fun ScopeSiteEntryDto.toScopeEntry(): ScopeSiteEntry = ScopeSiteEntry(
@@ -261,6 +267,62 @@ fun WorkspaceScheduleDto.toSchedule(): WorkspaceSchedule = WorkspaceSchedule(
     freq = freq.toScheduleFreq(),
     nextRunAt = nextRunAt,
     status = status,
+)
+
+@Serializable
+data class ArtifactItemDto(
+    val type: String,
+    val id: String,
+    val title: String? = null,
+    val caption: String? = null,
+    val prompt: String? = null,
+    val status: String? = null,
+    val previewUrl: String? = null,
+    val downloadUrl: String? = null,
+    val version: Int? = null,
+)
+
+@Serializable
+data class ArtifactListDto(val items: List<ArtifactItemDto> = emptyList())
+
+@Serializable
+data class ArtifactDetailDto(val artifact: ArtifactItemDto)
+
+@Serializable
+data class ImageCaptionDto(val sessionId: String, val caption: String)
+
+fun String.toArtifactType(): ArtifactType = when (this) {
+    "document" -> ArtifactType.Document
+    "image" -> ArtifactType.Image
+    "web_bundle" -> ArtifactType.WebBundle
+    "site" -> ArtifactType.Site
+    "task" -> ArtifactType.Task
+    "schedule" -> ArtifactType.Schedule
+    "session" -> ArtifactType.Session
+    else -> ArtifactType.Unknown
+}
+
+fun ArtifactType.toWire(): String? = when (this) {
+    ArtifactType.Document -> "document"
+    ArtifactType.Image -> "image"
+    ArtifactType.WebBundle -> "web_bundle"
+    ArtifactType.Site -> "site"
+    ArtifactType.Task -> "task"
+    ArtifactType.Schedule -> "schedule"
+    ArtifactType.Session -> "session"
+    ArtifactType.Unknown -> null
+}
+
+fun ArtifactItemDto.toArtifact(): ArtifactItem = ArtifactItem(
+    id = id,
+    type = type.toArtifactType(),
+    title = title,
+    caption = caption,
+    prompt = prompt,
+    status = status,
+    previewUrl = previewUrl,
+    downloadUrl = downloadUrl,
+    version = version,
 )
 
 fun DocumentPreviewDto.toPreview(): DocumentPreview = DocumentPreview(

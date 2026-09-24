@@ -200,6 +200,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                             WorkspaceSection.Sites -> state.sites.size
                             WorkspaceSection.Tasks -> state.tasks.size
                             WorkspaceSection.Schedules -> state.schedules.size
+                            WorkspaceSection.Artifacts -> state.artifacts.size
                             WorkspaceSection.Projects -> 0
                         }
                         WorkspaceLoadedLabel(
@@ -345,6 +346,19 @@ private fun WorkspaceContent(state: WorkspaceState, onAction: (WorkspaceAction) 
                 editor = state.scheduleEditor,
                 isMutating = state.isMutating,
                 mutationError = state.mutationError,
+                onAction = onAction,
+            )
+            WorkspaceSection.Artifacts -> ArtifactsBrowser(
+                artifacts = state.artifacts,
+                isLoading = state.isLoading,
+                loaded = WorkspaceSection.Artifacts in state.loadedSections,
+                hasScope = state.scopeSessionId != null,
+                error = state.error,
+                typeFilter = state.artifactTypeFilter,
+                detail = state.artifactDetail,
+                captionDraft = state.captionDraft,
+                captionSaving = state.captionSaving,
+                captionError = state.captionError,
                 onAction = onAction,
             )
         }
@@ -1039,6 +1053,7 @@ private fun WorkspaceSection.label(): String = when (this) {
     WorkspaceSection.Sites -> AnrealCopy.get(AnrealCopy.LABEL_SITES)
     WorkspaceSection.Tasks -> AnrealCopy.get(AnrealCopy.LABEL_TASKS)
     WorkspaceSection.Schedules -> AnrealCopy.get(AnrealCopy.LABEL_SCHEDULES)
+    WorkspaceSection.Artifacts -> AnrealCopy.get(AnrealCopy.LABEL_ARTIFACTS)
 }
 
 @AnrealPreviews

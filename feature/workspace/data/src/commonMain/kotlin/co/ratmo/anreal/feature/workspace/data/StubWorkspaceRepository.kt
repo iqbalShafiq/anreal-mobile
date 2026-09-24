@@ -3,6 +3,8 @@ package co.ratmo.anreal.feature.workspace.data
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ArtifactItem
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
@@ -131,4 +133,24 @@ class StubWorkspaceRepository : WorkspaceRepository {
 
     override suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError> =
         Result.Success(Unit)
+
+    override suspend fun listArtifacts(
+        sessionId: String,
+        type: ArtifactType?,
+        query: String?,
+    ): Result<List<ArtifactItem>, WorkspaceError> = Result.Success(emptyList())
+
+    override suspend fun getArtifact(
+        sessionId: String,
+        type: ArtifactType,
+        id: String,
+    ): Result<ArtifactItem, WorkspaceError> =
+        Result.Success(ArtifactItem(id = id, type = type))
+
+    override suspend fun updateImageCaption(
+        sessionId: String,
+        imageId: String,
+        caption: String,
+    ): Result<ArtifactItem, WorkspaceError> =
+        Result.Success(ArtifactItem(id = imageId, type = ArtifactType.Image, caption = caption))
 }

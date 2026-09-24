@@ -36,6 +36,7 @@ data class WorkspaceDocument(
     val originSessionId: String,
     val projectId: String?,
     val projectName: String?,
+    val kind: String = "source",
 )
 
 data class WorkspaceImage(
@@ -49,6 +50,7 @@ data class WorkspaceImage(
     val prompt: String,
     val nOfTotal: String?,
     val createdAt: String,
+    val caption: String = "",
 )
 
 data class DocumentPageImage(
@@ -104,6 +106,20 @@ data class WorkspaceSchedule(
     val freq: ScheduleFreq = ScheduleFreq.Once,
     val nextRunAt: String? = null,
     val status: String = "active",
+)
+
+enum class ArtifactType { Document, Image, WebBundle, Site, Task, Schedule, Session, Unknown }
+
+data class ArtifactItem(
+    val id: String,
+    val type: ArtifactType = ArtifactType.Unknown,
+    val title: String? = null,
+    val caption: String? = null,
+    val prompt: String? = null,
+    val status: String? = null,
+    val previewUrl: String? = null,
+    val downloadUrl: String? = null,
+    val version: Int? = null,
 )
 
 data class DocumentPreview(

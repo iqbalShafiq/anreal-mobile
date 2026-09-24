@@ -1,6 +1,7 @@
 package co.ratmo.anreal.feature.workspace.data
 
 import assertk.assertThat
+import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isTrue
@@ -8,6 +9,7 @@ import co.ratmo.anreal.core.data.auth.InMemorySessionTokenStore
 import co.ratmo.anreal.core.data.network.HttpClientFactory
 import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.Result
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -195,6 +197,85 @@ class KtorWorkspaceRepositoryTest {
         val result = repository.cancelSchedule("abc", "sc1")
 
         assertThat(result).isEqualTo(Result.Success(Unit))
+    }
+
+    @Test
+    fun artifacts_list_maps_mixed_items() = runTest {
+        val repository = repository(
+            """{"items":[{"type":"image","id":"i1","caption":"Chart","prompt":"Draw"},{"type":"site","id":"s1","title":null,"status":"ready","previewUrl":"/api/sites/s1/v1/preview/index.html","downloadUrl":"/api/sites/s1/v1/download","version":1},{"type":"task","id":"t1","title":"Fix login","status":"doing"}]}""",
+        )
+
+        val result = repository.listArtifacts("abc", null, null)
+
+        val items = (result as Result.Success).data
+        assertThat(items).hasSize(3)
+        assertThat(items[0].type).isEqualTo(ArtifactType.Image)
+        assertThat(items[0].caption).isEqualTo("Chart")
+        assertThat(items[1].type).isEqualTo(ArtifactType.Site)
+    }
+
+    @Test
+    fun artifacts_future_type_maps_unknown() = runTest {
+        val repository = repository("""{"items":[{"type":"hologram","id":"h1"}]}""")
+
+        val result = repository.listArtifacts("abc", null, null)
+
+        assertThat((result as Result.Success).data.single().type).isEqualTo(ArtifactType.Unknown)
+    }
+
+    @Test
+    fun artifacts_get_maps_detail() = runTest {
+        val repository = repository(
+            """{"artifact":{"type":"image","id":"i1","caption":"Chart","prompt":"Draw"}}""",
+        )
+
+        val result = repository.getArtifact("abc", ArtifactType.Image, "i1")
+
+        assertThat((result as Result.Success).data.caption).isEqualTo("Chart")
+    }
+
+    @Test
+    fun artifacts_caption_update_maps() = runTest {
+        val repository = repository("""{"type":"image","id":"i1","caption":"New caption"}""")
+
+        val result = repository.updateImageCaption("abc", "i1", "New caption")
+
+        assertThat((result as Result.Success).data.caption).isEqualTo("New caption")
+    }
+
+    @Test
+    fun artifacts_caption_404_keeps_code() = runTest {
+        val repository = repository(
+            body = """{"error":"Image not found","code":"IMAGE_NOT_FOUND"}""",
+            status = HttpStatusCode.NotFound,
+        )
+
+        val result = repository.updateImageCaption("abc", "ghost", "x")
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.code).isEqualTo("IMAGE_NOT_FOUND")
+    }
+
+    @Test
+    fun image_caption_maps_with_prompt_fallback() = runTest {
+        val repository = repository(
+            """{"images":[{"id":"i1","sessionId":"s1","mediaType":"image/png","prompt":"Draw","caption":""}]}""",
+        )
+
+        val images = (repository.listImages(null) as Result.Success).data
+
+        assertThat(images.single().caption).isEqualTo("Draw")
+    }
+
+    @Test
+    fun document_kind_defaults_source() = runTest {
+        val repository = repository(
+            """{"items":[{"id":"d1","filename":"a.pdf"}],"nextCursor":null}""",
+        )
+
+        val document = (repository.listDocuments() as Result.Success).data.items.single()
+
+        assertThat(document.kind).isEqualTo("source")
     }
 
     @Test

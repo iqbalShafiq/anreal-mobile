@@ -13,6 +13,8 @@ import co.ratmo.anreal.core.domain.util.asEmptyResult
 import co.ratmo.anreal.core.domain.util.map
 import co.ratmo.anreal.core.domain.util.mapError
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ArtifactItem
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
@@ -199,6 +201,44 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
         httpClient.delete(route = "/api/schedules/$id", queryParameters = mapOf("sessionId" to sessionId))
             .mapWorkspaceError()
             .asEmptyResult()
+
+    override suspend fun listArtifacts(
+        sessionId: String,
+        type: ArtifactType?,
+        query: String?,
+    ): Result<List<ArtifactItem>, WorkspaceError> =
+        httpClient.get<ArtifactListDto>(
+            route = "/api/artifacts",
+            queryParameters = mapOf(
+                "sessionId" to sessionId,
+                "type" to type?.toWire(),
+                "q" to query?.ifBlank { null },
+            ),
+        ).map { dto -> dto.items.map { it.toArtifact() } }.mapWorkspaceError()
+
+    override suspend fun getArtifact(
+        sessionId: String,
+        type: ArtifactType,
+        id: String,
+    ): Result<ArtifactItem, WorkspaceError> =
+        httpClient.get<ArtifactDetailDto>(
+            route = "/api/artifacts/$id",
+            queryParameters = mapOf(
+                "sessionId" to sessionId,
+                "type" to (type.toWire() ?: return Result.Error(
+                    WorkspaceError.Network(DataError.Network(DataError.Network.Kind.BAD_REQUEST, 400, "Unknown artifact type", null, emptyMap())),
+                )),
+            ),
+        ).map { it.artifact.toArtifact() }.mapWorkspaceError()
+
+    override suspend fun updateImageCaption(
+        sessionId: String,
+        imageId: String,
+        caption: String,
+    ): Result<ArtifactItem, WorkspaceError> = httpClient.patch<ImageCaptionDto, ArtifactItemDto>(
+        route = "/api/artifacts/images/$imageId",
+        body = ImageCaptionDto(sessionId = sessionId, caption = caption),
+    ).map { it.toArtifact() }.mapWorkspaceError()
 }
 
 private fun <T> Result<T, DataError.Network>.mapWorkspaceError(): Result<T, WorkspaceError> =

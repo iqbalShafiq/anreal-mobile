@@ -15,6 +15,8 @@ import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.ArtifactItem
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.TaskSubtask
@@ -252,6 +254,41 @@ class WorkspaceViewModelTest {
         assertThat(repository.scheduleCancels).isEqualTo(listOf("sc1"))
         assertThat(viewModel.state.value.schedules).hasSize(0)
     }
+
+    @Test
+    fun artifacts_section_loads_items() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Artifacts, repository, scopeSessionId = "abc")
+
+        assertThat(repository.artifactScopes).isEqualTo(listOf("abc"))
+        assertThat(viewModel.state.value.artifacts).hasSize(2)
+    }
+
+    @Test
+    fun artifacts_type_filter_reloads() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Artifacts, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnArtifactTypeFilter(ArtifactType.Image))
+
+        assertThat(repository.artifactTypes).isEqualTo(listOf(null, ArtifactType.Image))
+        assertThat(viewModel.state.value.artifactTypeFilter).isEqualTo(ArtifactType.Image)
+    }
+
+    @Test
+    fun caption_404_keeps_editor() {
+        val repository = FakeWorkspaceRepository().apply { captionError = true }
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Artifacts, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnArtifactOpen("i1"))
+        viewModel.onAction(WorkspaceAction.OnCaptionChange("Chart typed"))
+        viewModel.onAction(WorkspaceAction.OnCaptionSave)
+
+        assertThat(viewModel.state.value.artifactDetail).isNotNull()
+        assertThat(viewModel.state.value.captionDraft).isEqualTo("Chart typed")
+        assertThat(viewModel.state.value.captionError).isNotNull()
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {
@@ -448,5 +485,51 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
     override suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError> {
         scheduleCancels += id
         return Result.Success(Unit)
+    }
+
+    private val artifactImage = ArtifactItem(
+        id = "i1", type = ArtifactType.Image, title = null,
+        caption = "Chart", prompt = "Draw", status = null,
+        previewUrl = null, downloadUrl = null, version = null,
+    )
+    private val artifactSite = ArtifactItem(
+        id = "s1", type = ArtifactType.Site, title = null, caption = null,
+        prompt = null, status = "ready",
+        previewUrl = "/api/sites/s1/v1/preview/index.html",
+        downloadUrl = "/api/sites/s1/v1/download", version = 1,
+    )
+    val artifactScopes = mutableListOf<String>()
+    val artifactTypes = mutableListOf<ArtifactType?>()
+    var captionError = false
+
+    override suspend fun listArtifacts(
+        sessionId: String,
+        type: ArtifactType?,
+        query: String?,
+    ): Result<List<ArtifactItem>, WorkspaceError> {
+        artifactScopes += sessionId
+        artifactTypes += type
+        return Result.Success(listOf(artifactImage, artifactSite))
+    }
+
+    override suspend fun getArtifact(
+        sessionId: String,
+        type: ArtifactType,
+        id: String,
+    ): Result<ArtifactItem, WorkspaceError> = Result.Success(artifactImage.copy(id = id))
+
+    override suspend fun updateImageCaption(
+        sessionId: String,
+        imageId: String,
+        caption: String,
+    ): Result<ArtifactItem, WorkspaceError> {
+        if (captionError) {
+            return Result.Error(
+                WorkspaceError.Network(
+                    DataError.Network(DataError.Network.Kind.NOT_FOUND, 404, "Image not found", "IMAGE_NOT_FOUND", emptyMap()),
+                ),
+            )
+        }
+        return Result.Success(artifactImage.copy(caption = caption))
     }
 }

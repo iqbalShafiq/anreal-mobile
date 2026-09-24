@@ -12,6 +12,8 @@ import co.ratmo.anreal.core.presentation.toUiText
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.ArtifactItem
+import co.ratmo.anreal.feature.workspace.domain.ArtifactType
 import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceBaseUrlProvider
@@ -37,7 +39,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 private const val LOAD_WAIT_INTERVAL_MS = 25L
 
 @Serializable
-enum class WorkspaceSection { Projects, Documents, Images, Sites, Tasks, Schedules }
+enum class WorkspaceSection { Projects, Documents, Images, Sites, Tasks, Schedules, Artifacts }
 
 enum class WorkspaceViewMode { List, Grid }
 
@@ -124,6 +126,18 @@ data class ScheduleEditorState(
     val saving: Boolean = false,
 )
 
+data class ArtifactItemUi(
+    val id: String,
+    val type: ArtifactType,
+    val title: String?,
+    val caption: String?,
+    val prompt: String?,
+    val status: String?,
+    val previewUrl: String?,
+    val downloadUrl: String?,
+    val version: Int?,
+)
+
 data class DocumentPreviewUi(
     val id: String,
     val filename: String,
@@ -171,6 +185,12 @@ data class WorkspaceState(
     val taskEditor: TaskEditorState? = null,
     val schedules: List<ScheduleUi> = emptyList(),
     val scheduleEditor: ScheduleEditorState? = null,
+    val artifacts: List<ArtifactItemUi> = emptyList(),
+    val artifactTypeFilter: ArtifactType? = null,
+    val artifactDetail: ArtifactItemUi? = null,
+    val captionDraft: String = "",
+    val captionSaving: Boolean = false,
+    val captionError: UiText? = null,
     val siteBaseUrl: String = "",
     val previewSiteId: String? = null,
     val query: String = "",
@@ -241,6 +261,11 @@ sealed interface WorkspaceAction {
     data class OnScheduleRunAtChange(val value: String) : WorkspaceAction
     data object OnScheduleSave : WorkspaceAction
     data class OnRequestCancelSchedule(val id: String, val title: String) : WorkspaceAction
+    data class OnArtifactTypeFilter(val type: ArtifactType?) : WorkspaceAction
+    data class OnArtifactOpen(val id: String) : WorkspaceAction
+    data object OnArtifactClose : WorkspaceAction
+    data class OnCaptionChange(val value: String) : WorkspaceAction
+    data object OnCaptionSave : WorkspaceAction
 }
 
 sealed interface WorkspaceEvent {
@@ -383,6 +408,20 @@ class WorkspaceViewModel(
             is WorkspaceAction.OnRequestCancelSchedule -> _state.update {
                 it.copy(deleteTarget = WorkspaceDeleteTarget.Schedule(action.id, action.title), mutationError = null)
             }
+            is WorkspaceAction.OnArtifactTypeFilter -> {
+                _state.update { it.copy(artifactTypeFilter = action.type) }
+                if (_state.value.section == WorkspaceSection.Artifacts) {
+                    viewModelScope.launch { awaitThenLoad(WorkspaceSection.Artifacts) }
+                }
+            }
+            is WorkspaceAction.OnArtifactOpen -> viewModelScope.launch { openArtifact(action.id) }
+            WorkspaceAction.OnArtifactClose -> _state.update {
+                it.copy(artifactDetail = null, captionDraft = "", captionSaving = false, captionError = null)
+            }
+            is WorkspaceAction.OnCaptionChange -> _state.update {
+                it.copy(captionDraft = action.value, captionError = null)
+            }
+            WorkspaceAction.OnCaptionSave -> viewModelScope.launch { saveCaption() }
         }
     }
 
@@ -457,6 +496,21 @@ class WorkspaceViewModel(
                     }
                 }
             }
+            WorkspaceSection.Artifacts -> {
+                val scopeId = _state.value.scopeSessionId
+                if (scopeId.isNullOrBlank()) {
+                    _state.update {
+                        it.copy(artifacts = emptyList(), isLoading = false, loadedSections = it.loadedSections + section)
+                    }
+                } else {
+                    applyResult(
+                        section,
+                        repository.listArtifacts(scopeId, _state.value.artifactTypeFilter, _state.value.query.ifBlank { null }),
+                    ) { items ->
+                        _state.update { state -> state.copy(artifacts = items.map(ArtifactItem::toUi)) }
+                    }
+                }
+            }
         }
     }
 
@@ -497,6 +551,7 @@ class WorkspaceViewModel(
             WorkspaceSection.Sites -> _state.update { it.copy(isLoadingMore = false) }
             WorkspaceSection.Tasks -> _state.update { it.copy(isLoadingMore = false) }
             WorkspaceSection.Schedules -> _state.update { it.copy(isLoadingMore = false) }
+            WorkspaceSection.Artifacts -> _state.update { it.copy(isLoadingMore = false) }
         }
     }
 
@@ -801,6 +856,44 @@ class WorkspaceViewModel(
         }
     }
 
+    private suspend fun openArtifact(id: String) {
+        val scopeId = _state.value.scopeSessionId ?: return
+        val listed = _state.value.artifacts.firstOrNull { it.id == id } ?: return
+        when (val result = repository.getArtifact(scopeId, listed.type, id)) {
+            is Result.Success -> _state.update {
+                it.copy(
+                    artifactDetail = result.data.toUi(),
+                    captionDraft = result.data.caption.orEmpty(),
+                    captionSaving = false,
+                    captionError = null,
+                )
+            }
+            is Result.Error -> _state.update { it.copy(error = result.error.toUiText()) }
+        }
+    }
+
+    private suspend fun saveCaption() {
+        val detail = _state.value.artifactDetail ?: return
+        val scopeId = _state.value.scopeSessionId ?: return
+        if (detail.type != ArtifactType.Image) return
+        _state.update { it.copy(captionSaving = true, captionError = null) }
+        when (val result = repository.updateImageCaption(scopeId, detail.id, _state.value.captionDraft)) {
+            is Result.Success -> _state.update {
+                it.copy(
+                    artifactDetail = result.data.toUi(),
+                    captionDraft = result.data.caption.orEmpty(),
+                    captionSaving = false,
+                    artifacts = it.artifacts.map { item ->
+                        if (item.id == detail.id) result.data.toUi() else item
+                    },
+                )
+            }
+            is Result.Error -> _state.update {
+                it.copy(captionSaving = false, captionError = result.error.toUiText())
+            }
+        }
+    }
+
     private suspend fun deleteSelected() {
         val target = _state.value.deleteTarget ?: return
         _state.update { it.copy(isMutating = true, mutationError = null) }
@@ -850,6 +943,18 @@ private fun WorkspaceSchedule.toUi(): ScheduleUi = ScheduleUi(
     freq = freq,
     nextRunAt = nextRunAt,
     status = status,
+)
+
+private fun ArtifactItem.toUi(): ArtifactItemUi = ArtifactItemUi(
+    id = id,
+    type = type,
+    title = title,
+    caption = caption,
+    prompt = prompt,
+    status = status,
+    previewUrl = previewUrl,
+    downloadUrl = downloadUrl,
+    version = version,
 )
 
 private fun ScopeSiteEntry.toUi(): SiteUi = SiteUi(

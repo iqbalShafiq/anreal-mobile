@@ -65,4 +65,19 @@ interface WorkspaceRepository {
         runAt: String?,
     ): Result<WorkspaceSchedule, WorkspaceError>
     suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError>
+    suspend fun listArtifacts(
+        sessionId: String,
+        type: ArtifactType?,
+        query: String?,
+    ): Result<List<ArtifactItem>, WorkspaceError>
+    suspend fun getArtifact(
+        sessionId: String,
+        type: ArtifactType,
+        id: String,
+    ): Result<ArtifactItem, WorkspaceError>
+    suspend fun updateImageCaption(
+        sessionId: String,
+        imageId: String,
+        caption: String,
+    ): Result<ArtifactItem, WorkspaceError>
 }
