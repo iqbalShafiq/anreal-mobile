@@ -77,6 +77,24 @@ data class ScopeSiteEntry(
     val updatedAt: String,
 )
 
+enum class TaskStatus { Inbox, Doing, Done }
+
+data class TaskSubtask(
+    val id: String,
+    val title: String,
+    val done: Boolean,
+)
+
+data class WorkspaceTask(
+    val id: String,
+    val title: String,
+    val status: TaskStatus = TaskStatus.Inbox,
+    val description: String? = null,
+    val subtasks: List<TaskSubtask> = emptyList(),
+    val sourceSessionId: String? = null,
+    val dueAt: String? = null,
+)
+
 data class DocumentPreview(
     val id: String,
     val filename: String,

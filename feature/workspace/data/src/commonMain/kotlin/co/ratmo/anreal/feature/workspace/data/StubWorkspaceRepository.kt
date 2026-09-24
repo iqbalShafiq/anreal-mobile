@@ -4,6 +4,8 @@ import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -85,4 +87,31 @@ class StubWorkspaceRepository : WorkspaceRepository {
 
     override suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError> =
         Result.Success(emptyList())
+
+    override suspend fun listTasks(sessionId: String): Result<List<WorkspaceTask>, WorkspaceError> =
+        Result.Success(emptyList())
+
+    override suspend fun createTask(
+        sessionId: String,
+        title: String,
+        description: String?,
+        subtasks: List<String>,
+        dueAt: String?,
+    ): Result<WorkspaceTask, WorkspaceError> =
+        Result.Success(WorkspaceTask(id = "stub", title = title, status = TaskStatus.Inbox))
+
+    override suspend fun updateTask(
+        sessionId: String,
+        id: String,
+        status: TaskStatus?,
+        title: String?,
+        description: String?,
+        addSubtasks: List<String>,
+        toggleSubtasks: List<Pair<String, Boolean>>,
+        removeSubtasks: List<String>,
+    ): Result<WorkspaceTask, WorkspaceError> =
+        Result.Success(WorkspaceTask(id = id, title = title ?: "stub"))
+
+    override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
+        Result.Success(Unit)
 }

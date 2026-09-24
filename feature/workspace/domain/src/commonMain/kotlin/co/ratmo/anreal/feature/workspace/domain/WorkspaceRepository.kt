@@ -37,4 +37,23 @@ interface WorkspaceRepository {
     suspend fun listImages(projectId: String? = null): Result<List<WorkspaceImage>, WorkspaceError>
     suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError>
     suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError>
+    suspend fun listTasks(sessionId: String): Result<List<WorkspaceTask>, WorkspaceError>
+    suspend fun createTask(
+        sessionId: String,
+        title: String,
+        description: String?,
+        subtasks: List<String>,
+        dueAt: String?,
+    ): Result<WorkspaceTask, WorkspaceError>
+    suspend fun updateTask(
+        sessionId: String,
+        id: String,
+        status: TaskStatus?,
+        title: String?,
+        description: String?,
+        addSubtasks: List<String>,
+        toggleSubtasks: List<Pair<String, Boolean>>,
+        removeSubtasks: List<String>,
+    ): Result<WorkspaceTask, WorkspaceError>
+    suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError>
 }

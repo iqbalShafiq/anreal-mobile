@@ -6,6 +6,7 @@ import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isNotNull
+import assertk.assertions.isNull
 import assertk.assertions.isTrue
 import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.EmptyResult
@@ -14,6 +15,9 @@ import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.TaskSubtask
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -155,6 +159,58 @@ class WorkspaceViewModelTest {
         assertThat(repository.scopeLoads).hasSize(0)
         assertThat(viewModel.state.value.sites).hasSize(0)
     }
+
+    @Test
+    fun tasks_section_loads_items() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Tasks, repository, scopeSessionId = "abc")
+
+        assertThat(repository.taskScopes).isEqualTo(listOf("abc"))
+        assertThat(viewModel.state.value.tasks).hasSize(1)
+        assertThat(viewModel.state.value.tasks.single().title).isEqualTo("Fix login")
+    }
+
+    @Test
+    fun task_save_with_no_changes_makes_no_network_call() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Tasks, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnEditTask("t1"))
+        viewModel.onAction(WorkspaceAction.OnTaskSave)
+
+        assertThat(repository.taskUpdates).hasSize(0)
+        assertThat(viewModel.state.value.taskEditor).isNotNull()
+    }
+
+    @Test
+    fun task_create_validates_title_then_saves() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Tasks, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnNewTask)
+        viewModel.onAction(WorkspaceAction.OnTaskSave)
+        assertThat(repository.taskCreates).hasSize(0)
+
+        viewModel.onAction(WorkspaceAction.OnTaskTitleChange("Ship it"))
+        viewModel.onAction(WorkspaceAction.OnTaskSave)
+        assertThat(repository.taskCreates).isEqualTo(listOf("Ship it"))
+        assertThat(viewModel.state.value.taskEditor).isNull()
+        assertThat(viewModel.state.value.tasks.first().title).isEqualTo("Ship it")
+    }
+
+    @Test
+    fun task_subtask_toggle_persists_and_updates_list() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Tasks, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnEditTask("t1"))
+        viewModel.onAction(WorkspaceAction.OnTaskToggleSubtask("st1", true))
+        viewModel.onAction(WorkspaceAction.OnTaskSave)
+
+        assertThat(repository.taskUpdates).hasSize(1)
+        assertThat(viewModel.state.value.tasks.single().doneCount).isEqualTo(1)
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {
@@ -273,4 +329,54 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
             ),
         )
     }
+
+    private val task = WorkspaceTask(
+        id = "t1", title = "Fix login", status = TaskStatus.Doing, description = "Old bug",
+        subtasks = listOf(TaskSubtask("st1", "Repro", false)),
+        sourceSessionId = "abc", dueAt = null,
+    )
+    val taskScopes = mutableListOf<String>()
+    val taskCreates = mutableListOf<String>()
+    val taskUpdates = mutableListOf<String>()
+
+    override suspend fun listTasks(sessionId: String): Result<List<WorkspaceTask>, WorkspaceError> {
+        taskScopes += sessionId
+        return Result.Success(listOf(task))
+    }
+
+    override suspend fun createTask(
+        sessionId: String,
+        title: String,
+        description: String?,
+        subtasks: List<String>,
+        dueAt: String?,
+    ): Result<WorkspaceTask, WorkspaceError> {
+        taskCreates += title
+        return Result.Success(task.copy(id = "t2", title = title, status = TaskStatus.Inbox))
+    }
+
+    override suspend fun updateTask(
+        sessionId: String,
+        id: String,
+        status: TaskStatus?,
+        title: String?,
+        description: String?,
+        addSubtasks: List<String>,
+        toggleSubtasks: List<Pair<String, Boolean>>,
+        removeSubtasks: List<String>,
+    ): Result<WorkspaceTask, WorkspaceError> {
+        taskUpdates += id
+        var updated = task.copy(id = id)
+        if (status != null) updated = updated.copy(status = status)
+        if (title != null) updated = updated.copy(title = title)
+        if (description != null) updated = updated.copy(description = description)
+        val toggled = toggleSubtasks.toMap()
+        updated = updated.copy(
+            subtasks = updated.subtasks.map { it.copy(done = toggled[it.id] ?: it.done) },
+        )
+        return Result.Success(updated)
+    }
+
+    override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
+        Result.Success(Unit)
 }

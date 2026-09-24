@@ -164,7 +164,9 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                         top = AnrealSpacing.md,
                     ),
                 )
-                if (state.section != WorkspaceSection.Images && state.section != WorkspaceSection.Sites) {
+                if (state.section != WorkspaceSection.Images && state.section != WorkspaceSection.Sites &&
+                    state.section != WorkspaceSection.Tasks
+                ) {
                     AnrealSearchField(
                         value = state.query,
                         onValueChange = { onAction(WorkspaceAction.ChangeQuery(it)) },
@@ -196,6 +198,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                             WorkspaceSection.Documents -> state.documents.size
                             WorkspaceSection.Images -> state.images.size
                             WorkspaceSection.Sites -> state.sites.size
+                            WorkspaceSection.Tasks -> state.tasks.size
                             WorkspaceSection.Projects -> 0
                         }
                         WorkspaceLoadedLabel(
@@ -319,6 +322,17 @@ private fun WorkspaceContent(state: WorkspaceState, onAction: (WorkspaceAction) 
                 error = state.error,
                 baseUrl = state.siteBaseUrl,
                 previewSiteId = state.previewSiteId,
+                onAction = onAction,
+            )
+            WorkspaceSection.Tasks -> TasksPanel(
+                tasks = state.tasks,
+                isLoading = state.isLoading,
+                loaded = WorkspaceSection.Tasks in state.loadedSections,
+                hasScope = state.scopeSessionId != null,
+                error = state.error,
+                editor = state.taskEditor,
+                isMutating = state.isMutating,
+                mutationError = state.mutationError,
                 onAction = onAction,
             )
         }
@@ -1011,6 +1025,7 @@ private fun WorkspaceSection.label(): String = when (this) {
     WorkspaceSection.Documents -> AnrealCopy.get(AnrealCopy.LABEL_DOCUMENTS)
     WorkspaceSection.Images -> AnrealCopy.get(AnrealCopy.LABEL_IMAGES)
     WorkspaceSection.Sites -> AnrealCopy.get(AnrealCopy.LABEL_SITES)
+    WorkspaceSection.Tasks -> AnrealCopy.get(AnrealCopy.LABEL_TASKS)
 }
 
 @AnrealPreviews

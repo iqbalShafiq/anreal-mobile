@@ -12,7 +12,9 @@ import co.ratmo.anreal.core.presentation.toUiText
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceBaseUrlProvider
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -33,7 +35,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 private const val LOAD_WAIT_INTERVAL_MS = 25L
 
 @Serializable
-enum class WorkspaceSection { Projects, Documents, Images, Sites }
+enum class WorkspaceSection { Projects, Documents, Images, Sites, Tasks }
 
 enum class WorkspaceViewMode { List, Grid }
 
@@ -71,6 +73,37 @@ data class SiteUi(
     val downloadUrl: String,
 )
 
+data class SubtaskUi(
+    val id: String,
+    val title: String,
+    val done: Boolean,
+)
+
+data class TaskUi(
+    val id: String,
+    val title: String,
+    val status: TaskStatus,
+    val description: String?,
+    val subtasks: List<SubtaskUi>,
+    val dueAt: String?,
+) {
+    val doneCount: Int get() = subtasks.count { it.done }
+    val totalCount: Int get() = subtasks.size
+}
+
+data class TaskEditorState(
+    val isNew: Boolean = true,
+    val sourceId: String? = null,
+    val title: String = "",
+    val description: String = "",
+    val dueAt: String = "",
+    val status: TaskStatus = TaskStatus.Inbox,
+    val subtasks: List<SubtaskUi> = emptyList(),
+    val newSubtaskTitle: String = "",
+    val fieldError: UiText? = null,
+    val saving: Boolean = false,
+)
+
 data class DocumentPreviewUi(
     val id: String,
     val filename: String,
@@ -87,6 +120,7 @@ sealed interface WorkspaceDeleteTarget {
 
     data class Project(override val id: String, override val label: String) : WorkspaceDeleteTarget
     data class Document(override val id: String, override val label: String) : WorkspaceDeleteTarget
+    data class Task(override val id: String, override val label: String) : WorkspaceDeleteTarget
 }
 
 sealed interface WorkspaceCardSheetTarget {
@@ -112,6 +146,8 @@ data class WorkspaceState(
     val images: List<ImageUi> = emptyList(),
     val sites: List<SiteUi> = emptyList(),
     val scopeSessionId: String? = null,
+    val tasks: List<TaskUi> = emptyList(),
+    val taskEditor: TaskEditorState? = null,
     val siteBaseUrl: String = "",
     val previewSiteId: String? = null,
     val query: String = "",
@@ -161,6 +197,19 @@ sealed interface WorkspaceAction {
     data object Back : WorkspaceAction
     data class OpenSitePreview(val siteId: String) : WorkspaceAction
     data object CloseSitePreview : WorkspaceAction
+    data object OnNewTask : WorkspaceAction
+    data class OnEditTask(val id: String) : WorkspaceAction
+    data object OnCloseTaskEditor : WorkspaceAction
+    data class OnTaskTitleChange(val value: String) : WorkspaceAction
+    data class OnTaskDescriptionChange(val value: String) : WorkspaceAction
+    data class OnTaskDueChange(val value: String) : WorkspaceAction
+    data class OnTaskStatusChange(val status: TaskStatus) : WorkspaceAction
+    data class OnTaskNewSubtaskChange(val value: String) : WorkspaceAction
+    data object OnTaskAddSubtask : WorkspaceAction
+    data class OnTaskToggleSubtask(val id: String, val done: Boolean) : WorkspaceAction
+    data class OnTaskRemoveSubtask(val id: String) : WorkspaceAction
+    data object OnTaskSave : WorkspaceAction
+    data class OnRequestDeleteTask(val id: String, val title: String) : WorkspaceAction
 }
 
 sealed interface WorkspaceEvent {
@@ -270,6 +319,27 @@ class WorkspaceViewModel(
             WorkspaceAction.Back -> viewModelScope.launch { _events.send(WorkspaceEvent.NavigateBack) }
             is WorkspaceAction.OpenSitePreview -> _state.update { it.copy(previewSiteId = action.siteId) }
             WorkspaceAction.CloseSitePreview -> _state.update { it.copy(previewSiteId = null) }
+            WorkspaceAction.OnNewTask -> _state.update { it.copy(taskEditor = TaskEditorState()) }
+            is WorkspaceAction.OnEditTask -> openTaskEditor(action.id)
+            WorkspaceAction.OnCloseTaskEditor -> if (_state.value.taskEditor?.saving != true) {
+                _state.update { it.copy(taskEditor = null, mutationError = null) }
+            }
+            is WorkspaceAction.OnTaskTitleChange -> updateTaskEditor { it.copy(title = action.value, fieldError = null) }
+            is WorkspaceAction.OnTaskDescriptionChange -> updateTaskEditor { it.copy(description = action.value, fieldError = null) }
+            is WorkspaceAction.OnTaskDueChange -> updateTaskEditor { it.copy(dueAt = action.value, fieldError = null) }
+            is WorkspaceAction.OnTaskStatusChange -> updateTaskEditor { it.copy(status = action.status, fieldError = null) }
+            is WorkspaceAction.OnTaskNewSubtaskChange -> updateTaskEditor { it.copy(newSubtaskTitle = action.value) }
+            WorkspaceAction.OnTaskAddSubtask -> addTaskSubtask()
+            is WorkspaceAction.OnTaskToggleSubtask -> updateTaskEditor { editor ->
+                editor.copy(subtasks = editor.subtasks.map { if (it.id == action.id) it.copy(done = action.done) else it })
+            }
+            is WorkspaceAction.OnTaskRemoveSubtask -> updateTaskEditor { editor ->
+                editor.copy(subtasks = editor.subtasks.filterNot { it.id == action.id })
+            }
+            WorkspaceAction.OnTaskSave -> viewModelScope.launch { saveTaskEditor() }
+            is WorkspaceAction.OnRequestDeleteTask -> _state.update {
+                it.copy(deleteTarget = WorkspaceDeleteTarget.Task(action.id, action.title), mutationError = null)
+            }
         }
     }
 
@@ -320,6 +390,18 @@ class WorkspaceViewModel(
                     }
                 }
             }
+            WorkspaceSection.Tasks -> {
+                val scopeId = _state.value.scopeSessionId
+                if (scopeId.isNullOrBlank()) {
+                    _state.update {
+                        it.copy(tasks = emptyList(), isLoading = false, loadedSections = it.loadedSections + section)
+                    }
+                } else {
+                    applyResult(section, repository.listTasks(scopeId)) { tasks ->
+                        _state.update { state -> state.copy(tasks = tasks.map(WorkspaceTask::toUi)) }
+                    }
+                }
+            }
         }
     }
 
@@ -358,6 +440,7 @@ class WorkspaceViewModel(
             }.onFailure { finishLoadMore(it) }
             WorkspaceSection.Images -> _state.update { it.copy(isLoadingMore = false) }
             WorkspaceSection.Sites -> _state.update { it.copy(isLoadingMore = false) }
+            WorkspaceSection.Tasks -> _state.update { it.copy(isLoadingMore = false) }
         }
     }
 
@@ -506,18 +589,131 @@ class WorkspaceViewModel(
         }
     }
 
+    private fun openTaskEditor(id: String) {
+        val source = _state.value.tasks.firstOrNull { it.id == id } ?: return
+        _state.update {
+            it.copy(
+                taskEditor = TaskEditorState(
+                    isNew = false,
+                    sourceId = source.id,
+                    title = source.title,
+                    description = source.description.orEmpty(),
+                    dueAt = source.dueAt.orEmpty(),
+                    status = source.status,
+                    subtasks = source.subtasks,
+                ),
+                mutationError = null,
+            )
+        }
+    }
+
+    private inline fun updateTaskEditor(transform: (TaskEditorState) -> TaskEditorState) {
+        _state.update { it.copy(taskEditor = it.taskEditor?.let(transform)) }
+    }
+
+    private fun addTaskSubtask() {
+        val title = _state.value.taskEditor?.newSubtaskTitle?.trim().orEmpty()
+        if (title.isEmpty() || title.length > 200) return
+        val editor = _state.value.taskEditor ?: return
+        _state.update {
+            it.copy(
+                taskEditor = editor.copy(
+                    subtasks = editor.subtasks + SubtaskUi(id = "local-${editor.subtasks.size}", title = title, done = false),
+                    newSubtaskTitle = "",
+                ),
+            )
+        }
+    }
+
+    private suspend fun saveTaskEditor() {
+        val editor = _state.value.taskEditor ?: return
+        val scopeId = _state.value.scopeSessionId
+        if (scopeId.isNullOrBlank()) {
+            _state.update { it.copy(taskEditor = editor.copy(saving = false)) }
+            return
+        }
+        val title = editor.title.trim()
+        if (title.isEmpty() || title.length > 200) {
+            updateTaskEditor { it.copy(fieldError = UiText.StringResource(AnrealCopy.ERROR_TITLE_REQUIRED)) }
+            return
+        }
+        val dueAt = editor.dueAt.trim().ifEmpty { null }
+        if (dueAt != null && !isValidDueAt(dueAt)) {
+            updateTaskEditor { it.copy(fieldError = UiText.StringResource(AnrealCopy.ERROR_DUE_DATE_INVALID)) }
+            return
+        }
+        _state.update { it.copy(taskEditor = editor.copy(saving = true, fieldError = null)) }
+        if (editor.isNew) {
+            when (val result = repository.createTask(scopeId, title, editor.description.trim().ifEmpty { null }, editor.subtasks.map { it.title }, dueAt)) {
+                is Result.Success -> _state.update {
+                    it.copy(
+                        tasks = listOf(result.data.toUi()) + it.tasks,
+                        loadedSections = it.loadedSections + WorkspaceSection.Tasks,
+                        taskEditor = null,
+                    )
+                }
+                is Result.Error -> _state.update {
+                    it.copy(taskEditor = it.taskEditor?.copy(saving = false, fieldError = result.error.toUiText()))
+                }
+            }
+            return
+        }
+        val sourceId = editor.sourceId ?: return
+        val source = _state.value.tasks.firstOrNull { it.id == sourceId }
+        val description = editor.description.trim().ifEmpty { null }
+        val added = editor.subtasks.filter { it.id.startsWith("local-") }.map { it.title }
+        val keptIds = editor.subtasks.map { it.id }.toSet()
+        val removed = (source?.subtasks.orEmpty().map { it.id } - keptIds).toList()
+        val toggled = editor.subtasks.mapNotNull { ui ->
+            val before = source?.subtasks?.firstOrNull { it.id == ui.id }
+            if (before != null && before.done != ui.done) ui.id to ui.done else null
+        }
+        val statusChanged = if (source?.status != editor.status) editor.status else null
+        val titleChanged = if (source?.title != title) title else null
+        val descriptionChanged = if (source?.description != description) description else null
+        if (statusChanged == null && titleChanged == null && descriptionChanged == null &&
+            added.isEmpty() && toggled.isEmpty() && removed.isEmpty()
+        ) {
+            updateTaskEditor { it.copy(saving = false, fieldError = UiText.StringResource(AnrealCopy.ERROR_NOTHING_TO_UPDATE)) }
+            return
+        }
+        when (
+            val result = repository.updateTask(
+                sessionId = scopeId, id = sourceId, status = statusChanged, title = titleChanged,
+                description = descriptionChanged, addSubtasks = added,
+                toggleSubtasks = toggled, removeSubtasks = removed,
+            )
+        ) {
+            is Result.Success -> _state.update {
+                it.copy(
+                    tasks = it.tasks.map { item -> if (item.id == sourceId) result.data.toUi() else item },
+                    taskEditor = null,
+                )
+            }
+            is Result.Error -> _state.update {
+                it.copy(taskEditor = it.taskEditor?.copy(saving = false, fieldError = result.error.toUiText()))
+            }
+        }
+    }
+
+    private val dueAtRegex = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$""")
+
+    private fun isValidDueAt(value: String): Boolean = dueAtRegex.matches(value.trim())
+
     private suspend fun deleteSelected() {
         val target = _state.value.deleteTarget ?: return
         _state.update { it.copy(isMutating = true, mutationError = null) }
         val result = when (target) {
             is WorkspaceDeleteTarget.Project -> repository.deleteProject(target.id)
             is WorkspaceDeleteTarget.Document -> repository.deleteDocument(target.id)
+            is WorkspaceDeleteTarget.Task -> repository.deleteTask(_state.value.scopeSessionId.orEmpty(), target.id)
         }
         when (result) {
             is Result.Success -> _state.update {
                 it.copy(
                     projects = it.projects.filterNot { project -> project.id == target.id },
                     documents = it.documents.filterNot { document -> document.id == target.id },
+                    tasks = it.tasks.filterNot { task -> task.id == target.id },
                     deleteTarget = null,
                     isMutating = false,
                 )
@@ -534,6 +730,15 @@ private fun WorkspaceError.toUiText(): UiText = when (this) {
 }
 
 private fun Project.toUi(): ProjectUi = ProjectUi(id, name, description.orEmpty(), documentCount, chatCount)
+
+private fun WorkspaceTask.toUi(): TaskUi = TaskUi(
+    id = id,
+    title = title,
+    status = status,
+    description = description,
+    subtasks = subtasks.map { SubtaskUi(it.id, it.title, it.done) },
+    dueAt = dueAt,
+)
 
 private fun ScopeSiteEntry.toUi(): SiteUi = SiteUi(
     siteId = siteId,

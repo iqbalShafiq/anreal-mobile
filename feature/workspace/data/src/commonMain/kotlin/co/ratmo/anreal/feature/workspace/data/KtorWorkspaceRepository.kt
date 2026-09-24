@@ -14,6 +14,8 @@ import co.ratmo.anreal.core.domain.util.map
 import co.ratmo.anreal.core.domain.util.mapError
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -123,6 +125,56 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
             route = "/api/sites",
             queryParameters = mapOf("sessionId" to sessionId),
         ).map { dto -> dto.sites.map { it.toScopeEntry() } }.mapWorkspaceError()
+
+    override suspend fun listTasks(sessionId: String): Result<List<WorkspaceTask>, WorkspaceError> =
+        httpClient.get<TaskListDto>(
+            route = "/api/tasks",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { dto -> dto.items.map { it.toTask() } }.mapWorkspaceError()
+
+    override suspend fun createTask(
+        sessionId: String,
+        title: String,
+        description: String?,
+        subtasks: List<String>,
+        dueAt: String?,
+    ): Result<WorkspaceTask, WorkspaceError> = httpClient.post<TaskCreateDto, WorkspaceTaskDto>(
+        route = "/api/tasks",
+        body = TaskCreateDto(
+            sessionId = sessionId,
+            title = title,
+            description = description,
+            addSubtasks = subtasks.ifEmpty { null },
+            dueAt = dueAt,
+        ),
+    ).map { it.toTask() }.mapWorkspaceError()
+
+    override suspend fun updateTask(
+        sessionId: String,
+        id: String,
+        status: TaskStatus?,
+        title: String?,
+        description: String?,
+        addSubtasks: List<String>,
+        toggleSubtasks: List<Pair<String, Boolean>>,
+        removeSubtasks: List<String>,
+    ): Result<WorkspaceTask, WorkspaceError> = httpClient.patch<TaskUpdateDto, WorkspaceTaskDto>(
+        route = "/api/tasks/$id",
+        body = TaskUpdateDto(
+            sessionId = sessionId,
+            status = status?.toWire(),
+            title = title,
+            description = description,
+            addSubtasks = addSubtasks.ifEmpty { null },
+            toggleSubtasks = toggleSubtasks.map { TaskToggleDto(it.first, it.second) }.ifEmpty { null },
+            removeSubtasks = removeSubtasks.ifEmpty { null },
+        ),
+    ).map { it.toTask() }.mapWorkspaceError()
+
+    override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
+        httpClient.delete(route = "/api/tasks/$id", queryParameters = mapOf("sessionId" to sessionId))
+            .mapWorkspaceError()
+            .asEmptyResult()
 }
 
 private fun <T> Result<T, DataError.Network>.mapWorkspaceError(): Result<T, WorkspaceError> =

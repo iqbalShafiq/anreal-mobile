@@ -3,6 +3,9 @@ package co.ratmo.anreal.feature.workspace.data
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.TaskSubtask
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPageImage
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreviewPage
@@ -104,6 +107,48 @@ data class ScopeSiteEntryDto(
 @Serializable
 data class ScopeSitesDto(val sites: List<ScopeSiteEntryDto> = emptyList())
 
+@Serializable
+data class TaskSubtaskDto(val id: String, val title: String, val done: Boolean = false)
+
+@Serializable
+data class WorkspaceTaskDto(
+    val id: String,
+    val title: String,
+    val status: String = "inbox",
+    val description: String? = null,
+    val subtasks: List<TaskSubtaskDto> = emptyList(),
+    val sourceSessionId: String? = null,
+    val dueAt: String? = null,
+    val createdAt: String = "",
+    val updatedAt: String = "",
+)
+
+@Serializable
+data class TaskListDto(val items: List<WorkspaceTaskDto> = emptyList())
+
+@Serializable
+data class TaskCreateDto(
+    val sessionId: String,
+    val title: String,
+    val description: String? = null,
+    val addSubtasks: List<String>? = null,
+    val dueAt: String? = null,
+)
+
+@Serializable
+data class TaskToggleDto(val id: String, val done: Boolean)
+
+@Serializable
+data class TaskUpdateDto(
+    val sessionId: String,
+    val status: String? = null,
+    val title: String? = null,
+    val description: String? = null,
+    val addSubtasks: List<String>? = null,
+    val toggleSubtasks: List<TaskToggleDto>? = null,
+    val removeSubtasks: List<String>? = null,
+)
+
 fun ProjectPageDto.toPage(): WorkspacePage<Project> = WorkspacePage(items.map(ProjectDto::toProject), nextCursor)
 
 fun ProjectDto.toProject(): Project = Project(
@@ -146,6 +191,30 @@ fun ScopeSiteEntryDto.toScopeEntry(): ScopeSiteEntry = ScopeSiteEntry(
     previewUrl = previewUrl,
     downloadUrl = downloadUrl,
     updatedAt = updatedAt,
+)
+
+fun TaskStatus.toWire(): String = when (this) {
+    TaskStatus.Inbox -> "inbox"
+    TaskStatus.Doing -> "doing"
+    TaskStatus.Done -> "done"
+}
+
+fun String.toTaskStatus(): TaskStatus = when (this) {
+    "doing" -> TaskStatus.Doing
+    "done" -> TaskStatus.Done
+    else -> TaskStatus.Inbox
+}
+
+fun TaskSubtaskDto.toSubtask(): TaskSubtask = TaskSubtask(id = id, title = title, done = done)
+
+fun WorkspaceTaskDto.toTask(): WorkspaceTask = WorkspaceTask(
+    id = id,
+    title = title,
+    status = status.toTaskStatus(),
+    description = description,
+    subtasks = subtasks.map { it.toSubtask() },
+    sourceSessionId = sourceSessionId,
+    dueAt = dueAt,
 )
 
 fun DocumentPreviewDto.toPreview(): DocumentPreview = DocumentPreview(

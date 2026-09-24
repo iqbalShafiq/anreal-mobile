@@ -2,10 +2,13 @@ package co.ratmo.anreal.feature.workspace.data
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
+import assertk.assertions.isFalse
+import assertk.assertions.isTrue
 import co.ratmo.anreal.core.data.auth.InMemorySessionTokenStore
 import co.ratmo.anreal.core.data.network.HttpClientFactory
 import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.Result
+import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -95,6 +98,55 @@ class KtorWorkspaceRepositoryTest {
 
         val error = ((result as Result.Error).error as WorkspaceError.Network).error
         assertThat(error.kind).isEqualTo(DataError.Network.Kind.NOT_FOUND)
+    }
+
+    @Test
+    fun tasks_list_maps_items() = runTest {
+        val repository = repository(
+            """{"items":[{"id":"t1","userId":"u1","projectId":null,"title":"Fix login","status":"doing","sourceSessionId":"abc","dueAt":null,"description":"Old bug","subtasks":[{"id":"st1","title":"Repro","done":true}],"createdAt":"t","updatedAt":"t"}]}""",
+        )
+
+        val result = repository.listTasks("abc")
+
+        val task = (result as Result.Success).data.single()
+        assertThat(task.title).isEqualTo("Fix login")
+        assertThat(task.subtasks.single().done).isTrue()
+    }
+
+    @Test
+    fun tasks_create_maps_result() = runTest {
+        val repository = repository("""{"id":"t2","title":"New","status":"inbox"}""")
+
+        val result = repository.createTask("abc", "New", null, emptyList(), null)
+
+        val task = (result as Result.Success).data
+        assertThat(task.id).isEqualTo("t2")
+        assertThat(task.status).isEqualTo(TaskStatus.Inbox)
+    }
+
+    @Test
+    fun tasks_update_toggle_maps_subtasks() = runTest {
+        val repository = repository(
+            """{"id":"t1","title":"Fix login","status":"doing","description":null,"subtasks":[{"id":"st1","title":"Repro","done":false}]}""",
+        )
+
+        val result = repository.updateTask("abc", "t1", null, null, null, emptyList(), listOf("st1" to false), emptyList())
+
+        val task = (result as Result.Success).data
+        assertThat(task.subtasks.single().done).isFalse()
+    }
+
+    @Test
+    fun tasks_delete_404_maps_not_found() = runTest {
+        val repository = repository(
+            body = """{"error":"Task not found","code":"TASK_NOT_FOUND"}""",
+            status = HttpStatusCode.NotFound,
+        )
+
+        val result = repository.deleteTask("abc", "ghost")
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.code).isEqualTo("TASK_NOT_FOUND")
     }
 }
 
