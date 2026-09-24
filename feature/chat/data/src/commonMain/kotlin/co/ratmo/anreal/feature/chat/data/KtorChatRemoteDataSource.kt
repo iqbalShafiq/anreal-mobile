@@ -519,5 +519,7 @@ private fun ChatRunOptions.toMetadataDto(sessionId: String): ChatRequestMetadata
         imageGenerationEnabled = imageGenerationEnabled,
         deepResearchEnabled = deepResearchEnabled,
         imageGenSettings = imageSettings?.takeIf { imageGenerationEnabled }?.toDto(),
+        skillIds = skillIds.distinct().take(20),
+        mcpServerIds = mcpServerIds.distinct().take(5),
     )
 }

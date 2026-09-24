@@ -144,6 +144,8 @@ data class ChatCapabilities(
     val deepResearchAvailable: Boolean = false,
     val imageGenerationAvailable: Boolean = false,
     val context7Configured: Boolean = false,
+    val userSkillsCount: Int = 0,
+    val userMcpCount: Int = 0,
 )
 
 data class ChatRunOptions(
@@ -154,4 +156,6 @@ data class ChatRunOptions(
     val imageGenerationEnabled: Boolean = false,
     val imageGenSettings: ImageGenSettings? = null,
     val documentIds: List<String> = emptyList(),
+    val skillIds: List<String> = emptyList(),
+    val mcpServerIds: List<String> = emptyList(),
 )

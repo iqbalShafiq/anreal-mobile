@@ -148,6 +148,8 @@ data class CapabilitiesDto(
     val deepResearchAvailable: Boolean = false,
     val imageGenerationAvailable: Boolean = false,
     val context7Configured: Boolean = false,
+    val userSkillsCount: Int = 0,
+    val userMcpCount: Int = 0,
 )
 
 @Serializable
@@ -170,6 +172,8 @@ data class ChatRequestMetadataDto(
     val imageGenerationEnabled: Boolean,
     val deepResearchEnabled: Boolean,
     val imageGenSettings: ImageGenSettingsDto?,
+    val skillIds: List<String> = emptyList(),
+    val mcpServerIds: List<String> = emptyList(),
 )
 
 @Serializable
@@ -478,6 +482,8 @@ fun CapabilitiesDto.toCapabilities(): ChatCapabilities = ChatCapabilities(
     deepResearchAvailable = deepResearchAvailable,
     imageGenerationAvailable = imageGenerationAvailable,
     context7Configured = context7Configured,
+    userSkillsCount = userSkillsCount,
+    userMcpCount = userMcpCount,
 )
 
 fun ImageGenSettings.toDto(): ImageGenSettingsDto = ImageGenSettingsDto(
