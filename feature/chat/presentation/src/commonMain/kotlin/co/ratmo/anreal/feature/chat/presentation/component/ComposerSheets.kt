@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -34,6 +38,8 @@ import co.ratmo.anreal.feature.chat.presentation.ChatAction
 import co.ratmo.anreal.feature.chat.presentation.ChatState
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.presentation.preview.chatComposerCatalogPreviewState
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.composables.icons.materialsymbols.rounded.Settings
 
 internal enum class ComposerSheet {
     Model,
@@ -47,6 +53,8 @@ internal fun ComposerSheets(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
     onOpenAttachments: () -> Unit = {},
+    onManageSkills: () -> Unit = {},
+    onManageMcp: () -> Unit = {},
     onDismiss: () -> Unit,
 ) {
     if (sheet == null) return
@@ -56,6 +64,8 @@ internal fun ComposerSheets(
             state = state,
             onAction = onAction,
             onOpenAttachments = onOpenAttachments,
+            onManageSkills = onManageSkills,
+            onManageMcp = onManageMcp,
             onDismiss = onDismiss,
         )
     }
@@ -67,6 +77,8 @@ private fun ComposerSheetBody(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
     onOpenAttachments: () -> Unit,
+    onManageSkills: () -> Unit,
+    onManageMcp: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     when (sheet) {
@@ -75,6 +87,8 @@ private fun ComposerSheetBody(
             state = state,
             onAction = onAction,
             onOpenAttachments = onOpenAttachments,
+            onManageSkills = onManageSkills,
+            onManageMcp = onManageMcp,
         )
         ComposerSheet.Attach -> AttachSheet(onAction = onAction, onDismiss = onDismiss)
     }
@@ -260,6 +274,8 @@ private fun FeaturesSheet(
     state: ChatState,
     onAction: (ChatAction) -> Unit,
     onOpenAttachments: () -> Unit,
+    onManageSkills: () -> Unit,
+    onManageMcp: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(bottom = AnrealSpacing.lg)) {
         AnrealSheetTitle(AnrealCopy.get(AnrealCopy.CD_FEATURES))
@@ -324,6 +340,128 @@ private fun FeaturesSheet(
                 )
             },
         )
+        if (!state.catalogLoading) {
+            val skillsOn = state.selectedSkillIds.isNotEmpty()
+            EnhancementRow(
+                title = AnrealCopy.get(AnrealCopy.LABEL_SKILLS),
+                subtitle = when {
+                    state.capabilities.userSkillsCount == 0 -> {
+                        AnrealCopy.get(AnrealCopy.SKILLS_EMPTY)
+                    }
+                    skillsOn -> AnrealCopy.get(AnrealCopy.SKILLS_ON)
+                    else -> AnrealCopy.get(AnrealCopy.SKILLS_OFF)
+                },
+                checked = skillsOn,
+                enabled = state.capabilities.userSkillsCount > 0,
+                activeCount = state.selectedSkillIds.size,
+                totalCount = state.capabilities.userSkillsCount,
+                manageDescription = AnrealCopy.get(AnrealCopy.CD_MANAGE_SKILLS),
+                onToggle = { on ->
+                    // Turning back on from empty restores nothing here: the ChatViewModel
+                    // only intersects the ids it is given. Re-enable from the manager,
+                    // which owns the full catalog.
+                    onAction(ChatAction.OnSkillsToggle(if (on) state.selectedSkillIds else emptyList()))
+                },
+                onManage = onManageSkills,
+            )
+            val mcpOn = state.selectedMcpServerIds.isNotEmpty()
+            EnhancementRow(
+                title = AnrealCopy.get(AnrealCopy.LABEL_MCP),
+                subtitle = when {
+                    state.capabilities.userMcpCount == 0 -> {
+                        AnrealCopy.get(AnrealCopy.MCP_EMPTY)
+                    }
+                    mcpOn -> AnrealCopy.get(AnrealCopy.MCP_ON)
+                    else -> AnrealCopy.get(AnrealCopy.MCP_OFF)
+                },
+                checked = mcpOn,
+                enabled = state.capabilities.userMcpCount > 0,
+                activeCount = state.selectedMcpServerIds.size,
+                totalCount = state.capabilities.userMcpCount,
+                manageDescription = AnrealCopy.get(AnrealCopy.CD_MANAGE_MCP),
+                onToggle = { on ->
+                    onAction(ChatAction.OnMcpToggle(if (on) state.selectedMcpServerIds else emptyList()))
+                },
+                onManage = onManageMcp,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EnhancementRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean,
+    activeCount: Int,
+    totalCount: Int,
+    manageDescription: String,
+    onToggle: (Boolean) -> Unit,
+    onManage: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics {
+                role = Role.Button
+                selected = checked
+                contentDescription = title
+            }
+            .clickable(enabled = enabled, onClick = { onToggle(!checked) })
+            .padding(horizontal = AnrealSpacing.md, vertical = AnrealSpacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (checked) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        CountBadge(active = activeCount, total = totalCount)
+        IconButton(
+            onClick = onManage,
+            modifier = Modifier.size(AnrealSpacing.touch),
+        ) {
+            Icon(
+                imageVector = MaterialSymbols.Rounded.Settings,
+                contentDescription = manageDescription,
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onToggle,
+            enabled = enabled,
+        )
+    }
+}
+
+@Composable
+private fun CountBadge(active: Int, total: Int) {
+    Surface(
+        shape = MaterialTheme.shapes.small,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Text(
+            text = "$active/$total",
+            modifier = Modifier.padding(
+                horizontal = AnrealSpacing.xs,
+                vertical = AnrealSpacing.xxs,
+            ),
+            style = MaterialTheme.typography.labelMedium,
+        )
     }
 }
 
@@ -383,6 +521,27 @@ private fun FeaturesSheetPreview() {
         ComposerSheets(
             sheet = ComposerSheet.Features,
             state = chatComposerCatalogPreviewState(),
+            onAction = {},
+            onDismiss = {},
+        )
+    }
+}
+
+@AnrealPreviews
+@Composable
+private fun FeaturesSheetEnhancementsPreview() {
+    AnrealPreview {
+        ComposerSheets(
+            sheet = ComposerSheet.Features,
+            state = chatComposerCatalogPreviewState().copy(
+                catalogLoading = false,
+                capabilities = chatComposerCatalogPreviewState().capabilities.copy(
+                    userSkillsCount = 3,
+                    userMcpCount = 2,
+                ),
+                selectedSkillIds = listOf("s1", "s2"),
+                selectedMcpServerIds = emptyList(),
+            ),
             onAction = {},
             onDismiss = {},
         )

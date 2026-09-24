@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealComposerField
+import co.ratmo.anreal.core.designsystem.component.AnrealBottomSheet
 import co.ratmo.anreal.core.designsystem.component.GlassChrome
 import co.ratmo.anreal.core.designsystem.component.GlassChromeMode
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
@@ -66,8 +67,10 @@ internal fun ComposerBar(
     modelSheetOpenRequest: Boolean = false,
     onModelSheetOpenRequestConsumed: () -> Unit = {},
     surfaceTinted: Boolean = false,
+    onDownloadSiteZip: (siteId: String, version: Int) -> Unit = { _, _ -> },
 ) {
     var sheet by remember { mutableStateOf(initialSheet) }
+    var management by remember { mutableStateOf<ManagementSheet?>(null) }
     LaunchedEffect(modelSheetOpenRequest) {
         if (modelSheetOpenRequest) {
             sheet = ComposerSheet.Model
@@ -100,6 +103,15 @@ internal fun ComposerBar(
                 verticalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
             ) {
                 MessageQueueDock(state = state, onAction = onAction)
+                SiteBuildPanel(
+                    build = state.selectedSessionId?.let { state.siteBuilds[it] },
+                    versions = state.selectedSessionId?.let { state.siteVersions[it] }.orEmpty(),
+                    onRetry = { siteId -> onAction(ChatAction.OnSiteRetry(siteId)) },
+                    onRollback = { siteId, version ->
+                        onAction(ChatAction.OnSiteRollback(siteId, version))
+                    },
+                    onDownloadZip = onDownloadSiteZip,
+                )
                 SessionImageStrip(state = state, onAction = onAction)
                 state.uploadingDocuments.filter { it.status != "ready" }.forEach { document ->
                     Text(
@@ -152,6 +164,8 @@ internal fun ComposerBar(
                             featuresActive = state.webSearchEnabled ||
                                 state.deepResearchEnabled ||
                                 state.imageGenerationEnabled ||
+                                state.selectedSkillIds.isNotEmpty() ||
+                                state.selectedMcpServerIds.isNotEmpty() ||
                                 state.isUploading,
                             onClick = { sheet = ComposerSheet.Features },
                         )
@@ -182,8 +196,33 @@ internal fun ComposerBar(
         state = state,
         onAction = onAction,
         onOpenAttachments = { sheet = ComposerSheet.Attach },
+        onManageSkills = {
+            sheet = null
+            management = ManagementSheet.Skills
+        },
+        onManageMcp = {
+            sheet = null
+            management = ManagementSheet.Mcp
+        },
         onDismiss = { sheet = null },
     )
+    management?.let { target ->
+        AnrealBottomSheet(onDismiss = { management = null }) {
+            when (target) {
+                ManagementSheet.Skills -> SkillsManagementRoot(
+                    onDismiss = { management = null },
+                )
+                ManagementSheet.Mcp -> McpManagementRoot(
+                    onDismiss = { management = null },
+                )
+            }
+        }
+    }
+}
+
+private enum class ManagementSheet {
+    Skills,
+    Mcp,
 }
 
 private fun String.toUploadStatusLabel(): String = AnrealCopy.get(
