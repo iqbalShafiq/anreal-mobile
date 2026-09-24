@@ -3,6 +3,7 @@ package co.ratmo.anreal.feature.chat.data
 import co.ratmo.anreal.core.data.AppConfig
 import co.ratmo.anreal.feature.chat.domain.AccountSettingsDataSource
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
+import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
 import org.koin.dsl.module
 
 val chatDataModule = module {
@@ -21,6 +22,13 @@ val chatDataModule = module {
             StubAccountSettingsDataSource()
         } else {
             KtorAccountSettingsDataSource(get())
+        }
+    }
+    single<SkillsRemoteDataSource> {
+        if (get<AppConfig>().environment.stubApi) {
+            StubSkillsDataSource()
+        } else {
+            KtorSkillsDataSource(get())
         }
     }
 }
