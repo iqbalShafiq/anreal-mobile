@@ -21,6 +21,7 @@ kotlin {
         implementation(project(":core:database"))
         implementation(project(":feature:chat:domain"))
         implementation(libs.koin.core)
+        implementation(libs.androidx.datastore.preferences.core)
     }
     sourceSets.commonTest.dependencies {
         implementation(libs.kotlinx.coroutines.test)

@@ -11,6 +11,7 @@ import co.ratmo.anreal.core.domain.util.onFailure
 import co.ratmo.anreal.core.domain.util.onSuccess
 import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
+import co.ratmo.anreal.core.presentation.toUiText
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ChatError
 import co.ratmo.anreal.feature.chat.domain.ChatModel
@@ -21,11 +22,26 @@ import co.ratmo.anreal.feature.chat.domain.ChatUpload
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ContextUsage
 import co.ratmo.anreal.feature.chat.domain.DocumentIngest
+import co.ratmo.anreal.feature.chat.domain.EnhancementSelectionStore
 import co.ratmo.anreal.feature.chat.domain.HistoryWindow
 import co.ratmo.anreal.feature.chat.domain.LibraryDocument
+import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.McpServer
+import co.ratmo.anreal.feature.chat.domain.McpStatus
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
+import co.ratmo.anreal.feature.chat.domain.SessionSiteEntry
+import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
+import co.ratmo.anreal.feature.chat.domain.SiteBuildState
+import co.ratmo.anreal.feature.chat.domain.SiteStatus
+import co.ratmo.anreal.feature.chat.domain.SiteVersionEntry
+import co.ratmo.anreal.feature.chat.domain.SitesRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.Skill
+import co.ratmo.anreal.feature.chat.domain.SkillStatus
+import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.intersectWithCatalog
+import co.ratmo.anreal.feature.chat.domain.stableSiteUrls
 import co.ratmo.anreal.feature.chat.domain.reconcileCatalogSelection
 import co.ratmo.anreal.feature.chat.domain.SessionDocument
 import co.ratmo.anreal.feature.chat.domain.SessionImage
@@ -230,6 +246,10 @@ data class ChatState(
     val isCreatingShare: Boolean = false,
     val isDeactivatingShares: Boolean = false,
     val showDeactivateConfirm: Boolean = false,
+    val selectedSkillIds: List<String> = emptyList(),
+    val selectedMcpServerIds: List<String> = emptyList(),
+    val siteBuilds: Map<String, SiteBuildState> = emptyMap(),
+    val siteVersions: Map<String, List<SiteVersionEntry>> = emptyMap(),
 ) {
     val inProject: Boolean get() = activeProjectId != null
 }
@@ -330,6 +350,10 @@ sealed interface ChatAction {
     data object OnDismissDeactivateShares : ChatAction
     data object OnConfirmDeactivateShares : ChatAction
     data object OnRetryShare : ChatAction
+    data class OnSkillsToggle(val skillIds: List<String>) : ChatAction
+    data class OnMcpToggle(val serverIds: List<String>) : ChatAction
+    data class OnSiteRetry(val siteId: String) : ChatAction
+    data class OnSiteRollback(val siteId: String, val version: Int) : ChatAction
 }
 
 sealed interface ChatEvent {
@@ -348,6 +372,10 @@ class ChatViewModel(
     private val savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository,
     private val preferencesRepository: AppPreferencesRepository,
+    private val skillsSource: SkillsRemoteDataSource? = null,
+    private val mcpSource: McpRemoteDataSource? = null,
+    private val sitesSource: SitesRemoteDataSource? = null,
+    private val selectionStore: EnhancementSelectionStore? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(
@@ -371,6 +399,10 @@ class ChatViewModel(
     private var latestCachedCatalog: CachedModelCatalog? = null
     private var roomSelectionEstablished: Boolean = false
     private val catalogCacheReady = CompletableDeferred<Unit>()
+    private var latestSkills: List<Skill> = emptyList()
+    private var latestMcpServers: List<McpServer> = emptyList()
+    private var enhancementsLoaded: Boolean = false
+    private val sitePollStarted = mutableSetOf<String>()
 
     init {
         viewModelScope.launch {
@@ -386,6 +418,7 @@ class ChatViewModel(
         viewModelScope.launch { bootstrap() }
         viewModelScope.launch { loadCatalog(force = true) }
         viewModelScope.launch { loadRecentProjects() }
+        viewModelScope.launch { loadEnhancementSelection() }
     }
 
     fun onAction(action: ChatAction) {
@@ -543,6 +576,10 @@ class ChatViewModel(
             }
             ChatAction.OnConfirmDeactivateShares -> viewModelScope.launch { deactivateShares() }
             ChatAction.OnRetryShare -> viewModelScope.launch { loadShareStatus() }
+            is ChatAction.OnSkillsToggle -> viewModelScope.launch { toggleSkills(action.skillIds) }
+            is ChatAction.OnMcpToggle -> viewModelScope.launch { toggleMcp(action.serverIds) }
+            is ChatAction.OnSiteRetry -> viewModelScope.launch { retrySite(action.siteId) }
+            is ChatAction.OnSiteRollback -> viewModelScope.launch { rollbackSite(action.siteId, action.version) }
         }
     }
 
@@ -904,6 +941,7 @@ class ChatViewModel(
             launch { loadSessionImages(sessionId) }
             launch { loadContextSnippet(sessionId) }
             launch { loadContextUsage(sessionId) }
+            launch { pollSessionSites(sessionId) }
             launch { chatRepository.markRead(sessionId) }
         }
     }
@@ -1426,7 +1464,22 @@ class ChatViewModel(
         }
         _state.update { current ->
             if (current.selectedSessionId == sessionId) {
-                current.copy(thread = current.thread.reduce(envelope))
+                val reduced = current.thread.reduce(envelope)
+                val event = (envelope as? StreamEnvelope.Event)?.event
+                val reducedBuild = reduced.siteBuild
+                if (event is ChatStreamEvent.SiteBuildProgress || event is ChatStreamEvent.SiteBuildReady) {
+                    current.copy(
+                        thread = reduced,
+                        siteBuilds = if (reducedBuild == null) {
+                            current.siteBuilds
+                        } else {
+                            current.siteBuilds + (sessionId to reducedBuild)
+                        },
+                        siteVersions = current.siteVersions + (sessionId to reduced.siteVersions),
+                    )
+                } else {
+                    current.copy(thread = reduced)
+                }
             } else {
                 current
             }
@@ -1740,6 +1793,8 @@ class ChatViewModel(
             imageGenerationEnabled = current.imageGenerationEnabled,
             imageGenSettings = imageSettings,
             documentIds = current.activeDocuments.map { it.id },
+            skillIds = current.selectedSkillIds.distinct().take(MAX_SKILL_IDS),
+            mcpServerIds = current.selectedMcpServerIds.distinct().take(MAX_MCP_SERVER_IDS),
         )
     }
 
@@ -2020,10 +2075,195 @@ class ChatViewModel(
             }
     }
 
+    private suspend fun loadEnhancementSelection() {
+        val skills = skillsSource ?: return
+        val mcp = mcpSource ?: return
+        val store = selectionStore ?: return
+        if (enhancementsLoaded) return
+        enhancementsLoaded = true
+        val storedSkills = store.observeSkillIds().first()
+        val storedMcpIds = store.observeMcpServerIds().first()
+        latestSkills = when (val result = skills.listSkills()) {
+            is Result.Success -> result.data
+            is Result.Error -> emptyList()
+        }
+        latestMcpServers = when (val result = mcp.listServers()) {
+            is Result.Success -> result.data
+            is Result.Error -> emptyList()
+        }
+        val resolvedSkills = if (storedSkills.isEmpty() && latestSkills.isNotEmpty()) {
+            val defaults = latestSkills
+                .filter { it.isEnabled && it.status == SkillStatus.Active }
+                .map { it.id }
+            store.saveSkillIds(defaults)
+            defaults
+        } else {
+            intersectWithCatalog(storedSkills, latestSkills.map { it.id })
+        }
+        val resolvedMcp = if (storedMcpIds.isEmpty() && latestMcpServers.isNotEmpty()) {
+            val defaults = latestMcpServers
+                .filter { it.isEnabled && it.status == McpStatus.Ok && it.tools.isNotEmpty() }
+                .map { it.id }
+            store.saveMcpServerIds(defaults)
+            defaults
+        } else {
+            intersectWithCatalog(storedMcpIds, latestMcpServers.map { it.id })
+        }
+        _state.update { it.copy(selectedSkillIds = resolvedSkills, selectedMcpServerIds = resolvedMcp) }
+    }
+
+    private suspend fun toggleSkills(ids: List<String>) {
+        val store = selectionStore ?: return
+        val resolved = intersectWithCatalog(ids, latestSkills.map { it.id })
+        _state.update { it.copy(selectedSkillIds = resolved) }
+        store.saveSkillIds(resolved)
+    }
+
+    private suspend fun toggleMcp(ids: List<String>) {
+        val store = selectionStore ?: return
+        val resolved = intersectWithCatalog(ids, latestMcpServers.map { it.id })
+        _state.update { it.copy(selectedMcpServerIds = resolved) }
+        store.saveMcpServerIds(resolved)
+    }
+
+    private suspend fun pollSessionSites(sessionId: String) {
+        val source = sitesSource ?: return
+        if (!sitePollStarted.add(sessionId)) return
+        when (val result = source.sitesBySession(sessionId)) {
+            is Result.Success -> mergePolledSites(sessionId, result.data)
+            is Result.Error -> Unit
+        }
+    }
+
+    private fun mergePolledSites(sessionId: String, entries: List<SessionSiteEntry>) {
+        _state.update { current ->
+            if (current.selectedSessionId != sessionId) return@update current
+            if (current.isSending || current.thread.status == RunStatus.Streaming) return@update current
+            if (entries.isEmpty()) {
+                return@update current.copy(
+                    siteBuilds = current.siteBuilds - sessionId,
+                    siteVersions = current.siteVersions - sessionId,
+                )
+            }
+            val versions = entries.map { entry ->
+                SiteVersionEntry(
+                    siteId = entry.siteId,
+                    version = entry.version,
+                    ready = entry.status == SiteStatus.Ready,
+                    failed = entry.status == SiteStatus.Failed,
+                    stable = entry.stableVersion != null && entry.version == entry.stableVersion,
+                    previewUrl = entry.previewUrl,
+                    downloadUrl = entry.downloadUrl,
+                )
+            }
+            val latest = entries.maxByOrNull { it.version } ?: return@update current
+            val build = when (latest.status) {
+                SiteStatus.Ready -> SiteBuildState(
+                    siteId = latest.siteId,
+                    version = latest.version,
+                    phase = SiteBuildPhase.Ready,
+                    message = SITE_READY_MESSAGE,
+                    previewUrl = latest.previewUrl,
+                    downloadUrl = latest.downloadUrl,
+                )
+                SiteStatus.Failed -> SiteBuildState(
+                    siteId = latest.siteId,
+                    version = latest.version,
+                    phase = SiteBuildPhase.Failed,
+                    message = SITE_FAILED_MESSAGE,
+                    downloadUrl = latest.downloadUrl,
+                )
+                SiteStatus.Queued, SiteStatus.Running -> SiteBuildState(
+                    siteId = latest.siteId,
+                    version = latest.version,
+                    phase = SiteBuildPhase.Starting,
+                    message = SITE_QUEUED_MESSAGE,
+                )
+            }
+            current.copy(
+                siteBuilds = current.siteBuilds + (sessionId to build),
+                siteVersions = current.siteVersions + (sessionId to versions),
+            )
+        }
+    }
+
+    private suspend fun retrySite(siteId: String) {
+        val source = sitesSource ?: return
+        val sessionId = _state.value.siteBuilds.entries
+            .firstOrNull { it.value.siteId == siteId }?.key
+            ?: _state.value.selectedSessionId
+            ?: return
+        val prior = _state.value.siteBuilds[sessionId]
+        if (prior == null || prior.siteId != siteId) return
+        _state.update { current ->
+            val build = current.siteBuilds[sessionId]
+            if (build == null || build.siteId != siteId) {
+                current
+            } else {
+                current.copy(
+                    siteBuilds = current.siteBuilds + (sessionId to build.copy(phase = SiteBuildPhase.Starting, message = SITE_RETRY_MESSAGE)),
+                )
+            }
+        }
+        when (val result = source.retrySite(siteId)) {
+            is Result.Success -> {
+                _state.update { current ->
+                    current.copy(siteBuilds = current.siteBuilds + (sessionId to result.data))
+                }
+            }
+            is Result.Error -> {
+                _state.update { current ->
+                    current.copy(siteBuilds = current.siteBuilds + (sessionId to prior))
+                }
+                _events.send(ChatEvent.ShowMessage(result.error.toUiText()))
+            }
+        }
+    }
+
+    private suspend fun rollbackSite(siteId: String, version: Int) {
+        val source = sitesSource ?: return
+        when (val result = source.rollbackSite(siteId, version)) {
+            is Result.Success -> {
+                val stableVersion = result.data
+                val (previewUrl, downloadUrl) = stableSiteUrls(siteId, stableVersion)
+                _state.update { current ->
+                    current.copy(
+                        siteVersions = current.siteVersions.mapValues { (_, versions) ->
+                            if (versions.none { it.siteId == siteId }) {
+                                versions
+                            } else {
+                                versions.map { entry ->
+                                    if (entry.siteId != siteId) {
+                                        entry
+                                    } else if (entry.version == stableVersion) {
+                                        entry.copy(
+                                            stable = true,
+                                            previewUrl = entry.previewUrl ?: previewUrl,
+                                            downloadUrl = entry.downloadUrl.ifBlank { downloadUrl },
+                                        )
+                                    } else {
+                                        entry.copy(stable = false)
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+            is Result.Error -> _events.send(ChatEvent.ShowMessage(result.error.toUiText()))
+        }
+    }
+
     private companion object {
         const val SESSION_KEY = "sessionId"
         const val DRAFT_KEY = "draft"
         const val SESSION_TITLE_MAX = 48
+        const val MAX_SKILL_IDS = 20
+        const val MAX_MCP_SERVER_IDS = 5
+        const val SITE_READY_MESSAGE = "Situs siap diunduh."
+        const val SITE_FAILED_MESSAGE = "Build gagal."
+        const val SITE_QUEUED_MESSAGE = "Menunggu antrean build."
+        const val SITE_RETRY_MESSAGE = "Mengulang build."
         const val DOCUMENT_POLL_ATTEMPTS = 20
         const val DOCUMENT_POLL_INTERVAL_MS = 1_000L
         const val LIBRARY_SEARCH_DEBOUNCE_MS = 300L

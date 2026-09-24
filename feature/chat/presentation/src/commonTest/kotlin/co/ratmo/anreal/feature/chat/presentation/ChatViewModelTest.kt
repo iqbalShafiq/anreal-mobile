@@ -17,12 +17,27 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.EnhancementSelectionStore
+import co.ratmo.anreal.feature.chat.domain.McpAuthType
+import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.McpServer
+import co.ratmo.anreal.feature.chat.domain.McpStatus
+import co.ratmo.anreal.feature.chat.domain.McpTestResult
+import co.ratmo.anreal.feature.chat.domain.McpTool
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.CachedModelCatalog
 import co.ratmo.anreal.feature.chat.domain.ModelCatalog
 import co.ratmo.anreal.feature.chat.domain.RecentProject
 import co.ratmo.anreal.feature.chat.domain.ReasoningEffort
 import co.ratmo.anreal.feature.chat.domain.RunStatusSnapshot
+import co.ratmo.anreal.feature.chat.domain.SessionSiteEntry
+import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
+import co.ratmo.anreal.feature.chat.domain.SiteBuildState
+import co.ratmo.anreal.feature.chat.domain.SiteStatus
+import co.ratmo.anreal.feature.chat.domain.SitesRemoteDataSource
+import co.ratmo.anreal.feature.chat.domain.Skill
+import co.ratmo.anreal.feature.chat.domain.SkillStatus
+import co.ratmo.anreal.feature.chat.domain.SkillsRemoteDataSource
 import co.ratmo.anreal.feature.chat.domain.HISTORY_PAGE_SIZE
 import co.ratmo.anreal.feature.chat.domain.SessionPage
 import co.ratmo.anreal.feature.chat.domain.stream.ChatRole
@@ -1260,6 +1275,264 @@ class ChatViewModelTest {
         }
     }
 
+    @Test
+    fun first_catalog_load_defaults_selection_to_all_enabled() = runTest {
+        val selection = FakeSelectionStore()
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(
+                listOf(
+                    Skill(id = "s1", name = "alpha", description = "Alpha", status = SkillStatus.Active, isEnabled = true),
+                    Skill(id = "s2", name = "beta", description = "Beta", status = SkillStatus.Invalid, isEnabled = true),
+                    Skill(id = "s3", name = "gamma", description = "Gamma", status = SkillStatus.Active, isEnabled = false),
+                ),
+            ),
+            mcpSource = FakeMcpSource(
+                listOf(
+                    McpServer(id = "m1", name = "docs", url = "https://mcp.example.com/mcp", isEnabled = true, status = McpStatus.Ok, tools = listOf(McpTool("search", "Search"))),
+                    McpServer(id = "m2", name = "empty", url = "https://mcp.example.com/empty", isEnabled = true, status = McpStatus.Ok),
+                    McpServer(id = "m3", name = "down", url = "https://mcp.example.com/down", isEnabled = true, status = McpStatus.Error, tools = listOf(McpTool("search", "Search"))),
+                ),
+            ),
+            sitesSource = FakeSitesSource(),
+            selectionStore = selection,
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedSkillIds).isEqualTo(listOf("s1"))
+        assertThat(viewModel.state.value.selectedMcpServerIds).isEqualTo(listOf("m1"))
+        assertThat(selection.savedSkills).isEqualTo(listOf("s1"))
+        assertThat(selection.savedMcp).isEqualTo(listOf("m1"))
+    }
+
+    @Test
+    fun toggle_persists_intersected_ids_and_drops_ghosts() = runTest {
+        val selection = FakeSelectionStore(initialSkills = listOf("s1"))
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(
+                listOf(
+                    Skill(id = "s1", name = "alpha", description = "Alpha"),
+                    Skill(id = "s2", name = "beta", description = "Beta"),
+                ),
+            ),
+            mcpSource = FakeMcpSource(),
+            sitesSource = FakeSitesSource(),
+            selectionStore = selection,
+        )
+        advanceUntilIdle()
+        assertThat(viewModel.state.value.selectedSkillIds).isEqualTo(listOf("s1"))
+
+        viewModel.onAction(ChatAction.OnSkillsToggle(listOf("s1", "s2", "ghost")))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedSkillIds).isEqualTo(listOf("s1", "s2"))
+        assertThat(selection.savedSkills).isEqualTo(listOf("s1", "s2"))
+
+        viewModel.onAction(ChatAction.OnMcpToggle(listOf("ghost")))
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.selectedMcpServerIds).isEqualTo(emptyList())
+        assertThat(selection.savedMcp).isEqualTo(emptyList())
+    }
+
+    @Test
+    fun send_includes_selected_skill_and_mcp_ids() = runTest {
+        val fake = populatedRepo()
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(listOf(Skill(id = "s1", name = "alpha", description = "Alpha"))),
+            mcpSource = FakeMcpSource(
+                listOf(
+                    McpServer(id = "m1", name = "docs", url = "https://mcp.example.com/mcp", status = McpStatus.Ok, tools = listOf(McpTool("search", "Search"))),
+                ),
+            ),
+            sitesSource = FakeSitesSource(),
+            selectionStore = FakeSelectionStore(initialSkills = listOf("s1"), initialMcp = listOf("m1")),
+        )
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnDraftChange("Hello"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        assertThat(fake.sentOptions?.skillIds).isEqualTo(listOf("s1"))
+        assertThat(fake.sentOptions?.mcpServerIds).isEqualTo(listOf("m1"))
+    }
+
+    @Test
+    fun stream_progress_then_ready_updates_site_builds() = runTest {
+        val fake = populatedRepo().apply {
+            streamLines = listOf(
+                """{"type":"stream_start","streamId":"stream-1","eventId":0}""",
+                """{"type":"stream_event","streamId":"stream-1","eventId":1,"event":{"type":"data","name":"siteBuildProgress","data":{"siteId":"s1","version":1,"phase":"building","message":"Membangun hero."}}}""",
+                """{"type":"stream_event","streamId":"stream-1","eventId":2,"event":{"type":"data","name":"siteBuildReady","data":{"siteId":"s1","version":1,"previewUrl":"/api/sites/s1/v1/preview/index.html","downloadUrl":"/api/sites/s1/v1/download"}}}""",
+                """{"type":"stream_end","streamId":"stream-1","eventId":3,"status":"completed"}""",
+            )
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = FakeSitesSource(),
+            selectionStore = FakeSelectionStore(),
+        )
+        advanceUntilIdle()
+        val sessionId = viewModel.state.value.selectedSessionId
+
+        viewModel.onAction(ChatAction.OnDraftChange("Build a site"))
+        viewModel.onAction(ChatAction.OnSend)
+        advanceUntilIdle()
+
+        val build = viewModel.state.value.siteBuilds[sessionId]
+        assertThat(build?.phase).isEqualTo(SiteBuildPhase.Ready)
+        assertThat(build?.previewUrl).isEqualTo("/api/sites/s1/v1/preview/index.html")
+        assertThat(viewModel.state.value.siteVersions[sessionId]?.single()?.stable).isEqualTo(true)
+    }
+
+    @Test
+    fun empty_poll_during_streaming_keeps_streaming_state() = runTest {
+        val sites = FakeSitesSource().apply {
+            holdPoll = true
+            entries = Result.Success(emptyList())
+        }
+        val fake = populatedRepo().apply {
+            holdSend = true
+            streamLines = listOf(
+                """{"type":"stream_start","streamId":"stream-1","eventId":0}""",
+                """{"type":"stream_event","streamId":"stream-1","eventId":1,"event":{"type":"data","name":"siteBuildProgress","data":{"siteId":"s1","version":1,"phase":"building","message":"Membangun hero."}}}""",
+            )
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+        )
+        sites.pollStarted.await()
+
+        viewModel.onAction(ChatAction.OnDraftChange("Build a site"))
+        viewModel.onAction(ChatAction.OnSend)
+        fake.sendStarted.await()
+        val sessionId = viewModel.state.value.selectedSessionId
+        assertThat(viewModel.state.value.siteBuilds[sessionId]?.phase).isEqualTo(SiteBuildPhase.Building)
+
+        sites.allowPollToFinish.complete(Unit)
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.siteBuilds[sessionId]?.phase).isEqualTo(SiteBuildPhase.Building)
+        assertThat(sites.pollCalls).isEqualTo(listOf("draft"))
+
+        fake.allowSendToFinish.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun session_poll_populates_site_maps_once_per_session() = runTest {
+        val sites = FakeSitesSource().apply {
+            entries = Result.Success(
+                listOf(
+                    SessionSiteEntry(siteId = "s1", version = 2, stableVersion = 2, status = SiteStatus.Ready, previewUrl = "/api/sites/s1/v2/preview/index.html", downloadUrl = "/api/sites/s1/v2/download", updatedAt = "t"),
+                ),
+            )
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+        )
+        advanceUntilIdle()
+        val sessionId = viewModel.state.value.selectedSessionId
+
+        val build = viewModel.state.value.siteBuilds[sessionId]
+        assertThat(build?.phase).isEqualTo(SiteBuildPhase.Ready)
+        assertThat(build?.previewUrl).isEqualTo("/api/sites/s1/v2/preview/index.html")
+        assertThat(viewModel.state.value.siteVersions[sessionId]?.single()?.stable).isEqualTo(true)
+        assertThat(sites.pollCalls).isEqualTo(listOf("draft"))
+
+        viewModel.onAction(ChatAction.OnSessionClick("s1"))
+        advanceUntilIdle()
+
+        assertThat(sites.pollCalls).isEqualTo(listOf("draft", "s1"))
+    }
+
+    @Test
+    fun site_retry_replaces_build_with_retried_state() = runTest {
+        val sites = FakeSitesSource().apply {
+            entries = Result.Success(
+                listOf(
+                    SessionSiteEntry(siteId = "s1", version = 1, stableVersion = 1, status = SiteStatus.Failed, previewUrl = null, downloadUrl = "/api/sites/s1/v1/download", updatedAt = "t"),
+                ),
+            )
+            retryResult = Result.Success(SiteBuildState("s1", 2, SiteBuildPhase.Starting, "Mengulang build."))
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+        )
+        advanceUntilIdle()
+        val sessionId = viewModel.state.value.selectedSessionId
+        assertThat(viewModel.state.value.siteBuilds[sessionId]?.phase).isEqualTo(SiteBuildPhase.Failed)
+
+        viewModel.onAction(ChatAction.OnSiteRetry("s1"))
+        advanceUntilIdle()
+
+        val build = viewModel.state.value.siteBuilds[sessionId]
+        assertThat(build?.phase).isEqualTo(SiteBuildPhase.Starting)
+        assertThat(build?.version).isEqualTo(2)
+    }
+
+    @Test
+    fun site_rollback_marks_target_version_stable() = runTest {
+        val sites = FakeSitesSource().apply {
+            entries = Result.Success(
+                listOf(
+                    SessionSiteEntry(siteId = "s1", version = 1, stableVersion = 1, status = SiteStatus.Ready, previewUrl = "/api/sites/s1/v1/preview/index.html", downloadUrl = "/api/sites/s1/v1/download", updatedAt = "t"),
+                    SessionSiteEntry(siteId = "s1", version = 2, stableVersion = 1, status = SiteStatus.Ready, previewUrl = "/api/sites/s1/v2/preview/index.html", downloadUrl = "/api/sites/s1/v2/download", updatedAt = "t"),
+                ),
+            )
+            rollbackResult = Result.Success(2)
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = populatedRepo(),
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = sites,
+            selectionStore = FakeSelectionStore(),
+        )
+        advanceUntilIdle()
+        val sessionId = viewModel.state.value.selectedSessionId
+
+        viewModel.onAction(ChatAction.OnSiteRollback("s1", 2))
+        advanceUntilIdle()
+
+        val versions = viewModel.state.value.siteVersions[sessionId]
+        assertThat(versions?.first { it.version == 2 }?.stable).isEqualTo(true)
+        assertThat(versions?.first { it.version == 1 }?.stable).isEqualTo(false)
+    }
+
     private fun populatedRepo(): FakeChatRepository = FakeChatRepository().apply {
         refreshResult = Result.Success(
             SessionPage(listOf(ChatSession(id = "s1", title = "Docs", updatedAt = "now"))),
@@ -1463,5 +1736,98 @@ private class FakeChatPreferencesRepository(
 
     override suspend fun setChatReasoningEffort(effort: String?) {
         values.value = values.value.copy(chatReasoningEffort = effort)
+    }
+}
+
+private class FakeSkillsSource(
+    private var skills: List<Skill> = emptyList(),
+) : SkillsRemoteDataSource {
+    override suspend fun listSkills(): Result<List<Skill>, DataError.Network> = Result.Success(skills)
+
+    override suspend fun getSkill(id: String): Result<Skill, DataError.Network> =
+        Result.Error(DataError.Network.NOT_FOUND)
+
+    override suspend fun createSkill(name: String, description: String, bodyMd: String): Result<Skill, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun updateSkill(id: String, name: String, description: String, bodyMd: String, markReviewed: Boolean): Result<Skill, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun setSkillEnabled(id: String, isEnabled: Boolean): Result<Skill, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun deleteSkill(id: String): Result<Unit, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+}
+
+private class FakeMcpSource(
+    private var servers: List<McpServer> = emptyList(),
+) : McpRemoteDataSource {
+    override suspend fun listServers(): Result<List<McpServer>, DataError.Network> = Result.Success(servers)
+
+    override suspend fun createServer(name: String, url: String, authType: McpAuthType, token: String?, headers: List<Pair<String, String>>): Result<McpServer, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun updateServer(id: String, name: String, url: String, authType: McpAuthType, token: String?, headers: List<Pair<String, String>>?): Result<McpServer, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun setServerEnabled(id: String, isEnabled: Boolean): Result<McpServer, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun deleteServer(id: String): Result<Unit, DataError.Network> =
+        Result.Error(DataError.Network.UNKNOWN)
+
+    override suspend fun testConnection(url: String, authType: McpAuthType, token: String?, headers: List<Pair<String, String>>, serverId: String?): Result<McpTestResult, DataError.Network> =
+        Result.Success(McpTestResult(ok = false))
+}
+
+private class FakeSitesSource : SitesRemoteDataSource {
+    var entries: Result<List<SessionSiteEntry>, DataError.Network> = Result.Success(emptyList())
+    var retryResult: Result<SiteBuildState, DataError.Network> =
+        Result.Success(SiteBuildState("s1", 1, SiteBuildPhase.Starting, "Mengulang build."))
+    var rollbackResult: Result<Int, DataError.Network> = Result.Success(1)
+    val pollCalls = mutableListOf<String>()
+    var holdPoll: Boolean = false
+    var pollStarted: CompletableDeferred<Unit> = CompletableDeferred()
+    var allowPollToFinish: CompletableDeferred<Unit> = CompletableDeferred()
+
+    override suspend fun sitesBySession(sessionId: String): Result<List<SessionSiteEntry>, DataError.Network> {
+        pollCalls += sessionId
+        if (holdPoll) {
+            if (!pollStarted.isCompleted) pollStarted.complete(Unit)
+            allowPollToFinish.await()
+        }
+        return entries
+    }
+
+    override suspend fun downloadSite(siteId: String, version: Int): Result<ByteArray, DataError.Network> =
+        Result.Success(ByteArray(0))
+
+    override suspend fun retrySite(siteId: String): Result<SiteBuildState, DataError.Network> = retryResult
+
+    override suspend fun rollbackSite(siteId: String, version: Int): Result<Int, DataError.Network> = rollbackResult
+}
+
+private class FakeSelectionStore(
+    initialSkills: List<String> = emptyList(),
+    initialMcp: List<String> = emptyList(),
+) : EnhancementSelectionStore {
+    private val skillIds = MutableStateFlow(initialSkills)
+    private val mcpIds = MutableStateFlow(initialMcp)
+    var savedSkills: List<String>? = null
+    var savedMcp: List<String>? = null
+
+    override fun observeSkillIds(): Flow<List<String>> = skillIds
+
+    override fun observeMcpServerIds(): Flow<List<String>> = mcpIds
+
+    override suspend fun saveSkillIds(ids: List<String>) {
+        savedSkills = ids
+        skillIds.value = ids
+    }
+
+    override suspend fun saveMcpServerIds(ids: List<String>) {
+        savedMcp = ids
+        mcpIds.value = ids
     }
 }
