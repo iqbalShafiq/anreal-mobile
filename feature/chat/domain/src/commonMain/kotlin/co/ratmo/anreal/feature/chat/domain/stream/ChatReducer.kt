@@ -1,5 +1,9 @@
 package co.ratmo.anreal.feature.chat.domain.stream
 
+import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
+import co.ratmo.anreal.feature.chat.domain.applySiteBuildEvent
+import co.ratmo.anreal.feature.chat.domain.applySiteVersionEvent
+
 fun ChatThreadState.reduce(envelope: StreamEnvelope): ChatThreadState {
     return when (envelope) {
         is StreamEnvelope.Start -> copy(
@@ -96,6 +100,14 @@ private fun ChatThreadState.applyEvent(envelope: StreamEnvelope.Event): ChatThre
             staleInteractionIds = advanced.staleInteractionIds - event.id,
         )
         is ChatStreamEvent.Compaction -> advanced
+        is ChatStreamEvent.SiteBuildProgress -> advanced.copy(
+            siteBuild = applySiteBuildEvent(advanced.siteBuild, event.siteId, event.version, event.phase, event.message),
+            siteVersions = applySiteVersionEvent(advanced.siteVersions, event.siteId, event.version, event.phase, previewUrl = null, downloadUrl = null),
+        )
+        is ChatStreamEvent.SiteBuildReady -> advanced.copy(
+            siteBuild = applySiteBuildEvent(advanced.siteBuild, event.siteId, event.version, SiteBuildPhase.Ready, "", event.previewUrl, event.downloadUrl),
+            siteVersions = applySiteVersionEvent(advanced.siteVersions, event.siteId, event.version, SiteBuildPhase.Ready, event.previewUrl, event.downloadUrl),
+        )
         is ChatStreamEvent.Unknown -> advanced
     }
 }

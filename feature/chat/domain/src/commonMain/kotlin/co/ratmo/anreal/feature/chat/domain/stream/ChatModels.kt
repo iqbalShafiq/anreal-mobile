@@ -1,5 +1,8 @@
 package co.ratmo.anreal.feature.chat.domain.stream
 
+import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
+import co.ratmo.anreal.feature.chat.domain.SiteBuildState
+import co.ratmo.anreal.feature.chat.domain.SiteVersionEntry
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -140,6 +143,8 @@ data class ChatThreadState(
     val pendingInteractions: List<NativeInteraction> = emptyList(),
     val staleInteractionIds: Set<String> = emptySet(),
     val deepResearch: DeepResearchStatus? = null,
+    val siteBuild: SiteBuildState? = null,
+    val siteVersions: List<SiteVersionEntry> = emptyList(),
 )
 
 data class ToolApproval(
@@ -232,6 +237,20 @@ sealed interface ChatStreamEvent {
     data class InteractionMarkedStale(val id: String) : ChatStreamEvent
     data class DeepResearchProgress(val status: DeepResearchStatus) : ChatStreamEvent
     data class Compaction(val phase: String) : ChatStreamEvent
+
+    data class SiteBuildProgress(
+        val siteId: String,
+        val version: Int,
+        val phase: SiteBuildPhase,
+        val message: String,
+    ) : ChatStreamEvent
+
+    data class SiteBuildReady(
+        val siteId: String,
+        val version: Int,
+        val previewUrl: String?,
+        val downloadUrl: String,
+    ) : ChatStreamEvent
 
     data class Unknown(
         val type: String,

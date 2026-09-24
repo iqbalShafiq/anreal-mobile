@@ -1,5 +1,6 @@
 package co.ratmo.anreal.feature.chat.domain.stream
 
+import co.ratmo.anreal.feature.chat.domain.SiteBuildPhase
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -239,7 +240,32 @@ private fun parseNativeInteraction(event: JsonObject, type: String): ChatStreamE
 }
 
 private fun parseDataEvent(event: JsonObject, type: String): ChatStreamEvent {
-    if (event.string("name") != "deepResearchProgress") return ChatStreamEvent.Unknown(type)
+    return when (event.string("name")) {
+        "deepResearchProgress" -> parseDeepResearch(event, type)
+        "siteBuildProgress" -> {
+            val data = event["data"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+            val phase = sitePhase(data.string("phase")) ?: return ChatStreamEvent.Unknown(type)
+            ChatStreamEvent.SiteBuildProgress(
+                siteId = data.string("siteId") ?: return ChatStreamEvent.Unknown(type),
+                version = data.int("version") ?: return ChatStreamEvent.Unknown(type),
+                phase = phase,
+                message = data.string("message").orEmpty(),
+            )
+        }
+        "siteBuildReady" -> {
+            val data = event["data"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
+            ChatStreamEvent.SiteBuildReady(
+                siteId = data.string("siteId") ?: return ChatStreamEvent.Unknown(type),
+                version = data.int("version") ?: return ChatStreamEvent.Unknown(type),
+                previewUrl = data.string("previewUrl"),
+                downloadUrl = data.string("downloadUrl").orEmpty(),
+            )
+        }
+        else -> ChatStreamEvent.Unknown(type)
+    }
+}
+
+private fun parseDeepResearch(event: JsonObject, type: String): ChatStreamEvent {
     val data = event["data"] as? JsonObject ?: return ChatStreamEvent.Unknown(type)
     val phase = when (data.string("phase")) {
         "planning" -> DeepResearchPhase.Planning
@@ -252,6 +278,17 @@ private fun parseDataEvent(event: JsonObject, type: String): ChatStreamEvent {
     return ChatStreamEvent.DeepResearchProgress(
         DeepResearchStatus(phase = phase, message = data.string("message").orEmpty()),
     )
+}
+
+private fun sitePhase(raw: String?): SiteBuildPhase? = when (raw) {
+    "starting" -> SiteBuildPhase.Starting
+    "planning" -> SiteBuildPhase.Planning
+    "building" -> SiteBuildPhase.Building
+    "bundling" -> SiteBuildPhase.Bundling
+    "preview" -> SiteBuildPhase.Preview
+    "ready" -> SiteBuildPhase.Ready
+    "failed" -> SiteBuildPhase.Failed
+    else -> null
 }
 
 private fun turnMessageId(event: JsonObject): String? =
