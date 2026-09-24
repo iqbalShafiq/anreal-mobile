@@ -12,8 +12,10 @@ import co.ratmo.anreal.core.presentation.toUiText
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceBaseUrlProvider
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceSchedule
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
@@ -35,7 +37,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 private const val LOAD_WAIT_INTERVAL_MS = 25L
 
 @Serializable
-enum class WorkspaceSection { Projects, Documents, Images, Sites, Tasks }
+enum class WorkspaceSection { Projects, Documents, Images, Sites, Tasks, Schedules }
 
 enum class WorkspaceViewMode { List, Grid }
 
@@ -104,6 +106,24 @@ data class TaskEditorState(
     val saving: Boolean = false,
 )
 
+data class ScheduleUi(
+    val id: String,
+    val title: String,
+    val prompt: String,
+    val freq: ScheduleFreq,
+    val nextRunAt: String?,
+    val status: String,
+)
+
+data class ScheduleEditorState(
+    val title: String = "",
+    val prompt: String = "",
+    val freq: ScheduleFreq = ScheduleFreq.Once,
+    val runAt: String = "",
+    val fieldError: UiText? = null,
+    val saving: Boolean = false,
+)
+
 data class DocumentPreviewUi(
     val id: String,
     val filename: String,
@@ -121,6 +141,7 @@ sealed interface WorkspaceDeleteTarget {
     data class Project(override val id: String, override val label: String) : WorkspaceDeleteTarget
     data class Document(override val id: String, override val label: String) : WorkspaceDeleteTarget
     data class Task(override val id: String, override val label: String) : WorkspaceDeleteTarget
+    data class Schedule(override val id: String, override val label: String) : WorkspaceDeleteTarget
 }
 
 sealed interface WorkspaceCardSheetTarget {
@@ -148,6 +169,8 @@ data class WorkspaceState(
     val scopeSessionId: String? = null,
     val tasks: List<TaskUi> = emptyList(),
     val taskEditor: TaskEditorState? = null,
+    val schedules: List<ScheduleUi> = emptyList(),
+    val scheduleEditor: ScheduleEditorState? = null,
     val siteBaseUrl: String = "",
     val previewSiteId: String? = null,
     val query: String = "",
@@ -210,6 +233,14 @@ sealed interface WorkspaceAction {
     data class OnTaskRemoveSubtask(val id: String) : WorkspaceAction
     data object OnTaskSave : WorkspaceAction
     data class OnRequestDeleteTask(val id: String, val title: String) : WorkspaceAction
+    data object OnNewSchedule : WorkspaceAction
+    data object OnCloseScheduleEditor : WorkspaceAction
+    data class OnScheduleTitleChange(val value: String) : WorkspaceAction
+    data class OnSchedulePromptChange(val value: String) : WorkspaceAction
+    data class OnScheduleFreqChange(val freq: ScheduleFreq) : WorkspaceAction
+    data class OnScheduleRunAtChange(val value: String) : WorkspaceAction
+    data object OnScheduleSave : WorkspaceAction
+    data class OnRequestCancelSchedule(val id: String, val title: String) : WorkspaceAction
 }
 
 sealed interface WorkspaceEvent {
@@ -340,6 +371,18 @@ class WorkspaceViewModel(
             is WorkspaceAction.OnRequestDeleteTask -> _state.update {
                 it.copy(deleteTarget = WorkspaceDeleteTarget.Task(action.id, action.title), mutationError = null)
             }
+            WorkspaceAction.OnNewSchedule -> _state.update { it.copy(scheduleEditor = ScheduleEditorState()) }
+            WorkspaceAction.OnCloseScheduleEditor -> if (_state.value.scheduleEditor?.saving != true) {
+                _state.update { it.copy(scheduleEditor = null, mutationError = null) }
+            }
+            is WorkspaceAction.OnScheduleTitleChange -> updateScheduleEditor { it.copy(title = action.value, fieldError = null) }
+            is WorkspaceAction.OnSchedulePromptChange -> updateScheduleEditor { it.copy(prompt = action.value, fieldError = null) }
+            is WorkspaceAction.OnScheduleFreqChange -> updateScheduleEditor { it.copy(freq = action.freq, fieldError = null) }
+            is WorkspaceAction.OnScheduleRunAtChange -> updateScheduleEditor { it.copy(runAt = action.value, fieldError = null) }
+            WorkspaceAction.OnScheduleSave -> viewModelScope.launch { saveScheduleEditor() }
+            is WorkspaceAction.OnRequestCancelSchedule -> _state.update {
+                it.copy(deleteTarget = WorkspaceDeleteTarget.Schedule(action.id, action.title), mutationError = null)
+            }
         }
     }
 
@@ -402,6 +445,18 @@ class WorkspaceViewModel(
                     }
                 }
             }
+            WorkspaceSection.Schedules -> {
+                val scopeId = _state.value.scopeSessionId
+                if (scopeId.isNullOrBlank()) {
+                    _state.update {
+                        it.copy(schedules = emptyList(), isLoading = false, loadedSections = it.loadedSections + section)
+                    }
+                } else {
+                    applyResult(section, repository.listSchedules(scopeId)) { schedules ->
+                        _state.update { state -> state.copy(schedules = schedules.map(WorkspaceSchedule::toUi)) }
+                    }
+                }
+            }
         }
     }
 
@@ -441,6 +496,7 @@ class WorkspaceViewModel(
             WorkspaceSection.Images -> _state.update { it.copy(isLoadingMore = false) }
             WorkspaceSection.Sites -> _state.update { it.copy(isLoadingMore = false) }
             WorkspaceSection.Tasks -> _state.update { it.copy(isLoadingMore = false) }
+            WorkspaceSection.Schedules -> _state.update { it.copy(isLoadingMore = false) }
         }
     }
 
@@ -611,6 +667,10 @@ class WorkspaceViewModel(
         _state.update { it.copy(taskEditor = it.taskEditor?.let(transform)) }
     }
 
+    private inline fun updateScheduleEditor(transform: (ScheduleEditorState) -> ScheduleEditorState) {
+        _state.update { it.copy(scheduleEditor = it.scheduleEditor?.let(transform)) }
+    }
+
     private fun addTaskSubtask() {
         val title = _state.value.taskEditor?.newSubtaskTitle?.trim().orEmpty()
         if (title.isEmpty() || title.length > 200) return
@@ -696,9 +756,50 @@ class WorkspaceViewModel(
         }
     }
 
-    private val dueAtRegex = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$""")
+    private val dateTimeRegex = Regex("""^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$""")
 
-    private fun isValidDueAt(value: String): Boolean = dueAtRegex.matches(value.trim())
+    private fun isValidDueAt(value: String): Boolean = isValidDateTime(value)
+
+    private fun isValidDateTime(value: String): Boolean = dateTimeRegex.matches(value.trim())
+
+    private suspend fun saveScheduleEditor() {
+        val editor = _state.value.scheduleEditor ?: return
+        val scopeId = _state.value.scopeSessionId
+        if (scopeId.isNullOrBlank()) {
+            _state.update { it.copy(scheduleEditor = editor.copy(saving = false)) }
+            return
+        }
+        val title = editor.title.trim()
+        if (title.isEmpty() || title.length > 200) {
+            updateScheduleEditor { it.copy(fieldError = UiText.StringResource(AnrealCopy.ERROR_TITLE_REQUIRED)) }
+            return
+        }
+        val prompt = editor.prompt.trim()
+        if (prompt.isEmpty() || prompt.length > 4000) {
+            updateScheduleEditor { it.copy(fieldError = UiText.StringResource(AnrealCopy.ERROR_PROMPT_REQUIRED)) }
+            return
+        }
+        val runAt = editor.runAt.trim().ifEmpty { null }
+        if (runAt != null && !isValidDateTime(runAt)) {
+            updateScheduleEditor { it.copy(fieldError = UiText.StringResource(AnrealCopy.ERROR_DUE_DATE_INVALID)) }
+            return
+        }
+        _state.update { it.copy(scheduleEditor = editor.copy(saving = true, fieldError = null)) }
+        when (
+            val result = repository.createSchedule(scopeId, title, prompt, editor.freq, runAt)
+        ) {
+            is Result.Success -> _state.update {
+                it.copy(
+                    schedules = listOf(result.data.toUi()) + it.schedules,
+                    loadedSections = it.loadedSections + WorkspaceSection.Schedules,
+                    scheduleEditor = null,
+                )
+            }
+            is Result.Error -> _state.update {
+                it.copy(scheduleEditor = it.scheduleEditor?.copy(saving = false, fieldError = result.error.toUiText()))
+            }
+        }
+    }
 
     private suspend fun deleteSelected() {
         val target = _state.value.deleteTarget ?: return
@@ -707,6 +808,7 @@ class WorkspaceViewModel(
             is WorkspaceDeleteTarget.Project -> repository.deleteProject(target.id)
             is WorkspaceDeleteTarget.Document -> repository.deleteDocument(target.id)
             is WorkspaceDeleteTarget.Task -> repository.deleteTask(_state.value.scopeSessionId.orEmpty(), target.id)
+            is WorkspaceDeleteTarget.Schedule -> repository.cancelSchedule(_state.value.scopeSessionId.orEmpty(), target.id)
         }
         when (result) {
             is Result.Success -> _state.update {
@@ -714,6 +816,7 @@ class WorkspaceViewModel(
                     projects = it.projects.filterNot { project -> project.id == target.id },
                     documents = it.documents.filterNot { document -> document.id == target.id },
                     tasks = it.tasks.filterNot { task -> task.id == target.id },
+                    schedules = it.schedules.filterNot { schedule -> schedule.id == target.id },
                     deleteTarget = null,
                     isMutating = false,
                 )
@@ -738,6 +841,15 @@ private fun WorkspaceTask.toUi(): TaskUi = TaskUi(
     description = description,
     subtasks = subtasks.map { SubtaskUi(it.id, it.title, it.done) },
     dueAt = dueAt,
+)
+
+private fun WorkspaceSchedule.toUi(): ScheduleUi = ScheduleUi(
+    id = id,
+    title = title,
+    prompt = prompt,
+    freq = freq,
+    nextRunAt = nextRunAt,
+    status = status,
 )
 
 private fun ScopeSiteEntry.toUi(): SiteUi = SiteUi(

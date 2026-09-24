@@ -56,4 +56,13 @@ interface WorkspaceRepository {
         removeSubtasks: List<String>,
     ): Result<WorkspaceTask, WorkspaceError>
     suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError>
+    suspend fun listSchedules(sessionId: String): Result<List<WorkspaceSchedule>, WorkspaceError>
+    suspend fun createSchedule(
+        sessionId: String,
+        title: String,
+        prompt: String,
+        freq: ScheduleFreq,
+        runAt: String?,
+    ): Result<WorkspaceSchedule, WorkspaceError>
+    suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError>
 }

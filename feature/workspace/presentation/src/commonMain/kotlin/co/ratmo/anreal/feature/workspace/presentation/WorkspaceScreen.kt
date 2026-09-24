@@ -165,7 +165,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     ),
                 )
                 if (state.section != WorkspaceSection.Images && state.section != WorkspaceSection.Sites &&
-                    state.section != WorkspaceSection.Tasks
+                    state.section != WorkspaceSection.Tasks && state.section != WorkspaceSection.Schedules
                 ) {
                     AnrealSearchField(
                         value = state.query,
@@ -199,6 +199,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                             WorkspaceSection.Images -> state.images.size
                             WorkspaceSection.Sites -> state.sites.size
                             WorkspaceSection.Tasks -> state.tasks.size
+                            WorkspaceSection.Schedules -> state.schedules.size
                             WorkspaceSection.Projects -> 0
                         }
                         WorkspaceLoadedLabel(
@@ -331,6 +332,17 @@ private fun WorkspaceContent(state: WorkspaceState, onAction: (WorkspaceAction) 
                 hasScope = state.scopeSessionId != null,
                 error = state.error,
                 editor = state.taskEditor,
+                isMutating = state.isMutating,
+                mutationError = state.mutationError,
+                onAction = onAction,
+            )
+            WorkspaceSection.Schedules -> SchedulesPanel(
+                schedules = state.schedules,
+                isLoading = state.isLoading,
+                loaded = WorkspaceSection.Schedules in state.loadedSections,
+                hasScope = state.scopeSessionId != null,
+                error = state.error,
+                editor = state.scheduleEditor,
                 isMutating = state.isMutating,
                 mutationError = state.mutationError,
                 onAction = onAction,
@@ -1026,6 +1038,7 @@ private fun WorkspaceSection.label(): String = when (this) {
     WorkspaceSection.Images -> AnrealCopy.get(AnrealCopy.LABEL_IMAGES)
     WorkspaceSection.Sites -> AnrealCopy.get(AnrealCopy.LABEL_SITES)
     WorkspaceSection.Tasks -> AnrealCopy.get(AnrealCopy.LABEL_TASKS)
+    WorkspaceSection.Schedules -> AnrealCopy.get(AnrealCopy.LABEL_SCHEDULES)
 }
 
 @AnrealPreviews

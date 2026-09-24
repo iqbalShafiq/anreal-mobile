@@ -15,8 +15,10 @@ import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.TaskSubtask
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceSchedule
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
@@ -211,6 +213,45 @@ class WorkspaceViewModelTest {
         assertThat(repository.taskUpdates).hasSize(1)
         assertThat(viewModel.state.value.tasks.single().doneCount).isEqualTo(1)
     }
+
+    @Test
+    fun schedules_section_loads_items() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Schedules, repository, scopeSessionId = "abc")
+
+        assertThat(repository.scheduleScopes).isEqualTo(listOf("abc"))
+        assertThat(viewModel.state.value.schedules).hasSize(1)
+        assertThat(viewModel.state.value.schedules.single().title).isEqualTo("Morning brief")
+    }
+
+    @Test
+    fun schedule_create_validates_then_saves() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Schedules, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnNewSchedule)
+        viewModel.onAction(WorkspaceAction.OnScheduleSave)
+        assertThat(repository.scheduleCreates).hasSize(0)
+
+        viewModel.onAction(WorkspaceAction.OnScheduleTitleChange("Weekly"))
+        viewModel.onAction(WorkspaceAction.OnSchedulePromptChange("Summarize"))
+        viewModel.onAction(WorkspaceAction.OnScheduleSave)
+        assertThat(repository.scheduleCreates).isEqualTo(listOf("Weekly"))
+        assertThat(viewModel.state.value.scheduleEditor).isNull()
+    }
+
+    @Test
+    fun schedule_cancel_removes_from_list() {
+        val repository = FakeWorkspaceRepository()
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Schedules, repository, scopeSessionId = "abc")
+
+        viewModel.onAction(WorkspaceAction.OnRequestCancelSchedule("sc1", "Morning brief"))
+        viewModel.onAction(WorkspaceAction.ConfirmDelete)
+
+        assertThat(repository.scheduleCancels).isEqualTo(listOf("sc1"))
+        assertThat(viewModel.state.value.schedules).hasSize(0)
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {
@@ -379,4 +420,33 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
 
     override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
         Result.Success(Unit)
+
+    private val schedule = WorkspaceSchedule(
+        id = "sc1", title = "Morning brief", prompt = "Summarize",
+        freq = ScheduleFreq.Daily, nextRunAt = "2026-09-25T07:00:00+07:00", status = "active",
+    )
+    val scheduleScopes = mutableListOf<String>()
+    val scheduleCreates = mutableListOf<String>()
+    val scheduleCancels = mutableListOf<String>()
+
+    override suspend fun listSchedules(sessionId: String): Result<List<WorkspaceSchedule>, WorkspaceError> {
+        scheduleScopes += sessionId
+        return Result.Success(listOf(schedule))
+    }
+
+    override suspend fun createSchedule(
+        sessionId: String,
+        title: String,
+        prompt: String,
+        freq: ScheduleFreq,
+        runAt: String?,
+    ): Result<WorkspaceSchedule, WorkspaceError> {
+        scheduleCreates += title
+        return Result.Success(schedule.copy(id = "sc2", title = title))
+    }
+
+    override suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError> {
+        scheduleCancels += id
+        return Result.Success(Unit)
+    }
 }

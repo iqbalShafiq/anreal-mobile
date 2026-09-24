@@ -14,7 +14,9 @@ import co.ratmo.anreal.core.domain.util.map
 import co.ratmo.anreal.core.domain.util.mapError
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceSchedule
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
@@ -173,6 +175,28 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
 
     override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
         httpClient.delete(route = "/api/tasks/$id", queryParameters = mapOf("sessionId" to sessionId))
+            .mapWorkspaceError()
+            .asEmptyResult()
+
+    override suspend fun listSchedules(sessionId: String): Result<List<WorkspaceSchedule>, WorkspaceError> =
+        httpClient.get<ScheduleListDto>(
+            route = "/api/schedules",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { dto -> dto.items.map { it.toSchedule() } }.mapWorkspaceError()
+
+    override suspend fun createSchedule(
+        sessionId: String,
+        title: String,
+        prompt: String,
+        freq: ScheduleFreq,
+        runAt: String?,
+    ): Result<WorkspaceSchedule, WorkspaceError> = httpClient.post<ScheduleCreateDto, WorkspaceScheduleDto>(
+        route = "/api/schedules",
+        body = ScheduleCreateDto(sessionId = sessionId, title = title, prompt = prompt, freq = freq.toWire(), runAt = runAt),
+    ).map { it.toSchedule() }.mapWorkspaceError()
+
+    override suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError> =
+        httpClient.delete(route = "/api/schedules/$id", queryParameters = mapOf("sessionId" to sessionId))
             .mapWorkspaceError()
             .asEmptyResult()
 }

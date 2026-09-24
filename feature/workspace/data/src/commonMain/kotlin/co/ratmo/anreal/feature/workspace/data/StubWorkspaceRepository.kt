@@ -4,7 +4,9 @@ import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceSchedule
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
@@ -113,5 +115,20 @@ class StubWorkspaceRepository : WorkspaceRepository {
         Result.Success(WorkspaceTask(id = id, title = title ?: "stub"))
 
     override suspend fun deleteTask(sessionId: String, id: String): EmptyResult<WorkspaceError> =
+        Result.Success(Unit)
+
+    override suspend fun listSchedules(sessionId: String): Result<List<WorkspaceSchedule>, WorkspaceError> =
+        Result.Success(emptyList())
+
+    override suspend fun createSchedule(
+        sessionId: String,
+        title: String,
+        prompt: String,
+        freq: ScheduleFreq,
+        runAt: String?,
+    ): Result<WorkspaceSchedule, WorkspaceError> =
+        Result.Success(WorkspaceSchedule(id = "stub", title = title, prompt = prompt, freq = freq))
+
+    override suspend fun cancelSchedule(sessionId: String, id: String): EmptyResult<WorkspaceError> =
         Result.Success(Unit)
 }

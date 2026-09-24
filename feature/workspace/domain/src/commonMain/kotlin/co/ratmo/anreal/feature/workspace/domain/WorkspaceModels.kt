@@ -95,6 +95,17 @@ data class WorkspaceTask(
     val dueAt: String? = null,
 )
 
+enum class ScheduleFreq { Once, Daily, Weekly }
+
+data class WorkspaceSchedule(
+    val id: String,
+    val title: String,
+    val prompt: String,
+    val freq: ScheduleFreq = ScheduleFreq.Once,
+    val nextRunAt: String? = null,
+    val status: String = "active",
+)
+
 data class DocumentPreview(
     val id: String,
     val filename: String,

@@ -9,6 +9,7 @@ import co.ratmo.anreal.core.data.network.HttpClientFactory
 import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -147,6 +148,66 @@ class KtorWorkspaceRepositoryTest {
 
         val error = ((result as Result.Error).error as WorkspaceError.Network).error
         assertThat(error.code).isEqualTo("TASK_NOT_FOUND")
+    }
+
+    @Test
+    fun schedules_list_maps_items() = runTest {
+        val repository = repository(
+            """{"items":[{"id":"sc1","userId":"u1","projectId":null,"title":"Morning brief","prompt":"Summarize","freq":"daily","nextRunAt":"2026-09-25T07:00:00+07:00","status":"active","createdAt":"t"}]}""",
+        )
+
+        val result = repository.listSchedules("abc")
+
+        val schedule = (result as Result.Success).data.single()
+        assertThat(schedule.title).isEqualTo("Morning brief")
+        assertThat(schedule.freq).isEqualTo(ScheduleFreq.Daily)
+    }
+
+    @Test
+    fun schedules_create_maps_result() = runTest {
+        val repository = repository(
+            """{"id":"sc2","title":"Weekly","freq":"weekly","nextRunAt":"2026-10-01T07:00:00+07:00","status":"active"}""",
+        )
+
+        val result = repository.createSchedule("abc", "Weekly", "Summarize", ScheduleFreq.Weekly, null)
+
+        val schedule = (result as Result.Success).data
+        assertThat(schedule.id).isEqualTo("sc2")
+    }
+
+    @Test
+    fun schedules_create_400_keeps_message() = runTest {
+        val repository = repository(
+            body = """{"error":"Invalid schedule payload"}""",
+            status = HttpStatusCode.BadRequest,
+        )
+
+        val result = repository.createSchedule("abc", "", "", ScheduleFreq.Once, null)
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.serverMessage).isEqualTo("Invalid schedule payload")
+    }
+
+    @Test
+    fun schedules_cancel_ok() = runTest {
+        val repository = repository("""{"ok":true}""")
+
+        val result = repository.cancelSchedule("abc", "sc1")
+
+        assertThat(result).isEqualTo(Result.Success(Unit))
+    }
+
+    @Test
+    fun schedules_past_run_shows_server_message() = runTest {
+        val repository = repository(
+            body = """{"error":"runAt must be in the future"}""",
+            status = HttpStatusCode.BadRequest,
+        )
+
+        val result = repository.createSchedule("abc", "Late", "Do", ScheduleFreq.Once, "2020-01-01T00:00:00Z")
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.serverMessage).isEqualTo("runAt must be in the future")
     }
 }
 

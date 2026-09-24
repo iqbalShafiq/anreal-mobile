@@ -3,8 +3,10 @@ package co.ratmo.anreal.feature.workspace.data
 import co.ratmo.anreal.feature.workspace.domain.Project
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.ScheduleFreq
 import co.ratmo.anreal.feature.workspace.domain.TaskStatus
 import co.ratmo.anreal.feature.workspace.domain.TaskSubtask
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceSchedule
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceTask
 import co.ratmo.anreal.feature.workspace.domain.DocumentPageImage
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
@@ -215,6 +217,50 @@ fun WorkspaceTaskDto.toTask(): WorkspaceTask = WorkspaceTask(
     subtasks = subtasks.map { it.toSubtask() },
     sourceSessionId = sourceSessionId,
     dueAt = dueAt,
+)
+
+@Serializable
+data class WorkspaceScheduleDto(
+    val id: String,
+    val title: String,
+    val prompt: String = "",
+    val freq: String = "once",
+    val nextRunAt: String? = null,
+    val status: String = "active",
+    val createdAt: String = "",
+)
+
+@Serializable
+data class ScheduleListDto(val items: List<WorkspaceScheduleDto> = emptyList())
+
+@Serializable
+data class ScheduleCreateDto(
+    val sessionId: String,
+    val title: String,
+    val prompt: String,
+    val freq: String,
+    val runAt: String? = null,
+)
+
+fun ScheduleFreq.toWire(): String = when (this) {
+    ScheduleFreq.Once -> "once"
+    ScheduleFreq.Daily -> "daily"
+    ScheduleFreq.Weekly -> "weekly"
+}
+
+fun String.toScheduleFreq(): ScheduleFreq = when (this) {
+    "daily" -> ScheduleFreq.Daily
+    "weekly" -> ScheduleFreq.Weekly
+    else -> ScheduleFreq.Once
+}
+
+fun WorkspaceScheduleDto.toSchedule(): WorkspaceSchedule = WorkspaceSchedule(
+    id = id,
+    title = title,
+    prompt = prompt,
+    freq = freq.toScheduleFreq(),
+    nextRunAt = nextRunAt,
+    status = status,
 )
 
 fun DocumentPreviewDto.toPreview(): DocumentPreview = DocumentPreview(
