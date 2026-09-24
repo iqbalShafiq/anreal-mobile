@@ -10,6 +10,9 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.core.presentation.toUiText
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceBaseUrlProvider
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -30,7 +33,7 @@ private const val SEARCH_DEBOUNCE_MS = 300L
 private const val LOAD_WAIT_INTERVAL_MS = 25L
 
 @Serializable
-enum class WorkspaceSection { Projects, Documents, Images }
+enum class WorkspaceSection { Projects, Documents, Images, Sites }
 
 enum class WorkspaceViewMode { List, Grid }
 
@@ -56,6 +59,16 @@ data class ImageUi(
     val detail: String,
     val bytes: ByteArray? = null,
     val loading: Boolean = false,
+)
+
+data class SiteUi(
+    val siteId: String,
+    val sessionId: String,
+    val version: Int,
+    val stableVersion: Int?,
+    val statusLabel: String,
+    val previewUrl: String?,
+    val downloadUrl: String,
 )
 
 data class DocumentPreviewUi(
@@ -97,6 +110,10 @@ data class WorkspaceState(
     val projects: List<ProjectUi> = emptyList(),
     val documents: List<DocumentUi> = emptyList(),
     val images: List<ImageUi> = emptyList(),
+    val sites: List<SiteUi> = emptyList(),
+    val scopeSessionId: String? = null,
+    val siteBaseUrl: String = "",
+    val previewSiteId: String? = null,
     val query: String = "",
     val nextCursors: Map<WorkspaceSection, String?> = emptyMap(),
     val isLoadingMore: Boolean = false,
@@ -142,6 +159,8 @@ sealed interface WorkspaceAction {
     data object DismissDelete : WorkspaceAction
     data object ConfirmDelete : WorkspaceAction
     data object Back : WorkspaceAction
+    data class OpenSitePreview(val siteId: String) : WorkspaceAction
+    data object CloseSitePreview : WorkspaceAction
 }
 
 sealed interface WorkspaceEvent {
@@ -152,8 +171,16 @@ sealed interface WorkspaceEvent {
 class WorkspaceViewModel(
     initialSection: WorkspaceSection,
     private val repository: WorkspaceRepository,
+    scopeSessionId: String? = null,
+    baseUrlProvider: WorkspaceBaseUrlProvider? = null,
 ) : ViewModel() {
-    private val _state = MutableStateFlow(WorkspaceState(section = initialSection))
+    private val _state = MutableStateFlow(
+        WorkspaceState(
+            section = initialSection,
+            scopeSessionId = scopeSessionId,
+            siteBaseUrl = baseUrlProvider?.baseUrl().orEmpty(),
+        ),
+    )
     val state = _state.asStateFlow()
     private val _events = Channel<WorkspaceEvent>()
     val events = _events.receiveAsFlow()
@@ -241,6 +268,8 @@ class WorkspaceViewModel(
             }
             WorkspaceAction.ConfirmDelete -> viewModelScope.launch { deleteSelected() }
             WorkspaceAction.Back -> viewModelScope.launch { _events.send(WorkspaceEvent.NavigateBack) }
+            is WorkspaceAction.OpenSitePreview -> _state.update { it.copy(previewSiteId = action.siteId) }
+            WorkspaceAction.CloseSitePreview -> _state.update { it.copy(previewSiteId = null) }
         }
     }
 
@@ -279,6 +308,18 @@ class WorkspaceViewModel(
                 _state.update { state -> state.copy(images = images.map(WorkspaceImage::toUi)) }
                 loadImageBytes(images)
             }
+            WorkspaceSection.Sites -> {
+                val scopeId = _state.value.scopeSessionId
+                if (scopeId.isNullOrBlank()) {
+                    _state.update {
+                        it.copy(sites = emptyList(), isLoading = false, loadedSections = it.loadedSections + section)
+                    }
+                } else {
+                    applyResult(section, repository.listScopeSites(scopeId)) { entries ->
+                        _state.update { state -> state.copy(sites = entries.map(ScopeSiteEntry::toUi)) }
+                    }
+                }
+            }
         }
     }
 
@@ -316,6 +357,7 @@ class WorkspaceViewModel(
                 }
             }.onFailure { finishLoadMore(it) }
             WorkspaceSection.Images -> _state.update { it.copy(isLoadingMore = false) }
+            WorkspaceSection.Sites -> _state.update { it.copy(isLoadingMore = false) }
         }
     }
 
@@ -492,6 +534,21 @@ private fun WorkspaceError.toUiText(): UiText = when (this) {
 }
 
 private fun Project.toUi(): ProjectUi = ProjectUi(id, name, description.orEmpty(), documentCount, chatCount)
+
+private fun ScopeSiteEntry.toUi(): SiteUi = SiteUi(
+    siteId = siteId,
+    sessionId = sessionId,
+    version = version,
+    stableVersion = stableVersion,
+    statusLabel = when (status) {
+        ScopeSiteStatus.Queued -> "queued"
+        ScopeSiteStatus.Running -> "running"
+        ScopeSiteStatus.Ready -> "ready"
+        ScopeSiteStatus.Failed -> "failed"
+    },
+    previewUrl = previewUrl,
+    downloadUrl = downloadUrl,
+)
 
 private fun WorkspaceDocument.toUi(): DocumentUi = DocumentUi(
     id = id,

@@ -3,6 +3,10 @@ package co.ratmo.anreal.feature.workspace.domain
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 
+fun interface WorkspaceBaseUrlProvider {
+    fun baseUrl(): String
+}
+
 interface WorkspaceRepository {
     suspend fun listProjects(
         query: String? = null,
@@ -32,4 +36,5 @@ interface WorkspaceRepository {
     ): Result<ByteArray, WorkspaceError>
     suspend fun listImages(projectId: String? = null): Result<List<WorkspaceImage>, WorkspaceError>
     suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError>
+    suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError>
 }

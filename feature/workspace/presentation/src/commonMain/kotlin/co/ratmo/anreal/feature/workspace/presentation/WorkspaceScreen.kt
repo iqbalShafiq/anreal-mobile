@@ -95,7 +95,8 @@ fun WorkspaceRoot(
     initialSection: WorkspaceSection,
     onBack: () -> Unit,
     onOpenProject: (projectId: String, name: String) -> Unit = { _, _ -> },
-    viewModel: WorkspaceViewModel = koinViewModel { parametersOf(initialSection) },
+    scopeSessionId: String? = null,
+    viewModel: WorkspaceViewModel = koinViewModel { parametersOf(initialSection, scopeSessionId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ObserveAsEvents(viewModel.events) { event ->
@@ -163,7 +164,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                         top = AnrealSpacing.md,
                     ),
                 )
-                if (state.section != WorkspaceSection.Images) {
+                if (state.section != WorkspaceSection.Images && state.section != WorkspaceSection.Sites) {
                     AnrealSearchField(
                         value = state.query,
                         onValueChange = { onAction(WorkspaceAction.ChangeQuery(it)) },
@@ -194,6 +195,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                         val count = when (state.section) {
                             WorkspaceSection.Documents -> state.documents.size
                             WorkspaceSection.Images -> state.images.size
+                            WorkspaceSection.Sites -> state.sites.size
                             WorkspaceSection.Projects -> 0
                         }
                         WorkspaceLoadedLabel(
@@ -309,6 +311,16 @@ private fun WorkspaceContent(state: WorkspaceState, onAction: (WorkspaceAction) 
                     }
                 }
             }
+            WorkspaceSection.Sites -> ScopeSitesPanel(
+                sites = state.sites,
+                isLoading = state.isLoading,
+                loaded = WorkspaceSection.Sites in state.loadedSections,
+                hasScope = state.scopeSessionId != null,
+                error = state.error,
+                baseUrl = state.siteBaseUrl,
+                previewSiteId = state.previewSiteId,
+                onAction = onAction,
+            )
         }
     }
 }
@@ -985,7 +997,7 @@ private fun ViewModeButton(
     }
 }
 
-private val WorkspaceListPadding = PaddingValues(
+internal val WorkspaceListPadding = PaddingValues(
     start = AnrealSpacing.screenCompact,
     // The parent column already supplies the control-to-content gap. Keeping
     // this edge flush makes that gap match the search-to-control spacing.
@@ -998,6 +1010,7 @@ private fun WorkspaceSection.label(): String = when (this) {
     WorkspaceSection.Projects -> AnrealCopy.get(AnrealCopy.LABEL_PROJECTS)
     WorkspaceSection.Documents -> AnrealCopy.get(AnrealCopy.LABEL_DOCUMENTS)
     WorkspaceSection.Images -> AnrealCopy.get(AnrealCopy.LABEL_IMAGES)
+    WorkspaceSection.Sites -> AnrealCopy.get(AnrealCopy.LABEL_SITES)
 }
 
 @AnrealPreviews

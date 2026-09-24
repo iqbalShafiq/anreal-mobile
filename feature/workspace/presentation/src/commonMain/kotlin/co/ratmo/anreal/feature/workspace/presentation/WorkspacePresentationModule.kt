@@ -4,5 +4,7 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val workspacePresentationModule = module {
-    viewModel { (section: WorkspaceSection) -> WorkspaceViewModel(section, get()) }
+    viewModel { (section: WorkspaceSection, scopeSessionId: String?) ->
+        WorkspaceViewModel(section, get(), scopeSessionId, get())
+    }
 }

@@ -1,6 +1,8 @@
 package co.ratmo.anreal.feature.workspace.data
 
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
 import co.ratmo.anreal.feature.workspace.domain.DocumentPageImage
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreviewPage
@@ -87,6 +89,21 @@ data class DocumentPreviewPageDto(
 @Serializable
 data class DocumentPageImageDto(val id: String, val mediaType: String)
 
+@Serializable
+data class ScopeSiteEntryDto(
+    val siteId: String,
+    val sessionId: String = "",
+    val version: Int,
+    val stableVersion: Int? = null,
+    val status: String = "queued",
+    val previewUrl: String? = null,
+    val downloadUrl: String = "",
+    val updatedAt: String = "",
+)
+
+@Serializable
+data class ScopeSitesDto(val sites: List<ScopeSiteEntryDto> = emptyList())
+
 fun ProjectPageDto.toPage(): WorkspacePage<Project> = WorkspacePage(items.map(ProjectDto::toProject), nextCursor)
 
 fun ProjectDto.toProject(): Project = Project(
@@ -113,6 +130,22 @@ fun DocumentPageDto.toPage(): WorkspacePage<WorkspaceDocument> = WorkspacePage(
 
 fun ImageDto.toImage(): WorkspaceImage = WorkspaceImage(
     id, projectId, sessionId, mediaType, width, height, modelId, prompt, nOfTotal, createdAt,
+)
+
+fun ScopeSiteEntryDto.toScopeEntry(): ScopeSiteEntry = ScopeSiteEntry(
+    siteId = siteId,
+    sessionId = sessionId,
+    version = version,
+    stableVersion = stableVersion,
+    status = when (status) {
+        "running" -> ScopeSiteStatus.Running
+        "ready" -> ScopeSiteStatus.Ready
+        "failed" -> ScopeSiteStatus.Failed
+        else -> ScopeSiteStatus.Queued
+    },
+    previewUrl = previewUrl,
+    downloadUrl = downloadUrl,
+    updatedAt = updatedAt,
 )
 
 fun DocumentPreviewDto.toPreview(): DocumentPreview = DocumentPreview(

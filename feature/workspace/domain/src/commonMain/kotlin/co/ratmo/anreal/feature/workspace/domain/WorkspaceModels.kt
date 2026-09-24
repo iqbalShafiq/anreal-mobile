@@ -64,6 +64,19 @@ data class DocumentPreviewPage(
     val images: List<DocumentPageImage>,
 )
 
+enum class ScopeSiteStatus { Queued, Running, Ready, Failed }
+
+data class ScopeSiteEntry(
+    val siteId: String,
+    val sessionId: String = "",
+    val version: Int,
+    val stableVersion: Int?,
+    val status: ScopeSiteStatus,
+    val previewUrl: String?,
+    val downloadUrl: String,
+    val updatedAt: String,
+)
+
 data class DocumentPreview(
     val id: String,
     val filename: String,

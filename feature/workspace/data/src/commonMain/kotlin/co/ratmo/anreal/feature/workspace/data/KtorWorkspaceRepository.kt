@@ -13,6 +13,7 @@ import co.ratmo.anreal.core.domain.util.asEmptyResult
 import co.ratmo.anreal.core.domain.util.map
 import co.ratmo.anreal.core.domain.util.mapError
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -116,6 +117,12 @@ class KtorWorkspaceRepository(private val httpClient: HttpClient) : WorkspaceRep
 
     override suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError> =
         httpClient.getBytes(route = "/api/images/$id").mapWorkspaceError()
+
+    override suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError> =
+        httpClient.get<ScopeSitesDto>(
+            route = "/api/sites",
+            queryParameters = mapOf("sessionId" to sessionId),
+        ).map { dto -> dto.sites.map { it.toScopeEntry() } }.mapWorkspaceError()
 }
 
 private fun <T> Result<T, DataError.Network>.mapWorkspaceError(): Result<T, WorkspaceError> =

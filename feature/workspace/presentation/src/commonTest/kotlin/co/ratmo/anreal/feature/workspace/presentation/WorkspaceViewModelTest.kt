@@ -7,10 +7,14 @@ import assertk.assertions.isEqualTo
 import assertk.assertions.isFalse
 import assertk.assertions.isNotNull
 import assertk.assertions.isTrue
+import co.ratmo.anreal.core.domain.util.DataError
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteStatus
+import co.ratmo.anreal.feature.workspace.domain.WorkspaceProjectSort
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceImage
@@ -117,12 +121,48 @@ class WorkspaceViewModelTest {
             .isEqualTo(byteArrayOf(1, 2, 3).toList())
         assertThat(viewModel.state.value.images.single().loading).isFalse()
     }
+    @Test
+    fun sites_section_loads_scope_entries() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Sites, repository, scopeSessionId = "abc")
+
+        assertThat(repository.scopeLoads).isEqualTo(listOf("abc"))
+        assertThat(viewModel.state.value.sites).hasSize(1)
+        assertThat(viewModel.state.value.sites.single().siteId).isEqualTo("s1")
+        assertThat(viewModel.state.value.loadedSections).isEqualTo(setOf(WorkspaceSection.Sites))
+    }
+
+    @Test
+    fun scope_unknown_session_shows_retry() {
+        val repository = FakeWorkspaceRepository().apply { scopeError = true }
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Sites, repository, scopeSessionId = "ghost")
+
+        assertThat(viewModel.state.value.sites).hasSize(0)
+        assertThat(viewModel.state.value.error).isNotNull()
+        val calls = repository.scopeLoads.size
+        viewModel.onAction(WorkspaceAction.Retry)
+        assertThat(repository.scopeLoads.size).isEqualTo(calls + 1)
+    }
+
+    @Test
+    fun sites_without_scope_session_loads_nothing() {
+        val repository = FakeWorkspaceRepository()
+
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Sites, repository)
+
+        assertThat(repository.scopeLoads).hasSize(0)
+        assertThat(viewModel.state.value.sites).hasSize(0)
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {
     var projectLoads = 0
     val createdNames = mutableListOf<String>()
     val deletedDocumentIds = mutableListOf<String>()
+    val scopeLoads = mutableListOf<String>()
+    var scopeError = false
 
     private val project = Project("p1", "Research", "Notes", 1, 2, null, "now", "now")
     private val document = WorkspaceDocument(
@@ -141,6 +181,7 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
     override suspend fun listProjects(
         query: String?,
         cursor: String?,
+        sort: WorkspaceProjectSort,
     ): Result<WorkspacePage<Project>, WorkspaceError> {
         projectLoads += 1
         return Result.Success(WorkspacePage(listOf(project), null))
@@ -211,4 +252,25 @@ private class FakeWorkspaceRepository : WorkspaceRepository {
 
     override suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError> =
         Result.Success(byteArrayOf(1, 2, 3))
+
+    override suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError> {
+        scopeLoads += sessionId
+        if (scopeError) {
+            return Result.Error(
+                WorkspaceError.Network(
+                    DataError.Network(DataError.Network.Kind.NOT_FOUND, 404, "Session not found", "SESSION_NOT_FOUND", emptyMap()),
+                ),
+            )
+        }
+        return Result.Success(
+            listOf(
+                ScopeSiteEntry(
+                    siteId = "s1", sessionId = sessionId, version = 2, stableVersion = 1,
+                    status = ScopeSiteStatus.Ready,
+                    previewUrl = "/api/sites/s1/v2/preview/index.html",
+                    downloadUrl = "/api/sites/s1/v2/download", updatedAt = "t",
+                ),
+            ),
+        )
+    }
 }

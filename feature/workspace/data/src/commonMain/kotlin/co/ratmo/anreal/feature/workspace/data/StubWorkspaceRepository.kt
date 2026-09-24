@@ -3,6 +3,7 @@ package co.ratmo.anreal.feature.workspace.data
 import co.ratmo.anreal.core.domain.util.EmptyResult
 import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.workspace.domain.Project
+import co.ratmo.anreal.feature.workspace.domain.ScopeSiteEntry
 import co.ratmo.anreal.feature.workspace.domain.DocumentPreview
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceDocument
 import co.ratmo.anreal.feature.workspace.domain.WorkspaceError
@@ -81,4 +82,7 @@ class StubWorkspaceRepository : WorkspaceRepository {
         Result.Success(emptyList())
 
     override suspend fun getImageBytes(id: String): Result<ByteArray, WorkspaceError> = Result.Success(ByteArray(0))
+
+    override suspend fun listScopeSites(sessionId: String): Result<List<ScopeSiteEntry>, WorkspaceError> =
+        Result.Success(emptyList())
 }

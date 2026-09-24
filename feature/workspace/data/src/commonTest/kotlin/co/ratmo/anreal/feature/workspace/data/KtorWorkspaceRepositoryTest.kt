@@ -56,6 +56,46 @@ class KtorWorkspaceRepositoryTest {
         assertThat(error.code).isEqualTo("CONFIRM_REQUIRED")
         assertThat(error.serverMessage).isEqualTo("Cascade delete requires confirm=true")
     }
+
+    @Test
+    fun scope_sites_maps_entries_with_session() = runTest {
+        val repository = repository(
+            """{"sites":[{"siteId":"s1","sessionId":"abc","version":2,"stableVersion":1,"status":"ready","previewUrl":"/api/sites/s1/v2/preview/index.html","downloadUrl":"/api/sites/s1/v2/download","updatedAt":"t"}]}""",
+        )
+
+        val result = repository.listScopeSites("abc")
+
+        val entry = (result as Result.Success).data.single()
+        assertThat(entry.siteId).isEqualTo("s1")
+        assertThat(entry.sessionId).isEqualTo("abc")
+    }
+
+    @Test
+    fun scope_sites_400_keeps_message() = runTest {
+        val repository = repository(
+            body = """{"error":"sessionId is required"}""",
+            status = HttpStatusCode.BadRequest,
+        )
+
+        val result = repository.listScopeSites("")
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.kind).isEqualTo(DataError.Network.Kind.BAD_REQUEST)
+        assertThat(error.serverMessage).isEqualTo("sessionId is required")
+    }
+
+    @Test
+    fun scope_sites_404_maps_not_found() = runTest {
+        val repository = repository(
+            body = """{"error":"Session not found"}""",
+            status = HttpStatusCode.NotFound,
+        )
+
+        val result = repository.listScopeSites("ghost")
+
+        val error = ((result as Result.Error).error as WorkspaceError.Network).error
+        assertThat(error.kind).isEqualTo(DataError.Network.Kind.NOT_FOUND)
+    }
 }
 
 private fun repository(
