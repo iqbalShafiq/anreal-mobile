@@ -2,7 +2,6 @@ package co.ratmo.anreal.feature.chat.data
 
 import assertk.assertThat
 import assertk.assertions.isEqualTo
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 
