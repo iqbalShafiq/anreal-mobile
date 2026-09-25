@@ -162,6 +162,9 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     onSelect = { onAction(WorkspaceAction.SelectSection(it)) },
                     glass = false,
                     containerColor = Color.Transparent,
+                    scrollable = true,
+                    backContentDescription = AnrealCopy.get(AnrealCopy.CD_SCROLL_TABS_BACK),
+                    forwardContentDescription = AnrealCopy.get(AnrealCopy.CD_SCROLL_TABS_FORWARD),
                     modifier = Modifier.padding(
                         start = AnrealSpacing.screenCompact,
                         end = AnrealSpacing.screenCompact,
@@ -188,6 +191,15 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val loadedCount = when (state.section) {
+                        WorkspaceSection.Documents -> state.documents.size
+                        WorkspaceSection.Images -> state.images.size
+                        WorkspaceSection.Sites -> state.sites.size
+                        WorkspaceSection.Tasks -> state.tasks.size
+                        WorkspaceSection.Schedules -> state.schedules.size
+                        WorkspaceSection.Artifacts -> state.artifacts.size
+                        WorkspaceSection.Projects -> 0
+                    }
                     if (state.section == WorkspaceSection.Projects) {
                         ProjectSortChips(
                             selected = state.projectSort,
@@ -198,17 +210,8 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                             selected = state.viewMode,
                             onSelect = { onAction(WorkspaceAction.SetViewMode(it)) },
                         )
-                        val count = when (state.section) {
-                            WorkspaceSection.Documents -> state.documents.size
-                            WorkspaceSection.Images -> state.images.size
-                            WorkspaceSection.Sites -> state.sites.size
-                            WorkspaceSection.Tasks -> state.tasks.size
-                            WorkspaceSection.Schedules -> state.schedules.size
-                            WorkspaceSection.Artifacts -> state.artifacts.size
-                            WorkspaceSection.Projects -> 0
-                        }
                         WorkspaceLoadedLabel(
-                            count = count,
+                            count = loadedCount,
                             modifier = Modifier
                                 .weight(1f)
                                 .padding(start = AnrealSpacing.md),
@@ -216,7 +219,7 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                         )
                     } else {
                         WorkspaceLoadedLabel(
-                            count = state.documents.size,
+                            count = loadedCount,
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Start,
                         )
