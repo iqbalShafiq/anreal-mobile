@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -185,7 +186,7 @@ private fun ScopeSiteCard(
                     }
                 }
                 if (site.previewUrl != null) {
-                    IconButton(onClick = onPreview) {
+                    FilledTonalIconButton(onClick = onPreview) {
                         Icon(
                             MaterialSymbols.Rounded.Visibility,
                             contentDescription = AnrealCopy.get(AnrealCopy.SITE_PREVIEW_ACTION),
@@ -204,7 +205,6 @@ private fun ScopeSiteCard(
                     modifier = Modifier
                         .heightIn(min = AnrealSpacing.touch)
                         .clickable(role = Role.Button, onClick = onOpenOrigin)
-                        .padding(horizontal = AnrealSpacing.sm)
                         .wrapContentHeight(Alignment.CenterVertically),
                 )
                 FilledTonalButton(onClick = onContinue) {
