@@ -1,5 +1,6 @@
 package co.ratmo.anreal.core.designsystem.component
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,12 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -184,22 +185,23 @@ private fun <T> ScrollableTabRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (scrollState.canScrollBackward) {
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        with(density) {
-                            scrollState.animateScrollTo(scrollState.value - 240.dp.roundToPx())
+            Icon(
+                MaterialSymbols.Rounded.Chevron_left,
+                contentDescription = backContentDescription,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Nudge the 24.dp glyph box so the chevron ink (narrower than its
+                // viewport) lands on the content edge instead of floating inside.
+                modifier = Modifier
+                    .size(24.dp)
+                    .offset(x = -AnrealSpacing.xs)
+                    .clickable(role = Role.Button) {
+                        scope.launch {
+                            with(density) {
+                                scrollState.animateScrollTo(scrollState.value - 240.dp.roundToPx())
+                            }
                         }
-                    }
-                },
-                modifier = Modifier.offset(x = -AnrealSpacing.sm),
-            ) {
-                Icon(
-                    MaterialSymbols.Rounded.Chevron_left,
-                    contentDescription = backContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                    },
+            )
         }
         Row(
             modifier = Modifier
@@ -247,22 +249,23 @@ private fun <T> ScrollableTabRow(
             }
         }
         if (scrollState.canScrollForward) {
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        with(density) {
-                            scrollState.animateScrollTo(scrollState.value + 240.dp.roundToPx())
+            Icon(
+                MaterialSymbols.Rounded.Chevron_right,
+                contentDescription = forwardContentDescription,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                // Nudge the 24.dp glyph box so the chevron ink (narrower than its
+                // viewport) lands on the content edge instead of floating inside.
+                modifier = Modifier
+                    .size(24.dp)
+                    .offset(x = AnrealSpacing.xs)
+                    .clickable(role = Role.Button) {
+                        scope.launch {
+                            with(density) {
+                                scrollState.animateScrollTo(scrollState.value + 240.dp.roundToPx())
+                            }
                         }
-                    }
-                },
-                modifier = Modifier.offset(x = AnrealSpacing.sm),
-            ) {
-                Icon(
-                    MaterialSymbols.Rounded.Chevron_right,
-                    contentDescription = forwardContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+                    },
+            )
         }
     }
 }
