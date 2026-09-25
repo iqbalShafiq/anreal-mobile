@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import com.composables.icons.materialsymbols.MaterialSymbols
@@ -107,6 +109,7 @@ private fun SegmentedTabItem(
     glass: Boolean,
     modifier: Modifier = Modifier,
     showContainer: Boolean = true,
+    contentHorizontalPadding: Dp = AnrealSpacing.md,
 ) {
     val textColor = if (selected) {
         if (glass) MaterialTheme.colorScheme.onSurface
@@ -117,6 +120,7 @@ private fun SegmentedTabItem(
     val content: @Composable () -> Unit = {
         Box(
             modifier = Modifier
+                .widthIn(min = AnrealSpacing.touch)
                 .heightIn(min = AnrealSpacing.touch)
                 .selectable(
                     selected = selected,
@@ -125,7 +129,7 @@ private fun SegmentedTabItem(
                     onClick = onSelect,
                 )
                 .alpha(if (enabled) 1f else 0.38f)
-                .padding(horizontal = AnrealSpacing.md),
+                .padding(horizontal = contentHorizontalPadding),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -173,7 +177,7 @@ private fun <T> ScrollableTabRow(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val fadePx = with(density) { 56.dp.toPx() }
+    val fadePx = with(density) { 96.dp.toPx() }
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -232,6 +236,7 @@ private fun <T> ScrollableTabRow(
                 SegmentedTabItem(
                     selected = itemSelected,
                     showContainer = itemSelected,
+                    contentHorizontalPadding = if (itemSelected) AnrealSpacing.md else 0.dp,
                     label = label(item),
                     onSelect = { onSelect(item) },
                     enabled = enabled,
