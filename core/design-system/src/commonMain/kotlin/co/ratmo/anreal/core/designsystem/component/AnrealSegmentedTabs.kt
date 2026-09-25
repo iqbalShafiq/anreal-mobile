@@ -4,11 +4,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -108,24 +106,17 @@ private fun SegmentedTabItem(
     enabled: Boolean,
     glass: Boolean,
     modifier: Modifier = Modifier,
+    showContainer: Boolean = true,
 ) {
-    Surface(
-        modifier = modifier,
-        shape = if (selected) MaterialTheme.shapes.extraLarge else MaterialTheme.shapes.large,
-        color = if (selected) {
-            if (glass) glassHighlightColor() else MaterialTheme.colorScheme.secondaryContainer
-        } else {
-            Color.Transparent
-        },
-        contentColor = if (selected) {
-            if (glass) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-        },
-    ) {
+    val textColor = if (selected) {
+        if (glass) MaterialTheme.colorScheme.onSurface
+        else MaterialTheme.colorScheme.onSecondaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val content: @Composable () -> Unit = {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .heightIn(min = AnrealSpacing.touch)
                 .selectable(
                     selected = selected,
@@ -140,16 +131,31 @@ private fun SegmentedTabItem(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = if (selected) {
-                    if (glass) MaterialTheme.colorScheme.onSurface
-                    else MaterialTheme.colorScheme.onSecondaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+                color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+    if (showContainer) {
+        Surface(
+            modifier = modifier,
+            shape = if (selected) MaterialTheme.shapes.extraLarge else MaterialTheme.shapes.large,
+            color = if (selected) {
+                if (glass) glassHighlightColor() else MaterialTheme.colorScheme.secondaryContainer
+            } else {
+                Color.Transparent
+            },
+            contentColor = if (selected) {
+                if (glass) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSecondaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        ) {
+            Box(modifier = Modifier.fillMaxWidth()) { content() }
+        }
+    } else {
+        Box(modifier = modifier) { content() }
     }
 }
 
@@ -168,10 +174,30 @@ private fun <T> ScrollableTabRow(
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val fadePx = with(density) { 56.dp.toPx() }
-    Box(modifier = modifier.fillMaxWidth()) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (scrollState.canScrollBackward) {
+            IconButton(
+                onClick = {
+                    scope.launch {
+                        with(density) {
+                            scrollState.animateScrollTo(scrollState.value - 240.dp.roundToPx())
+                        }
+                    }
+                },
+            ) {
+                Icon(
+                    MaterialSymbols.Rounded.Chevron_left,
+                    contentDescription = backContentDescription,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .horizontalScroll(scrollState)
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                 .drawWithContent {
@@ -196,36 +222,20 @@ private fun <T> ScrollableTabRow(
                         )
                     }
                 }
-                .padding(AnrealSpacing.xxs)
+                .padding(vertical = AnrealSpacing.xxs)
                 .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             items.forEach { item ->
+                val itemSelected = item == selected
                 SegmentedTabItem(
-                    selected = item == selected,
+                    selected = itemSelected,
+                    showContainer = itemSelected,
                     label = label(item),
                     onSelect = { onSelect(item) },
                     enabled = enabled,
                     glass = false,
-                )
-            }
-            Spacer(modifier = Modifier.width(AnrealSpacing.touch))
-        }
-        if (scrollState.canScrollBackward) {
-            IconButton(
-                onClick = {
-                    scope.launch {
-                        with(density) {
-                            scrollState.animateScrollTo(scrollState.value - 240.dp.roundToPx())
-                        }
-                    }
-                },
-                modifier = Modifier.align(Alignment.CenterStart),
-            ) {
-                Icon(
-                    MaterialSymbols.Rounded.Chevron_left,
-                    contentDescription = backContentDescription,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -238,7 +248,6 @@ private fun <T> ScrollableTabRow(
                         }
                     }
                 },
-                modifier = Modifier.align(Alignment.CenterEnd),
             ) {
                 Icon(
                     MaterialSymbols.Rounded.Chevron_right,
