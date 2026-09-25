@@ -167,7 +167,6 @@ fun WorkspaceScreen(state: WorkspaceState, onAction: (WorkspaceAction) -> Unit) 
                     forwardContentDescription = AnrealCopy.get(AnrealCopy.CD_SCROLL_TABS_FORWARD),
                     modifier = Modifier.padding(
                         start = AnrealSpacing.screenCompact,
-                        end = AnrealSpacing.screenCompact,
                         top = AnrealSpacing.md,
                     ),
                 )

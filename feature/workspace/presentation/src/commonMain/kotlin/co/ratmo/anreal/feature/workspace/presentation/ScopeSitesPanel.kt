@@ -7,12 +7,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -20,7 +20,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.component.AnrealEmpty
 import co.ratmo.anreal.core.designsystem.component.AnrealError
@@ -138,11 +140,11 @@ private fun ScopeSiteCard(
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dot = when (site.statusLabel) {
+    val statusColor = when (site.statusLabel) {
         "ready" -> MaterialTheme.colorScheme.primary
         "failed" -> MaterialTheme.colorScheme.error
         "running" -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.outline
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -156,16 +158,17 @@ private fun ScopeSiteCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Surface(
-                    modifier = Modifier.size(12.dp).clip(CircleShape),
-                    color = dot,
-                ) {}
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "v${site.version} · ${site.statusLabel}",
+                        text = buildAnnotatedString {
+                            append("v${site.version} · ")
+                            withStyle(SpanStyle(color = statusColor)) {
+                                append(site.statusLabel)
+                            }
+                        },
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -178,9 +181,11 @@ private fun ScopeSiteCard(
                     }
                 }
                 if (site.previewUrl != null) {
-                    TextButton(onClick = onPreview) {
-                        Icon(MaterialSymbols.Rounded.Visibility, contentDescription = null)
-                        Text(AnrealCopy.get(AnrealCopy.SITE_PREVIEW_ACTION))
+                    IconButton(onClick = onPreview) {
+                        Icon(
+                            MaterialSymbols.Rounded.Visibility,
+                            contentDescription = AnrealCopy.get(AnrealCopy.SITE_PREVIEW_ACTION),
+                        )
                     }
                 }
             }
@@ -191,7 +196,7 @@ private fun ScopeSiteCard(
                 TextButton(onClick = onOpenOrigin) {
                     Text(AnrealCopy.get(AnrealCopy.SITE_OPEN_CHAT))
                 }
-                TextButton(onClick = onContinue) {
+                FilledTonalButton(onClick = onContinue) {
                     Text(AnrealCopy.get(AnrealCopy.SITE_CONTINUE))
                 }
             }
