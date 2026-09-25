@@ -96,6 +96,8 @@ fun WorkspaceRoot(
     onBack: () -> Unit,
     onOpenProject: (projectId: String, name: String) -> Unit = { _, _ -> },
     scopeSessionId: String? = null,
+    onOpenSiteOrigin: (siteId: String, sessionId: String) -> Unit = { _, _ -> },
+    onContinueSite: (siteId: String, sessionId: String) -> Unit = { _, _ -> },
     viewModel: WorkspaceViewModel = koinViewModel { parametersOf(initialSection, scopeSessionId) },
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -103,6 +105,8 @@ fun WorkspaceRoot(
         when (event) {
             WorkspaceEvent.NavigateBack -> onBack()
             is WorkspaceEvent.OpenProject -> onOpenProject(event.projectId, event.name)
+            is WorkspaceEvent.OpenSiteOrigin -> onOpenSiteOrigin(event.siteId, event.sessionId)
+            is WorkspaceEvent.ContinueSite -> onContinueSite(event.siteId, event.sessionId)
         }
     }
     WorkspaceScreen(state, viewModel::onAction)

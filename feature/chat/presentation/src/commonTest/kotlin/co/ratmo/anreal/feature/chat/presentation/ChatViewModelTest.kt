@@ -17,6 +17,7 @@ import co.ratmo.anreal.core.presentation.AnrealCopy
 import co.ratmo.anreal.core.presentation.UiText
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatSessionDetail
 import co.ratmo.anreal.feature.chat.domain.EnhancementSelectionStore
 import co.ratmo.anreal.feature.chat.domain.McpAuthType
 import co.ratmo.anreal.feature.chat.domain.McpRemoteDataSource
@@ -1367,6 +1368,78 @@ class ChatViewModelTest {
 
         assertThat(fake.sentOptions?.skillIds).isEqualTo(listOf("s1"))
         assertThat(fake.sentOptions?.mcpServerIds).isEqualTo(listOf("m1"))
+    }
+
+    @Test
+    fun stream_focus_emits_event_once_and_clears() = runTest {
+        val fake = populatedRepo().apply {
+            streamLines = listOf(
+                """{"type":"stream_start","streamId":"stream-1","eventId":0}""",
+                """{"type":"stream_event","streamId":"stream-1","eventId":1,"event":{"type":"data","name":"artifactFocus","data":{"artifactId":"t1","artifactType":"task"}}}""",
+                """{"type":"stream_end","streamId":"stream-1","eventId":2,"status":"completed"}""",
+            )
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+            skillsSource = FakeSkillsSource(),
+            mcpSource = FakeMcpSource(),
+            sitesSource = FakeSitesSource(),
+            selectionStore = FakeSelectionStore(),
+        )
+        advanceUntilIdle()
+
+        viewModel.onAction(ChatAction.OnDraftChange("hi"))
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnSend)
+            val event = awaitItem()
+            val sessionId = viewModel.state.value.selectedSessionId ?: error("expected selected session")
+            assertThat(event).isEqualTo(ChatEvent.ArtifactFocus("task", "t1", sessionId))
+            cancelAndIgnoreRemainingEvents()
+        }
+        advanceUntilIdle()
+
+        assertThat(viewModel.state.value.thread.pendingArtifactFocus).isNull()
+    }
+
+    @Test
+    fun validate_origin_success_is_silent() = runTest {
+        val fake = populatedRepo().apply {
+            sessionDetailResult = Result.Success(ChatSessionDetail("abc", "p1", "Docs", "now"))
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+        )
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnValidateOriginSession("abc"))
+            advanceUntilIdle()
+            expectNoEvents()
+        }
+    }
+
+    @Test
+    fun validate_origin_missing_shows_message_and_back() = runTest {
+        val fake = populatedRepo().apply {
+            sessionDetailResult = Result.Error(ChatError.Network(DataError.Network(DataError.Network.Kind.NOT_FOUND, 404, "gone", "CHAT_SESSION_NOT_FOUND", emptyMap())))
+        }
+        val viewModel = ChatViewModel(
+            savedStateHandle = SavedStateHandle(),
+            chatRepository = fake,
+            preferencesRepository = FakeChatPreferencesRepository(),
+        )
+        advanceUntilIdle()
+
+        viewModel.events.test {
+            viewModel.onAction(ChatAction.OnValidateOriginSession("ghost"))
+            assertThat(awaitItem() is ChatEvent.ShowMessage).isTrue()
+            assertThat(awaitItem()).isEqualTo(ChatEvent.OpenOriginInvalid)
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

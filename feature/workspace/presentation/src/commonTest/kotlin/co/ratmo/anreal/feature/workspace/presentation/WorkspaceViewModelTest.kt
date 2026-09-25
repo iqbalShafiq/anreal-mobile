@@ -289,6 +289,19 @@ class WorkspaceViewModelTest {
         assertThat(viewModel.state.value.captionDraft).isEqualTo("Chart typed")
         assertThat(viewModel.state.value.captionError).isNotNull()
     }
+
+    @Test
+    fun site_origin_and_continue_emit_events() = runTest {
+        val viewModel = WorkspaceViewModel(WorkspaceSection.Sites, FakeWorkspaceRepository(), scopeSessionId = "abc")
+
+        viewModel.events.test {
+            viewModel.onAction(WorkspaceAction.OnOpenSiteOrigin("s1", "origin1"))
+            assertThat(awaitItem()).isEqualTo(WorkspaceEvent.OpenSiteOrigin("s1", "origin1"))
+            viewModel.onAction(WorkspaceAction.OnContinueSite("s1", "origin1"))
+            assertThat(awaitItem()).isEqualTo(WorkspaceEvent.ContinueSite("s1", "origin1"))
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }
 
 private class FakeWorkspaceRepository : WorkspaceRepository {

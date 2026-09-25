@@ -6,6 +6,7 @@ import co.ratmo.anreal.core.domain.util.Result
 import co.ratmo.anreal.feature.chat.domain.ChatCapabilities
 import co.ratmo.anreal.feature.chat.domain.ActiveRun
 import co.ratmo.anreal.feature.chat.domain.ChatError
+import co.ratmo.anreal.feature.chat.domain.ChatSessionDetail
 import co.ratmo.anreal.feature.chat.domain.ChatModel
 import co.ratmo.anreal.feature.chat.domain.ChatRepository
 import co.ratmo.anreal.feature.chat.domain.ChatRunOptions
@@ -95,6 +96,7 @@ class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<L
     var allowSendToFinish: CompletableDeferred<Unit> = CompletableDeferred()
     var lastRenamed: Pair<String, String>? = null
     var lastDeleted: String? = null
+    var sessionDetailResult: Result<ChatSessionDetail, ChatError>? = null
     var renameResult: Result<ChatSession, ChatError>? = null
     var deleteResult: EmptyResult<ChatError> = Result.Success(Unit)
     var runStatus: Result<RunStatusSnapshot, ChatError> = Result.Success(
@@ -311,6 +313,9 @@ class FakeChatRepository : ChatRepository {    val sessions = MutableStateFlow<L
     }
 
     override suspend fun listActiveRuns(): Result<List<ActiveRun>, ChatError> = activeRuns
+
+    override suspend fun getSession(id: String): Result<ChatSessionDetail, ChatError> =
+        sessionDetailResult ?: Result.Success(ChatSessionDetail(id, null, "Stub", "now"))
 
     override suspend fun getSessionMessageCount(sessionId: String): Result<Int, ChatError> =
         Result.Success((history as? Result.Success)?.data?.size ?: 0)

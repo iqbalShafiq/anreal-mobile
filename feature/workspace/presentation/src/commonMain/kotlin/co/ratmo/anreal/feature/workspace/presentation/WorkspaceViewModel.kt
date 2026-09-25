@@ -240,6 +240,8 @@ sealed interface WorkspaceAction {
     data object Back : WorkspaceAction
     data class OpenSitePreview(val siteId: String) : WorkspaceAction
     data object CloseSitePreview : WorkspaceAction
+    data class OnOpenSiteOrigin(val siteId: String, val sessionId: String) : WorkspaceAction
+    data class OnContinueSite(val siteId: String, val sessionId: String) : WorkspaceAction
     data object OnNewTask : WorkspaceAction
     data class OnEditTask(val id: String) : WorkspaceAction
     data object OnCloseTaskEditor : WorkspaceAction
@@ -271,6 +273,8 @@ sealed interface WorkspaceAction {
 sealed interface WorkspaceEvent {
     data object NavigateBack : WorkspaceEvent
     data class OpenProject(val projectId: String, val name: String) : WorkspaceEvent
+    data class OpenSiteOrigin(val siteId: String, val sessionId: String) : WorkspaceEvent
+    data class ContinueSite(val siteId: String, val sessionId: String) : WorkspaceEvent
 }
 
 class WorkspaceViewModel(
@@ -375,6 +379,12 @@ class WorkspaceViewModel(
             WorkspaceAction.Back -> viewModelScope.launch { _events.send(WorkspaceEvent.NavigateBack) }
             is WorkspaceAction.OpenSitePreview -> _state.update { it.copy(previewSiteId = action.siteId) }
             WorkspaceAction.CloseSitePreview -> _state.update { it.copy(previewSiteId = null) }
+            is WorkspaceAction.OnOpenSiteOrigin -> viewModelScope.launch {
+                _events.send(WorkspaceEvent.OpenSiteOrigin(action.siteId, action.sessionId))
+            }
+            is WorkspaceAction.OnContinueSite -> viewModelScope.launch {
+                _events.send(WorkspaceEvent.ContinueSite(action.siteId, action.sessionId))
+            }
             WorkspaceAction.OnNewTask -> _state.update { it.copy(taskEditor = TaskEditorState()) }
             is WorkspaceAction.OnEditTask -> openTaskEditor(action.id)
             WorkspaceAction.OnCloseTaskEditor -> if (_state.value.taskEditor?.saving != true) {

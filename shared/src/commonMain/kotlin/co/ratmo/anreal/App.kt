@@ -39,8 +39,10 @@ import co.ratmo.anreal.feature.auth.presentation.RegisterRoute
 import co.ratmo.anreal.feature.auth.presentation.authGraph
 import co.ratmo.anreal.feature.chat.presentation.AccountUi
 import co.ratmo.anreal.feature.chat.presentation.ChatRoute
+import co.ratmo.anreal.feature.chat.presentation.DraftPrefillRequest
 import co.ratmo.anreal.feature.chat.presentation.EnterProjectRequest
 import co.ratmo.anreal.feature.chat.presentation.ForkSendRequest
+import co.ratmo.anreal.feature.chat.presentation.OpenOriginRequest
 import co.ratmo.anreal.feature.chat.presentation.SharedChatRoute
 import co.ratmo.anreal.feature.chat.presentation.chatGraph
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -145,6 +147,8 @@ private fun AuthenticatedHost(
     val keyboard = LocalSoftwareKeyboardController.current
     val enterProjectRequest = remember { MutableStateFlow<EnterProjectRequest?>(null) }
     val forkSendRequest = remember { MutableStateFlow<ForkSendRequest?>(null) }
+    val openOriginRequest = remember { MutableStateFlow<OpenOriginRequest?>(null) }
+    val draftPrefillRequest = remember { MutableStateFlow<DraftPrefillRequest?>(null) }
     var pendingSharedToken by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sharedToken) {
         if (!sharedToken.isNullOrBlank()) {
@@ -214,12 +218,40 @@ private fun AuthenticatedHost(
                 forkSendRequest = forkSendRequest,
                 onForkSendConsumed = { forkSendRequest.value = null },
                 onForkSend = { forkSendRequest.value = it },
+                onArtifactFocus = { type, id, sessionId ->
+                    when (type) {
+                        "site" -> navController.navigate(WorkspaceRoute(WorkspaceSection.Sites, scopeSessionId = sessionId))
+                        "task" -> navController.navigate(WorkspaceRoute(WorkspaceSection.Tasks, scopeSessionId = sessionId))
+                        "schedule" -> navController.navigate(WorkspaceRoute(WorkspaceSection.Schedules, scopeSessionId = sessionId))
+                        "session" -> navController.navigate(ChatRoute(sessionId = id))
+                        else -> navController.navigate(WorkspaceRoute(WorkspaceSection.Artifacts, scopeSessionId = sessionId))
+                    }
+                },
+                openOriginRequest = openOriginRequest,
+                onOpenOriginConsumed = { openOriginRequest.value = null },
+                draftPrefillRequest = draftPrefillRequest,
+                onDraftPrefillConsumed = { draftPrefillRequest.value = null },
+                onOriginInvalid = { navController.popBackStack() },
             )
             workspaceGraph(
                 navController = navController,
                 onOpenProject = { projectId, name ->
                     enterProjectRequest.value = EnterProjectRequest(projectId, name)
                     navController.popBackStack()
+                },
+                onOpenSiteOrigin = { _, sessionId ->
+                    navController.navigate(ChatRoute(sessionId = sessionId)) {
+                        launchSingleTop = true
+                    }
+                    openOriginRequest.value = OpenOriginRequest(sessionId)
+                },
+                onContinueSite = { siteId, _ ->
+                    navController.navigate(ChatRoute()) {
+                        launchSingleTop = true
+                    }
+                    draftPrefillRequest.value = DraftPrefillRequest(
+                        AnrealCopy.get(AnrealCopy.SITE_CONTINUE_DRAFT).replace("{0}", siteId.take(8)),
+                    )
                 },
             )
         }

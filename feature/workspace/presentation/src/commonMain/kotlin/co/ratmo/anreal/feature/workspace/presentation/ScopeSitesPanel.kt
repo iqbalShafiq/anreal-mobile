@@ -105,6 +105,8 @@ fun ScopeSitesPanel(
                 ScopeSiteCard(
                     site = site,
                     onPreview = { onAction(WorkspaceAction.OpenSitePreview(site.siteId)) },
+                    onOpenOrigin = { onAction(WorkspaceAction.OnOpenSiteOrigin(site.siteId, site.sessionId)) },
+                    onContinue = { onAction(WorkspaceAction.OnContinueSite(site.siteId, site.sessionId)) },
                 )
             }
         }
@@ -132,6 +134,8 @@ fun ScopeSitesPanel(
 private fun ScopeSiteCard(
     site: SiteUi,
     onPreview: () -> Unit,
+    onOpenOrigin: () -> Unit,
+    onContinue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dot = when (site.statusLabel) {
@@ -146,33 +150,49 @@ private fun ScopeSiteCard(
         color = MaterialTheme.colorScheme.surfaceContainer,
         contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
-        Row(
+        Column(
             modifier = Modifier.fillMaxWidth().padding(AnrealSpacing.md),
-            horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
         ) {
-            Surface(
-                modifier = Modifier.size(12.dp).clip(CircleShape),
-                color = dot,
-            ) {}
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "v${site.version} · ${site.statusLabel}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (site.stableVersion != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.md),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.size(12.dp).clip(CircleShape),
+                    color = dot,
+                ) {}
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "stable v${site.stableVersion}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text = "v${site.version} · ${site.statusLabel}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
+                    if (site.stableVersion != null) {
+                        Text(
+                            text = "stable v${site.stableVersion}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (site.previewUrl != null) {
+                    TextButton(onClick = onPreview) {
+                        Icon(MaterialSymbols.Rounded.Visibility, contentDescription = null)
+                        Text(AnrealCopy.get(AnrealCopy.SITE_PREVIEW_ACTION))
+                    }
                 }
             }
-            if (site.previewUrl != null) {
-                TextButton(onClick = onPreview) {
-                    Icon(MaterialSymbols.Rounded.Visibility, contentDescription = null)
-                    Text(AnrealCopy.get(AnrealCopy.SITE_PREVIEW_ACTION))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(AnrealSpacing.xs),
+            ) {
+                TextButton(onClick = onOpenOrigin) {
+                    Text(AnrealCopy.get(AnrealCopy.SITE_OPEN_CHAT))
+                }
+                TextButton(onClick = onContinue) {
+                    Text(AnrealCopy.get(AnrealCopy.SITE_CONTINUE))
                 }
             }
         }

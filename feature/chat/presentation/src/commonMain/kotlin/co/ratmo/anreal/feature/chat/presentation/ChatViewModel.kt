@@ -362,6 +362,7 @@ sealed interface ChatAction {
     data class OnSiteRetry(val siteId: String) : ChatAction
     data class OnSiteRollback(val siteId: String, val version: Int) : ChatAction
     data class OnSiteDownload(val siteId: String, val version: Int) : ChatAction
+    data class OnValidateOriginSession(val sessionId: String) : ChatAction
 }
 
 sealed interface ChatEvent {
@@ -373,6 +374,8 @@ sealed interface ChatEvent {
     data object OpenDocuments : ChatEvent
     data object OpenImages : ChatEvent
     data object RevealChatsDrawer : ChatEvent
+    data class ArtifactFocus(val type: String, val id: String, val sessionId: String) : ChatEvent
+    data object OpenOriginInvalid : ChatEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -594,6 +597,7 @@ class ChatViewModel(
             is ChatAction.OnSiteRetry -> viewModelScope.launch { retrySite(action.siteId) }
             is ChatAction.OnSiteRollback -> viewModelScope.launch { rollbackSite(action.siteId, action.version) }
             is ChatAction.OnSiteDownload -> viewModelScope.launch { downloadSite(action.siteId, action.version) }
+            is ChatAction.OnValidateOriginSession -> viewModelScope.launch { validateOriginSession(action.sessionId) }
         }
     }
 
@@ -1498,6 +1502,13 @@ class ChatViewModel(
                 current
             }
         }
+        val focusEvent = (envelope as? StreamEnvelope.Event)?.event as? ChatStreamEvent.ArtifactFocus
+        if (focusEvent != null && _state.value.selectedSessionId == sessionId) {
+            _state.update { current ->
+                current.copy(thread = current.thread.copy(pendingArtifactFocus = null))
+            }
+            _events.send(ChatEvent.ArtifactFocus(focusEvent.artifactType, focusEvent.artifactId, sessionId))
+        }
         // Buffered transports may deliver every JSONL record in one burst.
         // Pace each line to one frame so Compose paints every reduced state
         // instead of jumping straight to the terminal answer. A plain yield()
@@ -2266,6 +2277,16 @@ class ChatViewModel(
                     current.copy(siteBuilds = current.siteBuilds + (sessionId to prior))
                 }
                 _events.send(ChatEvent.ShowMessage(result.error.toUiText()))
+            }
+        }
+    }
+
+    private suspend fun validateOriginSession(sessionId: String) {
+        when (val result = chatRepository.getSession(sessionId)) {
+            is Result.Success -> Unit
+            is Result.Error -> {
+                _events.send(ChatEvent.ShowMessage(result.error.toUiText()))
+                _events.send(ChatEvent.OpenOriginInvalid)
             }
         }
     }

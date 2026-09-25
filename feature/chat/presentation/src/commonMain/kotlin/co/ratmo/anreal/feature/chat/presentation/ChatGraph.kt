@@ -1,5 +1,6 @@
 package co.ratmo.anreal.feature.chat.presentation
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -17,6 +18,10 @@ import kotlinx.serialization.Serializable
 data class EnterProjectRequest(val projectId: String, val name: String?)
 
 data class ForkSendRequest(val sessionId: String, val firstMessage: String)
+
+data class OpenOriginRequest(val sessionId: String)
+
+data class DraftPrefillRequest(val text: String)
 
 @Serializable
 data class ChatRoute(val sessionId: String? = null)
@@ -49,12 +54,24 @@ fun NavGraphBuilder.chatGraph(
     forkSendRequest: StateFlow<ForkSendRequest?>,
     onForkSendConsumed: () -> Unit,
     onForkSend: (ForkSendRequest) -> Unit = {},
+    onArtifactFocus: (type: String, id: String, sessionId: String) -> Unit = { _, _, _ -> },
+    openOriginRequest: StateFlow<OpenOriginRequest?>,
+    onOpenOriginConsumed: () -> Unit,
+    draftPrefillRequest: StateFlow<DraftPrefillRequest?>,
+    onDraftPrefillConsumed: () -> Unit,
+    onOriginInvalid: () -> Unit = {},
 ) {
     composable<ChatRoute> {
         val enterProject by enterProjectRequest.collectAsStateWithLifecycle(
             minActiveState = Lifecycle.State.CREATED,
         )
         val forkSend by forkSendRequest.collectAsStateWithLifecycle(
+            minActiveState = Lifecycle.State.CREATED,
+        )
+        val openOrigin by openOriginRequest.collectAsStateWithLifecycle(
+            minActiveState = Lifecycle.State.CREATED,
+        )
+        val draftPrefill by draftPrefillRequest.collectAsStateWithLifecycle(
             minActiveState = Lifecycle.State.CREATED,
         )
         ChatRoot(
@@ -68,8 +85,14 @@ fun NavGraphBuilder.chatGraph(
             onEnterProjectConsumed = onEnterProjectConsumed,
             forkSend = forkSend,
             onForkSendConsumed = onForkSendConsumed,
+            openOrigin = openOrigin,
+            onOpenOriginConsumed = onOpenOriginConsumed,
+            draftPrefill = draftPrefill,
+            onDraftPrefillConsumed = onDraftPrefillConsumed,
             onNavigateSkills = { navController.navigate(SkillsRoute) },
             onNavigateMcp = { navController.navigate(McpRoute) },
+            onArtifactFocus = onArtifactFocus,
+            onOriginInvalid = onOriginInvalid,
         )
     }
     composable<AccountRoute> {

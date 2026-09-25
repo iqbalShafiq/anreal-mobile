@@ -100,11 +100,17 @@ fun ChatRoot(
     onNavigateImages: () -> Unit = {},
     onNavigateSkills: () -> Unit = {},
     onNavigateMcp: () -> Unit = {},
+    onArtifactFocus: (type: String, id: String, sessionId: String) -> Unit = { _, _, _ -> },
+    onOriginInvalid: () -> Unit = {},
     enterProjectId: String? = null,
     enterProjectName: String? = null,
     onEnterProjectConsumed: () -> Unit = {},
     forkSend: ForkSendRequest? = null,
     onForkSendConsumed: () -> Unit = {},
+    openOrigin: OpenOriginRequest? = null,
+    onOpenOriginConsumed: () -> Unit = {},
+    draftPrefill: DraftPrefillRequest? = null,
+    onDraftPrefillConsumed: () -> Unit = {},
     viewModel: ChatViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -120,6 +126,16 @@ fun ChatRoot(
         val request = forkSend ?: return@LaunchedEffect
         viewModel.onAction(ChatAction.OnForkSend(request.sessionId, request.firstMessage))
         onForkSendConsumed()
+    }
+    LaunchedEffect(openOrigin) {
+        val request = openOrigin ?: return@LaunchedEffect
+        viewModel.onAction(ChatAction.OnValidateOriginSession(request.sessionId))
+        onOpenOriginConsumed()
+    }
+    LaunchedEffect(draftPrefill) {
+        val request = draftPrefill ?: return@LaunchedEffect
+        viewModel.onAction(ChatAction.OnDraftChange(request.text))
+        onDraftPrefillConsumed()
     }
     @Suppress("DEPRECATION")
     val clipboard = LocalClipboardManager.current
@@ -167,6 +183,8 @@ fun ChatRoot(
             ChatEvent.OpenProjects -> onNavigateProjects()
             ChatEvent.OpenDocuments -> onNavigateDocuments()
             ChatEvent.OpenImages -> onNavigateImages()
+            is ChatEvent.ArtifactFocus -> onArtifactFocus(event.type, event.id, event.sessionId)
+            ChatEvent.OpenOriginInvalid -> onOriginInvalid()
             ChatEvent.RevealChatsDrawer -> revealChats += 1
         }
     }

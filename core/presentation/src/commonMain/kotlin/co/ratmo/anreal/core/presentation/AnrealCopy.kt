@@ -479,6 +479,9 @@ object AnrealCopy {
     const val SITE_PREVIEW_UNAVAILABLE = "site_preview_unavailable"
     const val SITE_DOWNLOAD_SAVED = "site_download_saved"
     const val SITE_DOWNLOAD_FAILED = "site_download_failed"
+    const val SITE_OPEN_CHAT = "site_open_chat"
+    const val SITE_CONTINUE = "site_continue"
+    const val SITE_CONTINUE_DRAFT = "site_continue_draft"
 
     fun get(key: String): String {
         return when (key) {
@@ -966,6 +969,9 @@ object AnrealCopy {
             SITE_PREVIEW_UNAVAILABLE -> "Preview is not available on this device yet."
             SITE_DOWNLOAD_SAVED -> "Site zip saved."
             SITE_DOWNLOAD_FAILED -> "Could not save that file."
+            SITE_OPEN_CHAT -> "Open chat"
+            SITE_CONTINUE -> "Continue"
+            SITE_CONTINUE_DRAFT -> "Lanjutkan site ini (site {0})"
             else -> key
         }
     }
