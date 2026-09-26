@@ -226,6 +226,7 @@ private fun DocumentsStoryVisual() {
                 StoryLabel(
                     icon = MaterialSymbols.Rounded.Description,
                     label = AnrealCopy.get(AnrealCopy.BOARDING_DOCUMENT_NAME),
+                    compact = true,
                 )
                 repeat(4) { index -> StoryLine(fraction = 1f - index * 0.12f) }
             }
