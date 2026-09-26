@@ -25,6 +25,9 @@ class AndroidApplicationConventionPlugin : Plugin<Project> {
                     versionName = "1.0"
                     buildConfigField("String", "BASE_URL", "\"${resolveBaseUrl()}\"")
                     buildConfigField("String", "ENVIRONMENT", "\"${resolveEnvironment()}\"")
+                    val deepLink = resolveDeepLink()
+                    manifestPlaceholders["anrealDeepLinkScheme"] = deepLink.scheme
+                    manifestPlaceholders["anrealDeepLinkHost"] = deepLink.host
                 }
 
                 compileOptions {

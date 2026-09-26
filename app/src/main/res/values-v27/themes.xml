@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API 27+: windowLightNavigationBar exists from 27. -->
+    <style name="Theme.Anreal" parent="Theme.Anreal.Base">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

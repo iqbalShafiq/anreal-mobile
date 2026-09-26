@@ -21,15 +21,19 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <intent-filter android:autoVerify="true">
+            <!-- Explicitly not an Android App Link: the host comes from
+                 anreal.baseUrl (LAN host in development), so there is no
+                 verifiable domain to claim. -->
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
 
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="https" />
-                <data android:scheme="http" />
-                <data android:pathPrefix="/share/" />
+                <data
+                    android:host="${anrealDeepLinkHost}"
+                    android:pathPrefix="/share/"
+                    android:scheme="${anrealDeepLinkScheme}" />
             </intent-filter>
         </activity>
     </application>

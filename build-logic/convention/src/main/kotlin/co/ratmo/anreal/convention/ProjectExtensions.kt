@@ -19,6 +19,23 @@ internal fun Project.resolveBaseUrl(): String {
     return resolveAnrealProperty("anreal.baseUrl") ?: "http://127.0.0.1:3001"
 }
 
+internal data class DeepLinkConfig(
+    val scheme: String,
+    val host: String,
+)
+
+/**
+ * Deep link target for `/share/{token}` intent filters. Derived from the same
+ * `anreal.baseUrl` the API client uses, so dev/staging/prod each register their
+ * own host instead of the unverifiable scheme-only filter.
+ */
+internal fun Project.resolveDeepLink(): DeepLinkConfig {
+    val parsed = runCatching { java.net.URI(resolveBaseUrl().trim()) }.getOrNull()
+    val scheme = parsed?.scheme?.lowercase()?.takeIf { it == "http" || it == "https" } ?: "https"
+    val host = parsed?.host?.takeIf { it.isNotBlank() } ?: "127.0.0.1"
+    return DeepLinkConfig(scheme = scheme, host = host)
+}
+
 internal fun Project.resolveEnvironment(): String {
     val raw = resolveAnrealProperty("anreal.environment") ?: "development"
     return when (raw.lowercase()) {
