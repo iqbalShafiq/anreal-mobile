@@ -57,7 +57,7 @@ Glass tints sample `surface` / `surfaceContainer` at low alpha so frost works in
 
 ## 3. Typography
 
-Face: **Geist** (UI) + **Geist Mono** (tokens, timestamps, model ids). SIL OFL, same as web.
+Face: **Geist** (400/500/600) + **Geist Mono** (400), dibundel di `:core:design-system` sebagai compose resources (`Res.font.geist_*`; lisensi SIL OFL di `composeResources/font/OFL.txt`). Skala M3 penuh (termasuk varian *Emphasized*) dipasang lewat `anrealTypography()` di `MaterialExpressiveTheme`.
 
 Map onto the M3 type scale. Do not invent 13.sp / 17.sp one-offs. Use **emphasized** styles for auth titles and empty-state headlines.
 
@@ -449,6 +449,7 @@ Every Screen preview file includes at minimum:
 | Token | Code |
 |---|---|
 | Theme | `AnrealTheme` → `MaterialExpressiveTheme` + dynamic/brand scheme |
+| Typography | `anrealTypography()` → `MaterialExpressiveTheme(typography = …)`; keluarga Geist via compose resources |
 | Motion | `AnrealMotion` + `MotionScheme.standard()` + `anrealEnter` / `anrealExit` |
 | Auth IME | `adjustNothing` + `rememberImeFocusShift` — never centered `imePadding()` |
 | Glass | Haze wrappers in `:core:design-system` |

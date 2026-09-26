@@ -39,6 +39,7 @@ fun AnrealTheme(
         MaterialExpressiveTheme(
             colorScheme = dynamicScheme ?: brandScheme,
             motionScheme = MotionScheme.standard(),
+            typography = anrealTypography(),
             content = content,
         )
     }

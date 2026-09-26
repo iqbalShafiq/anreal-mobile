@@ -5,6 +5,10 @@ plugins {
     alias(libs.plugins.anrealCompose)
 }
 
+compose.resources {
+    packageOfResClass = "co.ratmo.anreal.core.designsystem.resources"
+}
+
 kotlin {
     android {
         namespace = "co.ratmo.anreal.core.designsystem"
@@ -30,5 +34,11 @@ kotlin {
     }
     sourceSets.androidMain.dependencies {
         implementation(libs.androidx.activity.compose)
+    }
+    sourceSets.getByName("androidHostTest").dependencies {
+        implementation(libs.junit)
+        implementation(libs.robolectric)
+        implementation(libs.androidx.compose.ui.test.junit4)
+        implementation(libs.androidx.compose.ui.test.manifest)
     }
 }
