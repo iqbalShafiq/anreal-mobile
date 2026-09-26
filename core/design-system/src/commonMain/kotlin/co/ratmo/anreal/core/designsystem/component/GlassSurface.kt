@@ -130,7 +130,7 @@ fun GlassChrome(
         modifier = modifier,
         shape = shape,
         tone = GlassTone.Thin,
-        borderColor = scheme.outlineVariant.copy(alpha = borderAlpha),
+        borderColor = glassHairlineColor().copy(alpha = borderAlpha),
         fallbackColor = tint.copy(alpha = fallbackAlpha),
         tintColor = tint,
         opaqueTintColor = tint.copy(alpha = opaqueTintAlpha),
@@ -201,7 +201,7 @@ fun GlassSurface(
         error -> scheme.error
         emphasized -> scheme.primary.copy(alpha = 0.38f)
         borderColor != null -> borderColor
-        else -> scheme.outlineVariant.copy(alpha = 0.45f)
+        else -> glassHairlineColor().copy(alpha = 0.45f)
     }
     val clampedAlpha = effectAlpha.coerceIn(0f, 1f)
     val fallback = fallbackColor ?: scheme.surfaceContainer

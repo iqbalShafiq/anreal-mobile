@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.LocalAnrealHighContrast
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceTransparency
 import co.ratmo.anreal.core.designsystem.theme.AnrealBrand
 import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
@@ -66,10 +67,17 @@ fun glassFaintTextColor(): Color {
 }
 
 @Composable
+fun glassHairlineColor(): Color {
+    val scheme = MaterialTheme.colorScheme
+    return if (LocalAnrealHighContrast.current) scheme.outline else scheme.outlineVariant
+}
+
+@Composable
 fun glassDrawerBorderColor(): Color {
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.surface.luminance() < 0.5f
-    return scheme.outlineVariant.copy(alpha = if (dark) 0.18f else 0.28f)
+    val alpha = if (LocalAnrealHighContrast.current) 0.6f else if (dark) 0.18f else 0.28f
+    return glassHairlineColor().copy(alpha = alpha)
 }
 
 @Composable

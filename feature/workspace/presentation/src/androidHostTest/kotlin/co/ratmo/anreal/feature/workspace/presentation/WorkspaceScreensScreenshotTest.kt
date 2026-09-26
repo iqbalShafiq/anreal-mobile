@@ -119,6 +119,27 @@ class WorkspaceScreensScreenshotTest {
     }
 
     @Test
+    fun sitesHighContrastLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false, highContrast = true) {
+                WorkspaceScreen(
+                    state = WorkspaceState(
+                        section = WorkspaceSection.Sites,
+                        sites = listOf(
+                            SiteUi("s1", "abc", 3, 2, "ready", "/api/sites/s1/v3/preview/index.html", "/api/sites/s1/v3/download"),
+                            SiteUi("s2", "abc", 1, null, "failed", null, "/api/sites/s2/v1/download"),
+                        ),
+                        scopeSessionId = "abc",
+                        loadedSections = setOf(WorkspaceSection.Sites),
+                    ),
+                    onAction = {},
+                )
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun sitesPopulatedLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {

@@ -17,6 +17,7 @@ annotation class AnrealPreviews
 @Composable
 fun AnrealPreview(
     dark: Boolean? = null,
+    highContrast: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val isDark = dark ?: isSystemInDarkTheme()
@@ -25,6 +26,7 @@ fun AnrealPreview(
             mode = if (isDark) ThemeMode.Dark else ThemeMode.Light,
             dynamicColor = false,
         ),
+        highContrast = highContrast,
         content = content,
     )
 }

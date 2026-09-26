@@ -39,6 +39,16 @@ class AuthScreensScreenshotTest {
     }
 
     @Test
+    fun boardingHighContrastLight() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = false, highContrast = true) {
+                BoardingScreen(state = BoardingState(), onAction = {})
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun boardingIdleLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {

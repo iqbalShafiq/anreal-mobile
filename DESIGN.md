@@ -376,7 +376,7 @@ Accessibility ships with the component, not as a follow-up. Target **WCAG 2.2 AA
 | Font scale | `sp` + flexible layouts; no clipped labels at 200% |
 | `prefers-reduced-motion` / `isReduceMotionEnabled` | Crossfade instead of slide/scale; hide aurora; keep color/opacity |
 | Reduce transparency | Glass becomes solid `surfaceContainer`; no Haze |
-| High contrast / `isHighContrast` | Hairlines become `outline`; raise container contrast |
+| High contrast | `rememberPlatformContrast()` — API 34+ `UiModeManager.getContrast()`, di bawahnya setting `high_text_contrast_enabled` — menaikkan skema brand (MaterialKolor `contrastLevel`), hairline memakai `outline`, dan glass menjadi solid (setara reduce transparency). Skema dynamic dari wallpaper belum menerima `contrastLevel` (API Compose Multiplatform saat ini). iOS masih stub `0f`. |
 | Color inversion | Use theme colors, not bitmaps with baked greys |
 
 ### 9.5 Forms

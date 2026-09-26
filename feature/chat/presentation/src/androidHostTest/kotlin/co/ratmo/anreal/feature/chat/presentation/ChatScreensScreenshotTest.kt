@@ -56,6 +56,16 @@ class ChatScreensScreenshotTest {
     }
 
     @Test
+    fun populatedChatHighContrastDark() {
+        composeTestRule.setContent {
+            AnrealPreview(dark = true, highContrast = true) {
+                ChatScreen(state = chatPopulatedPreviewState(), onAction = {})
+            }
+        }
+        composeTestRule.onRoot().captureRoboImage()
+    }
+
+    @Test
     fun populatedChatLight() {
         composeTestRule.setContent {
             AnrealPreview(dark = false) {
