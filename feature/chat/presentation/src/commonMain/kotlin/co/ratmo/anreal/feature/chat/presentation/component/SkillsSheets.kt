@@ -41,7 +41,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntOffset
@@ -59,6 +58,7 @@ import co.ratmo.anreal.core.designsystem.component.AnrealSkeletonList
 import co.ratmo.anreal.core.designsystem.component.AnrealTextField
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreview
 import co.ratmo.anreal.core.designsystem.preview.AnrealPreviews
+import co.ratmo.anreal.core.designsystem.theme.AnrealFontFamily
 import co.ratmo.anreal.core.designsystem.theme.AnrealMotion
 import co.ratmo.anreal.core.designsystem.theme.AnrealSpacing
 import co.ratmo.anreal.core.designsystem.theme.LocalAnrealReduceMotion
@@ -725,7 +725,7 @@ private fun SkillEditor(
             supportingText = editor.fieldErrors["bodyMd"]?.let { message ->
                 { Text(text = message, color = MaterialTheme.colorScheme.error) }
             },
-            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = AnrealFontFamily.Mono()),
             shape = MaterialTheme.shapes.extraLarge,
         )
         editor.serverError?.let { error ->

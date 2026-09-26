@@ -58,6 +58,7 @@ Glass tints sample `surface` / `surfaceContainer` at low alpha so frost works in
 ## 3. Typography
 
 Face: **Geist** (400/500/600) + **Geist Mono** (400), dibundel di `:core:design-system` sebagai compose resources (`Res.font.geist_*`; lisensi SIL OFL di `composeResources/font/OFL.txt`). Skala M3 penuh (termasuk varian *Emphasized*) dipasang lewat `anrealTypography()` di `MaterialExpressiveTheme`.
+Geist Mono dipakai untuk badan editor skill (`AnrealFontFamily.Mono()`). Nilai token di kartu tool dan metadata gambar adalah kandidat berikutnya; keduanya masih baris campuran (label manusiawi + nilai mesin), jadi menunggu styling per-field.
 
 Map onto the M3 type scale. Do not invent 13.sp / 17.sp one-offs. Use **emphasized** styles for auth titles and empty-state headlines.
 
