@@ -20,8 +20,11 @@ internal fun platformContrastValue(
     sdkInt: Int,
     uiModeContrast: Float?,
     legacyEnabled: Boolean,
-): Float = when {
-    sdkInt >= PlatformContrastApiLevel -> uiModeContrast ?: 0f
-    legacyEnabled -> 1f
-    else -> 0f
+): Float {
+    val legacy = if (legacyEnabled) 1f else 0f
+    return if (sdkInt >= PlatformContrastApiLevel) {
+        maxOf(uiModeContrast ?: 0f, legacy)
+    } else {
+        legacy
+    }
 }

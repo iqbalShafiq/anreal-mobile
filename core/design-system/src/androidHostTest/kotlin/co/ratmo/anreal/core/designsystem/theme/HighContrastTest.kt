@@ -1,7 +1,10 @@
 package co.ratmo.anreal.core.designsystem.theme
 
 import android.provider.Settings
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import co.ratmo.anreal.core.designsystem.component.glassHairlineColor
 import org.junit.Rule
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -46,7 +49,9 @@ class HighContrastTest {
         assertEquals(1f, platformContrastValue(sdkInt = 33, uiModeContrast = null, legacyEnabled = true))
         assertEquals(0f, platformContrastValue(sdkInt = 33, uiModeContrast = null, legacyEnabled = false))
         assertEquals(0.5f, platformContrastValue(sdkInt = 34, uiModeContrast = 0.5f, legacyEnabled = false))
-        assertEquals(0f, platformContrastValue(sdkInt = 34, uiModeContrast = null, legacyEnabled = true))
+        assertEquals(1f, platformContrastValue(sdkInt = 34, uiModeContrast = 0.5f, legacyEnabled = true))
+        assertEquals(1f, platformContrastValue(sdkInt = 34, uiModeContrast = null, legacyEnabled = true))
+        assertEquals(0f, platformContrastValue(sdkInt = 34, uiModeContrast = null, legacyEnabled = false))
     }
 
     @Test
@@ -59,5 +64,41 @@ class HighContrastTest {
         composeTestRule.waitForIdle()
 
         assertEquals(1f, contrast)
+    }
+
+    @Test
+    fun wiring_exposes_high_contrast_flag_and_hairline() {
+        var active: Boolean? = null
+        var hairline: Color? = null
+        var outline: Color? = null
+        composeTestRule.setContent {
+            AnrealTheme(settings = ThemeSettings(dynamicColor = false), highContrast = true) {
+                active = LocalAnrealHighContrast.current
+                hairline = glassHairlineColor()
+                outline = MaterialTheme.colorScheme.outline
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(true, active)
+        assertEquals(outline, hairline)
+    }
+
+    @Test
+    fun wiring_defaults_to_outline_variant() {
+        var active: Boolean? = null
+        var hairline: Color? = null
+        var variant: Color? = null
+        composeTestRule.setContent {
+            AnrealTheme(settings = ThemeSettings(dynamicColor = false), highContrast = false) {
+                active = LocalAnrealHighContrast.current
+                hairline = glassHairlineColor()
+                variant = MaterialTheme.colorScheme.outlineVariant
+            }
+        }
+        composeTestRule.waitForIdle()
+
+        assertEquals(false, active)
+        assertEquals(variant, hairline)
     }
 }
