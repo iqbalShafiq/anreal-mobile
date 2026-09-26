@@ -14,7 +14,7 @@ Anreal is the native client of DocChat — a document-grounded AI workspace. Thi
 - **Motion:** Subtle and physical (4/10). Feedback and spatial continuity, not spectacle.
 - **Signature:** Warm aurora behind frosted M3 chrome. Amber is a *seed*, never a raw fill in feature code.
 
-Dark is black-led (`#050505` family), not charcoal-grey panels. Light is paper-led, not pure white. Glass lets the aurora (or the wallpaper-derived surface) read through chrome.
+Dark is seed-derived via MaterialKolor `PaletteStyle.Expressive`: a warm near-black surface (`surface` `#171308`) with a lavender accent — not neutral charcoal and not `#050505` (`#050505` remains only as the bubble glass tint). Light is warm paper (`#FFF8F0`), not pure white. Glass lets the aurora (or the wallpaper-derived surface) read through chrome.
 
 Do not clone the desktop L-frame on a phone. Compact uses a modal drawer + top bar + floating composer — the same information architecture as the web's `<768px` layout, expressed with M3 components.
 
@@ -41,12 +41,27 @@ Feature code uses **only** `MaterialTheme.colorScheme.*`. Hex values live in the
 
 **Contrast rule:** `onX` sits on `X`. `onXContainer` sits on `XContainer`. Mixing containers is a contrast bug.
 
+### Palette contract
+
+The palette source of truth is **seed `#E8A317` + `PaletteStyle.Expressive`** (`rememberDynamicColorScheme`); the hexes below are generated examples, not constants:
+
+| Role | Light | Dark |
+|---|---|---|
+| primary | `#774E8B` | `#E5B5FA` |
+| primaryContainer | `#F6D9FF` | `#5E3672` |
+| secondaryContainer | `#DDE8B3` | `#414B24` |
+| tertiary | `#6C5E1C` | `#D9C679` |
+| surface | `#FFF8F0` | `#171308` |
+| surfaceContainer | `#F7EDDA` | `#231F14` |
+| outlineVariant | `#D1C6AA` | `#4E4632` |
+| error | `#BA1A1A` | `#FFB4AB` |
+
 ### Light, dark, dynamic
 
 1. Follow system theme by default (`isSystemInDarkTheme()`).
 2. Settings: System / Light / Dark.
 3. **Dynamic color on by default on Android 12+** via `dynamicLightColorScheme` / `dynamicDarkColorScheme`.
-4. Fallback and “brand” mode: MaterialKolor `DynamicMaterialExpressiveTheme` with seed `#E8A317` (web accent), `SPEC_2025`, `PaletteStyle.Expressive`.
+4. Fallback and “brand” mode: MaterialKolor `rememberDynamicColorScheme` with seed `#E8A317` (web accent) and `PaletteStyle.Expressive`.
 5. Theme changes ease over ~200ms (color only). No full-screen flash.
 
 Glass tints sample `surface` / `surfaceContainer` at low alpha so frost works in light, dark, *and* wallpaper palettes. Never hardcode `rgb(5 5 5 / 0.82)` in mobile chrome.

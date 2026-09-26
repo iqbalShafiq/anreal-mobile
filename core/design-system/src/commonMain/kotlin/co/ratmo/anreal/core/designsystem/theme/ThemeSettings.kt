@@ -19,6 +19,7 @@ data class ThemeSettings(
     }
 }
 
+/** Seed + PaletteStyle.Expressive are the palette contract; DESIGN.md hexes are generated examples. */
 object AnrealBrand {
     const val seedArgb: Int = 0xFFE8A317.toInt()
     /** Near-black canvas the web glass chrome samples. */
